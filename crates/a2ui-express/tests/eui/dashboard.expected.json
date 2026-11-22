@@ -1,0 +1,961 @@
+[
+  {
+    "version": "1.0",
+    "createSurface": {
+      "surfaceId": "main",
+      "catalogId": "https://ui.exponential.at/catalogs/core/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Box",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "$spacing.lg",
+            "padding": "$spacing.lg",
+            "width": "100%",
+            "backgroundColor": "$color.background",
+            "direction": "ltr"
+          },
+          "children": [
+            "dash_bar",
+            "kpis",
+            "dash_tabs",
+            "dash_lower",
+            "dash_road",
+            "dash_footer"
+          ]
+        },
+        {
+          "id": "dash_bar",
+          "component": "AppBar",
+          "title": "Agent runs",
+          "subtitle": {
+            "@path": "/team"
+          },
+          "slots": {
+            "trailing": "dash_actions"
+          }
+        },
+        {
+          "id": "dash_actions",
+          "component": "Stack",
+          "direction": "horizontal",
+          "gap": "xs",
+          "align": "center",
+          "children": [
+            "dash_search",
+            "dash_new",
+            "dash_menu"
+          ]
+        },
+        {
+          "id": "dash_search",
+          "component": "Button",
+          "icon": "search",
+          "variant": "ghost",
+          "size": "icon",
+          "label": "Search",
+          "on": {
+            "press": {
+              "event": {
+                "name": "search"
+              }
+            }
+          }
+        },
+        {
+          "id": "dash_new",
+          "component": "Button",
+          "label": "New run",
+          "icon": "ui-send",
+          "size": "sm",
+          "on": {
+            "press": {
+              "event": {
+                "name": "newRun"
+              }
+            }
+          }
+        },
+        {
+          "id": "dash_menu",
+          "component": "Menu",
+          "items": [
+            {
+              "label": "Export CSV",
+              "value": "export",
+              "icon": "ui-copy"
+            },
+            {
+              "label": "Archive finished",
+              "value": "archive",
+              "icon": "ui-archive"
+            },
+            {
+              "label": "Settings",
+              "value": "settings",
+              "icon": "nav-settings"
+            }
+          ],
+          "on": {
+            "select": {
+              "event": {
+                "name": "dashMenu"
+              }
+            }
+          },
+          "children": [
+            "dash_menu_trigger"
+          ]
+        },
+        {
+          "id": "dash_menu_trigger",
+          "component": "Button",
+          "icon": "ui-more",
+          "variant": "ghost",
+          "size": "icon",
+          "label": "More"
+        },
+        {
+          "id": "kpis",
+          "component": "Grid",
+          "columns": {
+            "base": 1,
+            "md": 3
+          },
+          "gap": "md",
+          "children": [
+            "kpi_1",
+            "kpi_2",
+            "kpi_3"
+          ]
+        },
+        {
+          "id": "kpi_1",
+          "component": "Card",
+          "children": [
+            "kpi_1_body"
+          ]
+        },
+        {
+          "id": "kpi_1_body",
+          "component": "Stack",
+          "direction": "vertical",
+          "gap": "sm",
+          "children": [
+            "kpi_1_label",
+            "kpi_1_row",
+            "kpi_1_spark"
+          ]
+        },
+        {
+          "id": "kpi_1_label",
+          "component": "Text",
+          "text": "Runs this week",
+          "variant": "muted"
+        },
+        {
+          "id": "kpi_1_row",
+          "component": "Stack",
+          "direction": "horizontal",
+          "gap": "sm",
+          "align": "center",
+          "justify": "between",
+          "children": [
+            "kpi_1_value",
+            "kpi_1_delta"
+          ]
+        },
+        {
+          "id": "kpi_1_value",
+          "component": "Heading",
+          "text": "128",
+          "level": "h2"
+        },
+        {
+          "id": "kpi_1_delta",
+          "component": "Badge",
+          "text": "+12%",
+          "variant": "secondary"
+        },
+        {
+          "id": "kpi_1_spark",
+          "component": "Sparkline",
+          "values": [
+            8,
+            12,
+            9,
+            15,
+            14,
+            21,
+            18
+          ],
+          "tone": "success",
+          "height": 32
+        },
+        {
+          "id": "kpi_2",
+          "component": "Card",
+          "children": [
+            "kpi_2_body"
+          ]
+        },
+        {
+          "id": "kpi_2_body",
+          "component": "Stack",
+          "direction": "vertical",
+          "gap": "sm",
+          "children": [
+            "kpi_2_label",
+            "kpi_2_row",
+            "kpi_2_spark"
+          ]
+        },
+        {
+          "id": "kpi_2_label",
+          "component": "Text",
+          "text": "Median time to merge",
+          "variant": "muted"
+        },
+        {
+          "id": "kpi_2_row",
+          "component": "Stack",
+          "direction": "horizontal",
+          "gap": "sm",
+          "align": "center",
+          "justify": "between",
+          "children": [
+            "kpi_2_value",
+            "kpi_2_delta"
+          ]
+        },
+        {
+          "id": "kpi_2_value",
+          "component": "Heading",
+          "text": "3h 40m",
+          "level": "h2"
+        },
+        {
+          "id": "kpi_2_delta",
+          "component": "Badge",
+          "text": "-18%",
+          "variant": "secondary"
+        },
+        {
+          "id": "kpi_2_spark",
+          "component": "Sparkline",
+          "values": [
+            6,
+            5.5,
+            5.8,
+            4.9,
+            4.2,
+            4,
+            3.7
+          ],
+          "tone": "info",
+          "height": 32
+        },
+        {
+          "id": "kpi_3",
+          "component": "Card",
+          "children": [
+            "kpi_3_body"
+          ]
+        },
+        {
+          "id": "kpi_3_body",
+          "component": "Stack",
+          "direction": "vertical",
+          "gap": "sm",
+          "children": [
+            "kpi_3_label",
+            "kpi_3_row",
+            "kpi_3_progress"
+          ]
+        },
+        {
+          "id": "kpi_3_label",
+          "component": "Text",
+          "text": "Monthly budget",
+          "variant": "muted"
+        },
+        {
+          "id": "kpi_3_row",
+          "component": "Stack",
+          "direction": "horizontal",
+          "gap": "sm",
+          "align": "center",
+          "justify": "between",
+          "children": [
+            "kpi_3_value",
+            "kpi_3_delta"
+          ]
+        },
+        {
+          "id": "kpi_3_value",
+          "component": "Heading",
+          "text": "$412",
+          "level": "h2"
+        },
+        {
+          "id": "kpi_3_delta",
+          "component": "Badge",
+          "text": "72%",
+          "variant": "secondary"
+        },
+        {
+          "id": "kpi_3_progress",
+          "component": "Progress",
+          "value": 72,
+          "max": 100,
+          "label": "Budget used",
+          "tone": "warning"
+        },
+        {
+          "id": "dash_tabs",
+          "component": "Tabs",
+          "tabs": [
+            {
+              "label": "Overview",
+              "value": "overview",
+              "icon": "nav-boards"
+            },
+            {
+              "label": "Runs",
+              "value": "runs",
+              "count": 4
+            },
+            {
+              "label": "Reviews",
+              "value": "reviews",
+              "icon": "pr-open"
+            }
+          ],
+          "value": {
+            "@path": "/ui/tab"
+          },
+          "on": {
+            "change": {
+              "event": {
+                "name": "tab"
+              }
+            }
+          },
+          "children": [
+            "tab_overview",
+            "tab_runs",
+            "tab_reviews"
+          ]
+        },
+        {
+          "id": "tab_overview",
+          "component": "Text",
+          "text": "Throughput, cost and review load across every board."
+        },
+        {
+          "id": "tab_runs",
+          "component": "Stack",
+          "direction": "vertical",
+          "gap": "md",
+          "children": [
+            "runs_toolbar",
+            "runs_table"
+          ]
+        },
+        {
+          "id": "runs_toolbar",
+          "component": "Stack",
+          "direction": "horizontal",
+          "gap": "sm",
+          "align": "end",
+          "wrap": true,
+          "children": [
+            "runs_search",
+            "runs_filter"
+          ]
+        },
+        {
+          "id": "runs_search",
+          "component": "Input",
+          "label": "Search runs",
+          "name": "q",
+          "type": "search",
+          "placeholder": "Filter by title or owner",
+          "value": {
+            "@path": "/filter/q"
+          },
+          "style": {
+            "flexGrow": 1,
+            "flexBasis": 240,
+            "minWidth": 0
+          }
+        },
+        {
+          "id": "runs_filter",
+          "component": "Segmented",
+          "items": [
+            {
+              "label": "All",
+              "value": "all"
+            },
+            {
+              "label": "Running",
+              "value": "running"
+            },
+            {
+              "label": "In review",
+              "value": "review"
+            },
+            {
+              "label": "Merged",
+              "value": "merged"
+            }
+          ],
+          "value": {
+            "@path": "/filter/state"
+          },
+          "variant": "segmented",
+          "on": {
+            "change": {
+              "event": {
+                "name": "filterState"
+              }
+            }
+          }
+        },
+        {
+          "id": "runs_table",
+          "component": "Table",
+          "columns": [
+            {
+              "key": "owner",
+              "label": "Owner",
+              "type": "slot",
+              "slot": "ownerCell",
+              "width": 64
+            },
+            {
+              "key": "title",
+              "label": "Run",
+              "sortable": true
+            },
+            {
+              "key": "state",
+              "label": "State",
+              "type": "badge"
+            },
+            {
+              "key": "turns",
+              "label": "Turns",
+              "type": "number",
+              "align": "end",
+              "sortable": true,
+              "width": 72
+            },
+            {
+              "key": "cost",
+              "label": "Cost",
+              "type": "currency",
+              "currency": "USD",
+              "decimals": 2,
+              "align": "end",
+              "width": 88
+            }
+          ],
+          "rows": {
+            "@path": "/runs"
+          },
+          "rowKey": "id",
+          "selectable": "multiple",
+          "selected": {
+            "@path": "/ui/selected"
+          },
+          "sort": {
+            "key": "turns",
+            "direction": "desc"
+          },
+          "caption": "Four runs this week",
+          "striped": true,
+          "on": {
+            "sort": {
+              "event": {
+                "name": "sortRuns"
+              }
+            },
+            "select": {
+              "event": {
+                "name": "selectRuns"
+              }
+            }
+          },
+          "slots": {
+            "ownerCell": "runs_owner"
+          }
+        },
+        {
+          "id": "runs_owner",
+          "component": "Avatar",
+          "name": {
+            "@path": "owner"
+          },
+          "size": "sm"
+        },
+        {
+          "id": "tab_reviews",
+          "component": "Text",
+          "text": "Open pull requests waiting for a review."
+        },
+        {
+          "id": "dash_lower",
+          "component": "Grid",
+          "columns": {
+            "base": 1,
+            "md": 2
+          },
+          "gap": "md",
+          "children": [
+            "activity_card",
+            "reviews_card"
+          ]
+        },
+        {
+          "id": "activity_card",
+          "component": "Card",
+          "title": "Activity",
+          "padded": false,
+          "children": [
+            "activity",
+            "activity_item"
+          ]
+        },
+        {
+          "id": "activity",
+          "component": "List",
+          "direction": "vertical",
+          "divided": true,
+          "children": []
+        },
+        {
+          "id": "activity_item",
+          "component": "Row",
+          "title": {
+            "@path": "title"
+          },
+          "subtitle": {
+            "@path": "who"
+          },
+          "meta": {
+            "@path": "when"
+          },
+          "icon": "ui-issue"
+        },
+        {
+          "id": "reviews_card",
+          "component": "Card",
+          "title": "Reviews",
+          "children": [
+            "reviews_range_row",
+            "reviews_empty"
+          ]
+        },
+        {
+          "id": "reviews_range_row",
+          "component": "Stack",
+          "direction": "vertical",
+          "gap": "sm",
+          "align": "start",
+          "children": [
+            "reviews_range"
+          ]
+        },
+        {
+          "id": "reviews_range",
+          "component": "Segmented",
+          "variant": "bar",
+          "items": [
+            {
+              "label": "Mine",
+              "value": "mine"
+            },
+            {
+              "label": "Team",
+              "value": "team"
+            }
+          ],
+          "value": "mine"
+        },
+        {
+          "id": "reviews_empty",
+          "component": "EmptyState",
+          "icon": "pr-open",
+          "title": "No reviews waiting",
+          "description": "Pull requests that need you show up here.",
+          "actionLabel": "Open the queue",
+          "on": {
+            "press": {
+              "event": {
+                "name": "openReviews"
+              }
+            }
+          }
+        },
+        {
+          "id": "dash_road",
+          "component": "Timeline",
+          "source": "/road",
+          "rowTitle": "Workstream",
+          "showCount": true
+        },
+        {
+          "id": "dash_footer",
+          "component": "Stack",
+          "direction": "horizontal",
+          "gap": "sm",
+          "justify": "end",
+          "wrap": true,
+          "children": [
+            "dash_export",
+            "invite"
+          ]
+        },
+        {
+          "id": "dash_export",
+          "component": "Button",
+          "label": "Export",
+          "variant": "outline",
+          "icon": "ui-copy",
+          "on": {
+            "press": {
+              "event": {
+                "name": "export"
+              }
+            }
+          }
+        },
+        {
+          "id": "invite",
+          "component": "Dialog",
+          "title": "Invite a member",
+          "description": "They join the team and see every board.",
+          "open": {
+            "@path": "/ui/inviteOpen"
+          },
+          "dismissible": true,
+          "children": [
+            "invite_form"
+          ],
+          "slots": {
+            "trigger": "invite_trigger",
+            "footer": "invite_send"
+          }
+        },
+        {
+          "id": "invite_form",
+          "component": "Form",
+          "name": "invite",
+          "summary": true,
+          "on": {
+            "submit": {
+              "event": {
+                "name": "invite"
+              }
+            }
+          },
+          "children": [
+            "invite_email",
+            "invite_role",
+            "invite_note"
+          ]
+        },
+        {
+          "id": "invite_email",
+          "component": "Input",
+          "label": "Email",
+          "name": "email",
+          "type": "email",
+          "placeholder": "you@example.com",
+          "value": {
+            "@path": "/invite/email"
+          },
+          "checks": [
+            {
+              "condition": {
+                "@call": "email",
+                "args": {
+                  "value": {
+                    "@path": "/invite/email"
+                  }
+                }
+              },
+              "message": "Enter an email address"
+            }
+          ]
+        },
+        {
+          "id": "invite_role",
+          "component": "Select",
+          "label": "Role",
+          "name": "role",
+          "options": [
+            {
+              "label": "Member",
+              "value": "member"
+            },
+            {
+              "label": "Owner",
+              "value": "owner"
+            }
+          ],
+          "value": {
+            "@path": "/invite/role"
+          }
+        },
+        {
+          "id": "invite_note",
+          "component": "Textarea",
+          "label": "Note",
+          "name": "note",
+          "rows": 3,
+          "placeholder": "Optional",
+          "value": {
+            "@path": "/invite/note"
+          }
+        },
+        {
+          "id": "invite_trigger",
+          "component": "Button",
+          "label": "Invite member",
+          "icon": "ui-assignee"
+        },
+        {
+          "id": "invite_send",
+          "component": "Button",
+          "label": "Send invite",
+          "on": {
+            "press": {
+              "event": {
+                "name": "sendInvite"
+              }
+            }
+          }
+        }
+      ],
+      "dataModel": {
+        "team": "Platform team",
+        "ui": {
+          "tab": "runs",
+          "selected": [
+            "r2"
+          ],
+          "inviteOpen": false
+        },
+        "filter": {
+          "q": "",
+          "state": "all"
+        },
+        "runs": [
+          {
+            "id": "r1",
+            "owner": "Alex Chen",
+            "title": "Fix the flaky sync test on CI",
+            "state": "Running",
+            "turns": 42,
+            "cost": 3.18
+          },
+          {
+            "id": "r2",
+            "owner": "Mia Novak",
+            "title": "Batch: EXP-874 +2",
+            "state": "In review",
+            "turns": 117,
+            "cost": 9.4
+          },
+          {
+            "id": "r3",
+            "owner": "Sam Okafor",
+            "title": "Tidy up the Design board",
+            "state": "Merged",
+            "turns": 8,
+            "cost": 0.52
+          },
+          {
+            "id": "r4",
+            "owner": "Lena Hart",
+            "title": "Add light mode to the conformance matrix",
+            "state": "Running",
+            "turns": 64,
+            "cost": 5.07
+          }
+        ],
+        "activity": [
+          {
+            "id": "a1",
+            "title": "Opened PR #812",
+            "who": "Mia Novak",
+            "when": "2m"
+          },
+          {
+            "id": "a2",
+            "title": "Merged the sync fix",
+            "who": "Alex Chen",
+            "when": "18m"
+          },
+          {
+            "id": "a3",
+            "title": "Asked for a review on the dashboard layout",
+            "who": "Lena Hart",
+            "when": "1h"
+          }
+        ],
+        "invite": {
+          "email": "",
+          "role": "member",
+          "note": ""
+        },
+        "road": {
+          "timeline": {
+            "scale": "week",
+            "columns": [
+              {
+                "key": "w0",
+                "label": "2 Nov",
+                "end": "w0e",
+                "today": false
+              },
+              {
+                "key": "w1",
+                "label": "9 Nov",
+                "end": "w1e",
+                "today": true
+              },
+              {
+                "key": "w2",
+                "label": "16 Nov",
+                "end": "w2e",
+                "today": false
+              },
+              {
+                "key": "w3",
+                "label": "23 Nov",
+                "end": "w3e",
+                "today": false
+              },
+              {
+                "key": "w4",
+                "label": "30 Nov",
+                "end": "w4e",
+                "today": false
+              },
+              {
+                "key": "w5",
+                "label": "7 Dec",
+                "end": "w5e",
+                "today": false
+              },
+              {
+                "key": "w6",
+                "label": "14 Dec",
+                "end": "w6e",
+                "today": false
+              },
+              {
+                "key": "w7",
+                "label": "21 Dec",
+                "end": "w7e",
+                "today": false
+              }
+            ],
+            "bands": [
+              {
+                "label": "November",
+                "col": 1,
+                "span": 5
+              },
+              {
+                "label": "December",
+                "col": 6,
+                "span": 3
+              }
+            ],
+            "rows": [
+              {
+                "key": "Platform",
+                "index": 0,
+                "lanes": 2,
+                "count": 3,
+                "items": [
+                  {
+                    "id": "a",
+                    "rowIndex": 0,
+                    "col": 1,
+                    "span": 3,
+                    "lane": 0,
+                    "contL": false,
+                    "contR": false,
+                    "tone": 0,
+                    "row": {
+                      "title": "Migration"
+                    }
+                  },
+                  {
+                    "id": "b",
+                    "rowIndex": 0,
+                    "col": 2,
+                    "span": 2,
+                    "lane": 1,
+                    "contL": false,
+                    "contR": false,
+                    "tone": 1,
+                    "row": {
+                      "title": "Search"
+                    }
+                  },
+                  {
+                    "id": "c",
+                    "rowIndex": 0,
+                    "col": 6,
+                    "span": 2,
+                    "lane": 0,
+                    "contL": false,
+                    "contR": false,
+                    "tone": 2,
+                    "row": {
+                      "title": "Billing"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "Mobile",
+                "index": 1,
+                "lanes": 1,
+                "count": 1,
+                "items": [
+                  {
+                    "id": "d",
+                    "rowIndex": 0,
+                    "col": 4,
+                    "span": 1,
+                    "lane": 0,
+                    "contL": false,
+                    "contR": false,
+                    "tone": 3,
+                    "row": {
+                      "title": "Release"
+                    }
+                  }
+                ]
+              }
+            ],
+            "now": {
+              "col": 2,
+              "percent": 17.86
+            }
+          }
+        }
+      }
+    }
+  }
+]

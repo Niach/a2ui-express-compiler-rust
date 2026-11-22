@@ -22,6 +22,8 @@
 
 #![allow(dead_code)]
 
+use a2ui_express::compile::{Category, CompileError, Compiler};
+use a2ui_express::schema::{self, CatalogError};
 use serde_json::Value;
 
 /// A catalog a case registers, as the harness resolved it.
@@ -120,6 +122,22 @@ impl From<a2ui_express::Error> for SdkError {
     }
 }
 
+impl From<CompileError> for SdkError {
+    fn from(error: CompileError) -> Self {
+        let category = match error.category() {
+            Category::Parse => "ParseError",
+            Category::Validation => "ValidationError",
+        };
+        Self::new(category, error.message)
+    }
+}
+
+impl From<CatalogError> for SdkError {
+    fn from(error: CatalogError) -> Self {
+        Self::new("CatalogError", error.to_string())
+    }
+}
+
 pub type SdkResult<T> = Result<T, SdkError>;
 
 /// A response stream (`Parser.openStream`).
@@ -142,8 +160,136 @@ pub enum AfterRejectedBlock {
 /// Compiles one block (no sentinel tags) and validates the messages it emits
 /// against their envelope schema, the way upstream's `compile_checked` does.
 /// A surface the block updates without creating is assumed to exist.
-pub fn compile_checked(_parser: &ParserConfig, _payload: &str) -> SdkResult<Vec<Value>> {
-    Err(SdkError::unimplemented("compile"))
+pub fn compile_checked(parser: &ParserConfig, payload: &str) -> SdkResult<Vec<Value>> {
+    let compiler = compiler(&parser.catalogs)?;
+    let messages = compiler.compile(payload, &parser.surface_id)?;
+    validate_payload(&compiler, &messages)?;
+    Ok(messages)
+}
+
+/// The part of upstream's `validate_payload` the compiler suite relies on,
+/// beyond what the compiler checks itself:
+///
+/// - a `callRendererFunction` names a function the agent may call
+///   (`allowedCallers` `agentOnly` or `rendererOrAgent`, no user activation);
+/// - from v1.0, every `@call` in a component names a declared function.
+///
+/// Full schema validation of the messages is not ported.
+fn validate_payload(compiler: &Compiler, messages: &[Value]) -> SdkResult<()> {
+    let invalid = |m: String| SdkError::new("ValidationError", m);
+    let set = compiler.catalogs();
+    for message in messages {
+        if let Some(body) = message.get("callRendererFunction") {
+            let subject = format!(
+                "Function call '{}'",
+                body.get("functionCallId")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+            );
+            let call = &body["callFunction"];
+            let name = call.get("@call").and_then(Value::as_str).unwrap_or("");
+            let catalog_id = call.get("catalogId").and_then(Value::as_str).unwrap_or("");
+            let Some(catalog) = set.get(catalog_id) else {
+                return Err(invalid(format!(
+                    "{subject} names catalog '{catalog_id}', which isn't one of the active catalogs."
+                )));
+            };
+            let Some(function) = catalog.function(name).filter(|f| !f.is_system()) else {
+                return Err(invalid(format!(
+                    "{subject} names '{name}', which catalog '{catalog_id}' does not declare."
+                )));
+            };
+            let callers = function.allowed_callers();
+            if !callers.admits_agent() {
+                return Err(invalid(format!(
+                    "{subject} names '{name}', which only the renderer may call (allowedCallers is {}).",
+                    callers.as_str()
+                )));
+            }
+            if function.requires_user_activation() {
+                return Err(invalid(format!(
+                    "{subject} names '{name}', which requires a user activation, and a call from the agent has none."
+                )));
+            }
+        }
+        if !compiler.version().at_least_v1() {
+            continue;
+        }
+        for key in ["createSurface", "updateComponents"] {
+            let components = message
+                .get(key)
+                .and_then(|b| b.get("components"))
+                .and_then(Value::as_array);
+            for component in components.into_iter().flatten() {
+                let Some(map) = component.as_object() else {
+                    continue;
+                };
+                for (k, v) in map {
+                    if k != "id" && k != "component" {
+                        check_calls(compiler, v)?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Every `{"@call": name, …}` in a value names a declared function.
+fn check_calls(compiler: &Compiler, value: &Value) -> SdkResult<()> {
+    match value {
+        Value::Array(items) => items.iter().try_for_each(|v| check_calls(compiler, v)),
+        Value::Object(map) => {
+            if map.contains_key("@path") {
+                return Ok(());
+            }
+            if let Some(Value::String(name)) = map.get("@call") {
+                let declared = compiler
+                    .catalogs()
+                    .catalogs()
+                    .iter()
+                    .any(|c| c.function(name).is_some());
+                if !declared {
+                    return Err(SdkError::new(
+                        "ValidationError",
+                        format!("Unrecognized function '{name}'"),
+                    ));
+                }
+            }
+            map.values().try_for_each(|v| check_calls(compiler, v))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// The catalog a case registers, with its transformers applied.
+pub fn load_catalog(catalog: &Catalog) -> SdkResult<schema::Catalog> {
+    let mut document = catalog.document.clone();
+    for transformer in &catalog.transformers {
+        let (key, keep) = match transformer {
+            Transformer::ComponentPruning(names) => ("components", names),
+            Transformer::FunctionPruning(names) => ("functions", names),
+        };
+        match document.get_mut(key) {
+            Some(Value::Object(map)) => map.retain(|name, _| keep.contains(name)),
+            Some(Value::Array(list)) => list.retain(|f| {
+                f.get("name")
+                    .and_then(Value::as_str)
+                    .is_some_and(|n| keep.iter().any(|k| k == n))
+            }),
+            _ => {}
+        }
+    }
+    schema::Catalog::from_json(document).map_err(SdkError::from)
+}
+
+/// A compiler for the catalogs a case registers.
+pub fn compiler(catalogs: &[Catalog]) -> SdkResult<Compiler> {
+    let catalogs = catalogs
+        .iter()
+        .map(load_catalog)
+        .collect::<SdkResult<Vec<_>>>()?;
+    Compiler::new(catalogs, None).map_err(SdkError::from)
 }
 
 /// Writes messages back into Express notation.

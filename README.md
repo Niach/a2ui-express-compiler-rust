@@ -39,6 +39,11 @@ scripts/sync-eui.sh <eui-version>            # -> vendor/eui/,  pin in vendor/eu
 
 CI re-runs both at the recorded pins and fails if `vendor/` changes.
 
+`crates/a2ui-express/tests/eui/` holds the Express form of the eui fixtures
+and the `createSurface` each must compile to (`tests/eui.rs`). Both are
+generated from the pinned eui package, whose `flattenSurface` gives the flat
+components: `scripts/gen-eui-express.mjs <unpacked-eui-package>`.
+
 The lexer's identifier tables (`crates/a2ui-express/src/syntax/xid.rs`) are
 generated too, from upstream's ANTLR lexer at the same pin, so identifiers
 lex exactly as upstream lexes them: `scripts/gen-xid-tables.py <a2ui-checkout>`.
