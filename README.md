@@ -43,6 +43,30 @@ The lexer's identifier tables (`crates/a2ui-express/src/syntax/xid.rs`) are
 generated too, from upstream's ANTLR lexer at the same pin, so identifiers
 lex exactly as upstream lexes them: `scripts/gen-xid-tables.py <a2ui-checkout>`.
 
+## Running the suite
+
+`cargo test` runs every Express case through
+[`tests/conformance.rs`](crates/a2ui-express/tests/conformance.rs), as written
+(`v1.0`) and again lowered to v0.9 (`v0.9-lowered`, mirroring upstream's Python
+and TypeScript harnesses), and prints the passing count per suite. The number
+of passing cases is the project's progress metric.
+
+The crate is reached only through
+[`tests/conformance/sdk.rs`](crates/a2ui-express/tests/conformance/sdk.rs):
+one JSON-in, JSON-out function per suite call, each `unimplemented` until it is
+wired to the crate.
+
+[`conformance/known_failures.txt`](conformance/known_failures.txt) lists the
+cases expected to fail (`<case>`, or `<case>::<version>`). The test fails when
+an unlisted case fails, a listed case passes, or an entry names no case, so the
+list only shrinks. After fixing cases, regenerate it:
+
+```sh
+cargo test -p a2ui-express --test conformance -- <name-substring>   # a subset
+CONFORMANCE_VERBOSE=1 cargo test -p a2ui-express --test conformance # every failure's reason
+CONFORMANCE_BLESS=1 cargo test -p a2ui-express --test conformance   # rewrite known_failures.txt
+```
+
 ## Development
 
 ```sh

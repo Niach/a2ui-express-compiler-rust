@@ -8,6 +8,7 @@
 //! The behaviour is pinned by the upstream language-neutral conformance suite
 //! vendored under `vendor/a2ui/conformance/agent/express/`.
 
+pub mod schema;
 pub mod syntax;
 
 use serde::{Deserialize, Serialize};
