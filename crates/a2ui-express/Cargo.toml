@@ -1,0 +1,18 @@
+[package]
+name = "a2ui-express"
+description = "A2UI Express compiler: parse, compile, stream and decompile the Express inference format"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# Runtime dependencies stay limited to serde, serde_json and thiserror so the
+# crate embeds cleanly in eui-core and builds for wasm32-unknown-unknown.
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_yaml_ng.workspace = true

@@ -1,0 +1,16 @@
+[workspace]
+resolver = "3"
+members = ["crates/a2ui-express"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/Niach/a2ui-express-compiler-rust"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+serde_yaml_ng = "0.10"
