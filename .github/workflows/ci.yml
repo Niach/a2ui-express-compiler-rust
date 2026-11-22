@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: fmt, clippy, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
+  wasm:
+    name: wasm32 build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build -p a2ui-express --target wasm32-unknown-unknown
+
+  vendor:
+    name: vendor/ is reproducible
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Re-sync at the recorded pins
+        run: |
+          commit=$(sed -n 's/^commit: //p' vendor/a2ui/UPSTREAM)
+          version=$(sed -n 's/^version: //p' vendor/eui/UPSTREAM)
+          scripts/sync-upstream.sh "$commit"
+          scripts/sync-eui.sh "$version"
+      - name: Fail on drift
+        run: |
+          git status --porcelain vendor/
+          test -z "$(git status --porcelain vendor/)"
