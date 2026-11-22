@@ -1,0 +1,136 @@
+[
+  {
+    "version": "1.0",
+    "createSurface": {
+      "surfaceId": "main",
+      "catalogId": "https://ui.exponential.at/catalogs/core/v1",
+      "components": [
+        {
+          "id": "root",
+          "component": "Box",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "$spacing.lg",
+            "padding": "$spacing.xl",
+            "maxWidth": 560
+          },
+          "children": [
+            "demo_card"
+          ]
+        },
+        {
+          "id": "demo_card",
+          "component": "Card",
+          "title": "Release 0.18.84",
+          "description": "Shipped 02:14 · 3 platforms",
+          "children": [
+            "demo_status",
+            "demo_row_errors",
+            "demo_row_p95",
+            "demo_rollout",
+            "demo_chart",
+            "demo_actions"
+          ]
+        },
+        {
+          "id": "demo_status",
+          "component": "Stack",
+          "direction": "horizontal",
+          "gap": "sm",
+          "align": "center",
+          "children": [
+            "demo_badge",
+            "demo_badge_2"
+          ]
+        },
+        {
+          "id": "demo_badge",
+          "component": "Badge",
+          "text": "Healthy",
+          "variant": "default",
+          "icon": "check"
+        },
+        {
+          "id": "demo_badge_2",
+          "component": "Badge",
+          "text": "0 incidents",
+          "variant": "outline"
+        },
+        {
+          "id": "demo_row_errors",
+          "component": "Row",
+          "title": "Error rate",
+          "value": "0.04 %"
+        },
+        {
+          "id": "demo_row_p95",
+          "component": "Row",
+          "title": "p95 latency",
+          "value": "182 ms"
+        },
+        {
+          "id": "demo_rollout",
+          "component": "Progress",
+          "value": 80,
+          "max": 100,
+          "label": "Rollout",
+          "tone": "primary"
+        },
+        {
+          "id": "demo_chart",
+          "component": "Chart",
+          "kind": "line",
+          "title": "Requests per minute",
+          "height": 140,
+          "categories": [
+            "00:00",
+            "01:00",
+            "02:00",
+            "03:00",
+            "04:00",
+            "05:00",
+            "06:00"
+          ],
+          "series": [
+            {
+              "name": "Requests",
+              "values": [
+                420,
+                380,
+                510,
+                640,
+                590,
+                610,
+                700
+              ]
+            }
+          ]
+        },
+        {
+          "id": "demo_actions",
+          "component": "Stack",
+          "direction": "horizontal",
+          "gap": "sm",
+          "justify": "end",
+          "children": [
+            "demo_rollback",
+            "demo_promote"
+          ]
+        },
+        {
+          "id": "demo_rollback",
+          "component": "Button",
+          "label": "Roll back",
+          "variant": "outline"
+        },
+        {
+          "id": "demo_promote",
+          "component": "Button",
+          "label": "Promote to 100 %",
+          "variant": "default"
+        }
+      ]
+    }
+  }
+]
