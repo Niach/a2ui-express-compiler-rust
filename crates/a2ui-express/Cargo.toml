@@ -16,3 +16,11 @@ thiserror.workspace = true
 
 [dev-dependencies]
 serde_yaml_ng.workspace = true
+regex.workspace = true
+
+# The upstream conformance suite. A custom harness, so it can print the
+# per-suite pass counts and check conformance/known_failures.txt.
+[[test]]
+name = "conformance"
+path = "tests/conformance.rs"
+harness = false
