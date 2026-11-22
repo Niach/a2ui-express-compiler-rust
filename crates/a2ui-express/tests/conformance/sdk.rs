@@ -147,8 +147,38 @@ pub fn compile_checked(_parser: &ParserConfig, _payload: &str) -> SdkResult<Vec<
 }
 
 /// Writes messages back into Express notation.
-pub fn decompile(_parser: &ParserConfig, _messages: &[Value]) -> SdkResult<String> {
-    Err(SdkError::unimplemented("decompile"))
+pub fn decompile(parser: &ParserConfig, messages: &[Value]) -> SdkResult<String> {
+    use a2ui_express::decompile::{DecompileOptions, decompile};
+    let catalogs = decompile_catalogs(&parser.catalogs)?;
+    Ok(decompile(
+        &catalogs,
+        messages,
+        &DecompileOptions::default(),
+    )?)
+}
+
+/// The active catalogs of a decompile case, with their transformers applied.
+fn decompile_catalogs(catalogs: &[Catalog]) -> SdkResult<a2ui_express::schema::CatalogSet> {
+    use a2ui_express::schema::{Catalog as SchemaCatalog, CatalogSet};
+    let catalog_error =
+        |e: a2ui_express::schema::CatalogError| SdkError::new("CatalogError", e.to_string());
+    let loaded = catalogs
+        .iter()
+        .map(|c| {
+            let mut document = c.document.clone();
+            for transformer in &c.transformers {
+                let (key, keep) = match transformer {
+                    Transformer::ComponentPruning(keep) => ("components", keep),
+                    Transformer::FunctionPruning(keep) => ("functions", keep),
+                };
+                if let Some(Value::Object(defs)) = document.get_mut(key) {
+                    defs.retain(|name, _| keep.contains(name));
+                }
+            }
+            SchemaCatalog::from_json(document).map_err(catalog_error)
+        })
+        .collect::<SdkResult<Vec<_>>>()?;
+    CatalogSet::new(loaded).map_err(catalog_error)
 }
 
 /// Splits a response into text and raw payload parts.
