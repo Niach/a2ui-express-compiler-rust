@@ -9,6 +9,7 @@
 //! vendored under `vendor/a2ui/conformance/agent/express/`.
 
 pub mod compile;
+pub mod decompile;
 pub mod schema;
 pub mod syntax;
 
