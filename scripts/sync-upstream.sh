@@ -58,11 +58,9 @@ done
 # Express suite: only the YAML cases.
 find "$dest/conformance/agent/express" -type f ! -name '*.yaml' -delete
 
-committed="$(git -C "$tmp" log -1 --format=%cI FETCH_HEAD)"
 cat > "$dest/UPSTREAM" <<META
 repository: https://github.com/a2ui-project/a2ui
 commit: $commit
-committed: $committed
 synced-by: scripts/sync-upstream.sh $commit
 META
 
