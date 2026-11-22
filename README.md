@@ -39,6 +39,10 @@ scripts/sync-eui.sh <eui-version>            # -> vendor/eui/,  pin in vendor/eu
 
 CI re-runs both at the recorded pins and fails if `vendor/` changes.
 
+The lexer's identifier tables (`crates/a2ui-express/src/syntax/xid.rs`) are
+generated too, from upstream's ANTLR lexer at the same pin, so identifiers
+lex exactly as upstream lexes them: `scripts/gen-xid-tables.py <a2ui-checkout>`.
+
 ## Development
 
 ```sh
