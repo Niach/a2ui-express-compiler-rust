@@ -1,5 +1,5 @@
 //! Checks that the vendored upstream suite and eui fixtures are present and
-//! readable. The conformance runner itself comes later; this pins the inputs.
+//! readable. `tests/conformance.rs` runs the cases; this pins the inputs.
 
 use std::fs;
 use std::path::{Path, PathBuf};
