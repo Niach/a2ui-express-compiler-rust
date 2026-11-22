@@ -50,5 +50,10 @@ jobs:
           scripts/sync-eui.sh "$version"
       - name: Fail on drift
         run: |
-          git status --porcelain vendor/
-          test -z "$(git status --porcelain vendor/)"
+          drift="$(git status --porcelain --untracked-files=all vendor/)"
+          if [ -n "$drift" ]; then
+            echo "::error title=vendor/ drift::$(echo "$drift" | head -20 | sed 's/%/%25/g' | tr '\n' ';')"
+            { git --no-pager diff --stat vendor/; git --no-pager diff vendor/; } | head -9 \
+              | while IFS= read -r line; do echo "::warning title=vendor/ diff::$line"; done
+            exit 1
+          fi
