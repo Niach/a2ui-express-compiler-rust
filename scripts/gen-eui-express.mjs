@@ -99,7 +99,7 @@ function express(components, data) {
     if (!isIdent(c.id)) throw new Error(`component id ${c.id} is not an identifier`);
     const args = Object.entries(c)
       .filter(([k]) => k !== 'id' && k !== 'component')
-      .map(([k, v]) => `${k}=${prop(k, v, ids)}`);
+      .map(([k, v]) => `${k === '@checks' ? 'checks' : k}=${prop(k, v, ids)}`);
     lines.push(`${c.id} = ${c.component}(${args.join(', ')})`);
   }
   for (const [k, v] of Object.entries(data ?? {})) {
@@ -123,6 +123,17 @@ for (const name of ['dashboard', 'demo-surface', 'kitchen-sink']) {
       throw new Error(`${name}: the top id ${top} is referenced`);
     }
     components[0].id = 'root';
+  }
+
+  // eui writes the check mixin under the legacy bare `checks`; its v1.0
+  // catalog inherits `@checks` from Checkable, which is what the compiler
+  // emits (and what a decompile → compile round trip yields upstream too).
+  for (const c of components) {
+    if ('checks' in c && !('@checks' in c)) {
+      const entries = Object.entries(c).map(([k, v]) => [k === 'checks' ? '@checks' : k, v]);
+      for (const k of Object.keys(c)) delete c[k];
+      Object.assign(c, Object.fromEntries(entries));
+    }
   }
 
   const create = {surfaceId: 'main', catalogId: catalog.catalogId, components};
