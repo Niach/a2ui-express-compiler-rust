@@ -1,0 +1,20 @@
+<a2ui>
+surface("main")
+$/notifications = [
+  {sender: "Ada Lovelace", message: "Ada commented on your pull request", time: "2m ago", unread: true},
+  {sender: "Grace Hopper", message: "Grace assigned you to EXP-42", time: "15m ago", unread: true},
+  {sender: "Alan Turing", message: "Alan mentioned you in a thread", time: "1h ago", unread: false},
+  {sender: "Linus Torvalds", message: "Linus merged your branch into main", time: "3h ago", unread: false},
+  {sender: "Margaret Hamilton", message: "Margaret replied to your report", time: "Yesterday", unread: false}
+]
+markAll = Button(label="Mark all as read", variant="outline", on={press: Event("mark_all_read")})
+header = Toolbar(children=[Heading(text="Notifications", level="h2")], slots={trailing: markAll})
+item = Stack(direction="horizontal", gap="md", align="center", children=[
+  Avatar(name=$sender),
+  Text(text=$message, lines=1),
+  Text(text=$time, variant="caption"),
+  Icon(name="circle-dot", tone="primary", label="Unread", visible=$unread)
+])
+inbox = List(divided=true, children=_template($/notifications, item))
+root = Stack(gap="md", children=[header, inbox])
+</a2ui>

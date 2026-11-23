@@ -6,18 +6,6 @@ Request: A sign-in screen: email and password fields (both required, the email v
 
 ```
 Page title="Sign in"
-  Form name="signin"
-    Input label="Email" placeholder="you@example.com" name="email" type="email" checks=[{"condition":{"@call":"required","args":{"value":"Email is required"}},"message", {"condition":{"@call":"email","args":{"value":"Enter a valid email address"}},"m]
-    Input label="Password" name="password" type="password" checks=[{"condition":{"@call":"required","args":{"value":"Password is required"}},"messa]
-    Checkbox label="Remember me" name="remember"
-    Link label="Forgot password?"
-    Button label="Sign in" variant="default"
-```
-
-## Sample B
-
-```
-Page title="Sign in"
   Card
     Form name="signin"
       Input label="Email" value={"@path":"/email"} name="email" type="email" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/email"}}},"message":, {"condition":{"@call":"email","args":{"value":{"@path":"/email"}}},"message":"En]
@@ -26,4 +14,17 @@ Page title="Sign in"
       Button label="Sign in" variant="default"
       Link label="Forgot password?"
 [data model] / = {"email":"","password":"","remember":false}
+```
+
+## Sample B
+
+```
+Page title="Sign in"
+  Form name="signin"
+    Input label="Email" value={"@path":"/form/email"} name="email" type="email" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/form/email"}}},"mess, {"condition":{"@call":"email","args":{"value":{"@path":"/form/email"}}},"message]
+    Input label="Password" value={"@path":"/form/password"} name="password" type="password" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/form/password"}}},"m]
+    Checkbox label="Remember me" name="remember"
+    FormActions
+  Link label="Forgot password?"
+[data model] {"form":{"email":"","password":"","remember":false}}
 ```

@@ -1,0 +1,26 @@
+<a2ui>
+surface("main")
+$/form/delivery = "standard"
+$/order/subtotal = 49.9
+
+root = Page(title="Checkout", children=[checkoutForm])
+
+checkoutForm = Form(name="checkout", on={submit: Event("place_order", {name: $/form/name, street: $/form/street, city: $/form/city, postal: $/form/postal, country: $/form/country, delivery: $/form/delivery})}, children=[addressHeading, nameField, streetField, locationFields, countryField, deliveryRadio, summaryCard, actions])
+
+addressHeading = Heading(text="Shipping address", level="h2")
+nameField = Input(label="Full name", name="name", value=$/form/name, checks=[?required("Full name is required")])
+streetField = Input(label="Street", name="street", value=$/form/street, checks=[?required("Street is required")])
+locationFields = FieldGroup(children=[cityField, postalField])
+cityField = Input(label="City", name="city", value=$/form/city, checks=[?required("City is required")])
+postalField = Input(label="Postal code", name="postal", value=$/form/postal, checks=[?required("Postal code is required")])
+countryField = Select(label="Country", name="country", placeholder="Select a country", value=$/form/country, options=[{label: "Germany", value: "DE"}, {label: "Austria", value: "AT"}, {label: "Switzerland", value: "CH"}, {label: "France", value: "FR"}, {label: "United Kingdom", value: "GB"}, {label: "United States", value: "US"}], checks=[?required("Country is required")])
+
+deliveryRadio = Radio(label="Delivery option", name="delivery", value=$/form/delivery, options=[{label: "Standard (free)", value: "standard"}, {label: "Express ($9.90)", value: "express"}])
+
+summaryCard = Card(title="Order summary", children=[subtotalRow, shippingRow, totalRow])
+subtotalRow = Row(title="Subtotal", value=formatCurrency($/order/subtotal, "USD", 2))
+shippingRow = Row(title="Shipping", value=formatCurrency(cond(eq($/form/delivery, "express"), 9.9, 0), "USD", 2))
+totalRow = Row(title="Total", value=formatCurrency(add($/order/subtotal, cond(eq($/form/delivery, "express"), 9.9, 0)), "USD", 2))
+
+actions = FormActions(submit="Place order")
+</a2ui>

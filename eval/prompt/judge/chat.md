@@ -5,21 +5,6 @@ Request: A chat view: a scrollable list of three messages between the user and a
 ## Sample A
 
 ```
-Page title="Chat"
-  Stack
-    ScrollArea
-      Stack
-        MessageBubble text="Hi! Can you help me plan a trip to Lisbon?"
-        MessageBubble text="Of course! How many days will you be staying, and what do you enjoy most: food, history or beaches?"
-          [slot avatar]
-            Avatar name="Assistant"
-        MessageBubble text="Four days, mostly food and history."
-    Composer placeholder="Type a message"
-```
-
-## Sample B
-
-```
 Page title="Chat" subtitle="Assistant"
   Stack
     ScrollArea
@@ -32,4 +17,17 @@ Page title="Chat" subtitle="Assistant"
     Box
       Composer placeholder="Write a message…" value={"@path":"/draft"}
 [data model] / = {"draft":""}
+```
+
+## Sample B
+
+```
+Stack
+  ScrollArea
+    Stack
+      MessageBubble text="Hi! Can you help me plan a trip to Lisbon?"
+      MessageBubble text="Of course! How many days will you be there, and what do you enjoy most: food, history or nightlife?"
+      MessageBubble text="Four days, mostly food and history."
+  Composer placeholder="Type a message" value={"@path":"/draft"}
+[data model] {"draft":""}
 ```

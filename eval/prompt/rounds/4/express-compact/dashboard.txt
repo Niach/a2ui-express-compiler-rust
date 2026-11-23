@@ -1,0 +1,26 @@
+<a2ui>
+surface("main")
+$/orders = [
+  {id: "#10492", customer: "Acme Corp", amount: 1240, status: "Paid"},
+  {id: "#10491", customer: "Globex", amount: 860.5, status: "Pending"},
+  {id: "#10490", customer: "Initech", amount: 2300, status: "Paid"},
+  {id: "#10489", customer: "Umbrella Ltd", amount: 415.75, status: "Refunded"},
+  {id: "#10488", customer: "Hooli", amount: 980, status: "Paid"}
+]
+revenue = StatTile(label="Revenue", value="$1.2M", delta="+8%", tone="success")
+orders = StatTile(label="Orders", value="3,420", delta="+3%", tone="success")
+refunds = StatTile(label="Refunds", value="41", delta="-12%", tone="success")
+tiles = Grid(columns={base: 1, md: 3}, gap="md", children=[revenue, orders, refunds])
+ordersTable = Table(
+  columns=[
+    {key: "id", label: "Order ID", type: "text"},
+    {key: "customer", label: "Customer", type: "text"},
+    {key: "amount", label: "Amount", type: "currency", currency: "USD", align: "end"},
+    {key: "status", label: "Status", type: "badge"}
+  ],
+  rows=$/orders,
+  rowKey="id",
+  caption="Most recent orders"
+)
+root = Page(title="Q3 overview", children=[Stack(direction="vertical", gap="lg", children=[tiles, ordersTable])])
+</a2ui>

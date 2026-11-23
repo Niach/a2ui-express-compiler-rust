@@ -1,28 +1,26 @@
-# Issue detail (held out)
+# Issue detail
 
 Request: An issue detail view: the title 'Login fails on Safari' with a status badge 'In progress' and a priority, tabs for 'Details' and 'Activity'; Details shows the description text and assignee avatar, Activity lists three timeline events; a 'Close issue' button in the header.
 
 ## Sample A
 
 ```
-Stack
+Page title={"@path":"/issue/title"}
+  [slot trailing]
+    Button label="Close issue"
   Stack
-    Stack
-      Heading text="Login fails on Safari"
-      Stack
-        Badge text="In progress" variant="secondary" icon="status-in-progress"
-        Badge text="High" variant="outline" icon="priority-high"
-    Button label="Close issue" variant="default"
+    Badge text={"@path":"/issue/status"} variant="secondary"
+    Badge text={"@path":"/issue/priority"} variant="outline" icon="priority-high"
   Tabs value="details" tabs[2]
     Stack
-      Text text="Users on Safari 17 are redirected back to the login page after submitting valid credentials. The session cookie does not appear to be set." variant="body"
-      Stack
-        Text text="Assignee" variant="muted"
-        Avatar name="Dana Lee"
-    Stack
-      Row title="Issue created" icon="event-status-changed"
-      Row title="Assigned to Dana Lee" icon="event-assignee-changed"
-      Row title="Status changed to In progress" icon="event-status-changed"
+      Markdown text={"@path":"/issue/description"}
+      Row title={"@path":"/issue/assignee"} subtitle="Assignee"
+        [slot leading]
+          Avatar name={"@path":"/issue/assignee"}
+    List
+[template eventRow: repeated once per item of its list]
+  Row title={"@path":"title"} subtitle={"@path":"detail"} icon="event-status-changed"
+[data model] {"issue":{"title":"Login fails on Safari","status":"In progress","priority":"High","description":"Users on Safari 17 are redirected back to the login page after submitting valid credentials. The session cookie is not being stored.","assignee":"Dana Reyes"},"events":[{"title":"Issue created","detail":"Reported by Sam Lee","time":"2 days ago"},{"title":"Assigned to Dana Reyes","detail":"Status set to In progress","time":"1 day ago"},{"title":"Comment added","detail":"Reproduced on Safari 17.2","time":"3 hours ago"}]}
 ```
 
 ## Sample B

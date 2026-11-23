@@ -13,5 +13,5 @@ Page title="Projects"
 
 ```
 Page title="Projects"
-  EmptyState title="No projects yet" description="Projects you create will appear here so you can organize your work in one place." actionLabel="Create project" icon="folder"
+  EmptyState title="No projects yet" description="Projects you create will show up here so you can find them quickly." actionLabel="Create project" icon="folder"
 ```

@@ -1,0 +1,30 @@
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Now playing","children":["body"]},
+    {"id":"body","component":"Stack","direction":"vertical","gap":"lg","children":["cover","info","progress","controls","queueSection"]},
+    {"id":"cover","component":"Image","src":{"path":"/track/cover"},"alt":{"path":"/track/title"},"aspectRatio":1,"fit":"cover","style":{"width":"100%","maxWidth":360,"borderRadius":"$radius.lg","alignSelf":"center"}},
+    {"id":"info","component":"Stack","direction":"vertical","gap":"xs","align":"center","children":["trackTitle","trackArtist"]},
+    {"id":"trackTitle","component":"Heading","level":"h2","text":{"path":"/track/title"}},
+    {"id":"trackArtist","component":"Text","variant":"muted","text":{"path":"/track/artist"}},
+    {"id":"progress","component":"Progress","value":{"path":"/player/progress"},"max":100,"valueText":{"path":"/player/time"}},
+    {"id":"controls","component":"Stack","direction":"horizontal","gap":"md","justify":"center","align":"center","children":["prev","play","next"]},
+    {"id":"prev","component":"Button","icon":"skip-back","label":"Previous","variant":"ghost","size":"icon","on":{"press":{"event":{"name":"previous"}}}},
+    {"id":"play","component":"Button","icon":{"path":"/player/icon"},"label":{"path":"/player/playLabel"},"variant":"default","size":"icon","on":{"press":{"event":{"name":"togglePlay"}}}},
+    {"id":"next","component":"Button","icon":"skip-forward","label":"Next","variant":"ghost","size":"icon","on":{"press":{"event":{"name":"next"}}}},
+    {"id":"queueSection","component":"Section","title":"Up next","count":{"path":"/queueCount"},"children":["queue"]},
+    {"id":"queue","component":"List","divided":true,"children":{"componentId":"queueRow","path":"/queue","key":"id"}},
+    {"id":"queueRow","component":"Row","title":{"path":"title"},"subtitle":{"path":"artist"},"meta":{"path":"duration"},"icon":"music","pressable":true,"on":{"press":{"event":{"name":"playTrack","context":{"id":{"path":"id"}}}}}}
+  ]}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{
+    "track":{"title":"Midnight Drive","artist":"The Neon Hearts","cover":"https://example.com/covers/midnight-drive.jpg"},
+    "player":{"progress":35,"time":"1:24 / 3:58","icon":"pause","playLabel":"Pause"},
+    "queueCount":4,
+    "queue":[
+      {"id":"t2","title":"City Lights","artist":"Luna Park","duration":"3:12"},
+      {"id":"t3","title":"Golden Hour","artist":"Sam Rivers","duration":"4:05"},
+      {"id":"t4","title":"Paper Planes","artist":"The Neon Hearts","duration":"2:47"},
+      {"id":"t5","title":"Slow Tide","artist":"Aria Vale","duration":"3:36"}
+    ]
+  }}}
+]

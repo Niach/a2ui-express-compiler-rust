@@ -1,4 +1,4 @@
-# Prompt eval: compact Express prompt vs eui's `catalogPrompt` (AXC-20)
+# Prompt eval: compact Express prompt vs eui's `catalogPrompt` (AXC-20, AXC-21)
 
 Does a model given the compact Express prompt (`PromptStyle::Compact`) on
 eui's core catalog write UIs as well as one given eui's own hand-written
@@ -9,14 +9,14 @@ eui's core catalog write UIs as well as one given eui's own hand-written
 
 | Path | What |
 |---|---|
-| `requests.json` | The UI requests (6 used while tuning the compact prompt, 2 held out) |
+| `requests.json` | The UI requests; `set` says which were tuning data (`axc20`, `axc21`) and which were held out for the final prompt (`heldout`) |
 | `prompts/express-compact.txt` | `generate_prompt(eui core, PromptStyle::Compact)` |
 | `prompts/eui-catalogPrompt.txt` | eui's `catalogPrompt()` at github.com/Niach/exponential `503b944` (`packages/exponential-ui`, 0.21.0) |
 | `outputs/<arm>/<request>.txt` | What the model replied, verbatim |
 | `score.ts` | Validates and measures every reply; writes `results.json` and, with `--blind`, the judge packets |
 | `judge/<request>.md`, `judge/key.json`, `judge/verdict.json` | The blind judge's input, the label → arm key it never saw, its verdict |
-| `report.ts` | Builds the result table in `report.md` from `results.json` and the verdict |
-| `rounds/` | Express replies from the two earlier versions of the compact prompt |
+| `report.ts` | Builds the result tables in `report.md` (one per request set) from `results.json` and the verdict |
+| `rounds/` | Express replies (and prompt, results) from earlier versions of the compact prompt: 1–3 #AXC-20, 4 #AXC-21's first version |
 
 ## Method
 
@@ -41,6 +41,8 @@ eui's core catalog write UIs as well as one given eui's own hand-written
 4. **Judge.** A blind Claude Opus subagent reads, per request, the two
    rendered outlines under shuffled labels and scores fidelity and
    component use 1–5 and picks a winner.
+5. **Held out.** Requests in the `heldout` set are written after the prompt
+   is final and run once; the report lists them apart.
 
 ## Reproduce
 

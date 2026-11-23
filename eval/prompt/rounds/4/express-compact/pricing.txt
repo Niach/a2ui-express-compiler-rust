@@ -1,0 +1,15 @@
+<a2ui>
+surface("main")
+$/billing = "monthly"
+$/plans = [{id: "free", name: "Free", tagline: "For trying things out", monthly: "$0", yearly: "$0", recommended: false, features: ["1 project", "Community support", "Basic analytics", "1 GB storage"]}, {id: "pro", name: "Pro", tagline: "For growing individuals", monthly: "$12", yearly: "$10", recommended: true, features: ["Unlimited projects", "Priority support", "Advanced analytics", "50 GB storage"]}, {id: "team", name: "Team", tagline: "For collaborating teams", monthly: "$30", yearly: "$24", recommended: false, features: ["Everything in Pro", "Shared workspaces", "Roles and permissions", "500 GB storage"]}]
+header = Heading(text="Choose your plan", level="h1")
+billing = Segmented(items=[{label: "Monthly", value: "monthly"}, {label: "Yearly", value: "yearly"}], value=$/billing)
+plans = Grid(columns={base: 1, md: 3}, gap="lg", children=_template($/plans, planCard))
+planCard = Card(title=$name, description=$tagline, children=[recommendedBadge, price, featureList, choose])
+recommendedBadge = Badge(text="Recommended", variant="default", visible=$recommended)
+price = Text(text=concat([cond(if=eq($/billing, "yearly"), then=$yearly, else=$monthly), " per user / month"]), variant="title")
+featureList = Stack(direction="vertical", gap="sm", children=_template($features, featureItem))
+featureItem = Text(text=$)
+choose = Button(label="Choose plan", variant=cond(if=$recommended, then="default", else="outline"), on={press: Event("choose_plan", {plan: $id, billing: $/billing})})
+root = Stack(direction="vertical", gap="lg", children=[header, billing, plans])
+</a2ui>

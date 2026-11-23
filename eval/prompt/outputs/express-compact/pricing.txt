@@ -1,0 +1,73 @@
+<a2ui>
+surface("main")
+$/billing = "monthly"
+
+billingToggle = Segmented(items=[{label: "Monthly", value: "monthly"}, {label: "Yearly", value: "yearly"}], type="single", value=$/billing, on={change: Event("billing_changed", {billing: $/billing})})
+
+freeHead = Stack(gap="xs", children=[
+  Heading(text="Free", level="h3"),
+  Text(text="For trying things out", variant="muted"),
+  Heading(text="$0", level="h2")
+])
+freeFeatures = Stack(gap="xs", children=[
+  Text(text="1 project"),
+  Text(text="Community support"),
+  Text(text="Basic analytics"),
+  Text(text="1 GB storage")
+])
+freeCard = Card(children=[
+  Stack(gap="md", children=[
+    freeHead,
+    freeFeatures,
+    Button(label="Choose plan", variant="outline", on={press: Event("choose_plan", {plan: "free", billing: $/billing})})
+  ])
+])
+
+proHead = Stack(gap="xs", children=[
+  Badge(text="Recommended", variant="default"),
+  Heading(text="Pro", level="h3"),
+  Text(text="For growing professionals", variant="muted"),
+  Heading(text=cond(if=eq($/billing, "yearly"), then="$10", else="$12"), level="h2"),
+  Text(text="per user / month", variant="caption")
+])
+proFeatures = Stack(gap="xs", children=[
+  Text(text="Unlimited projects"),
+  Text(text="Priority email support"),
+  Text(text="Advanced analytics"),
+  Text(text="50 GB storage")
+])
+proCard = Card(style={borderWidth: 2, borderColor: "$color.primary"}, children=[
+  Stack(gap="md", children=[
+    proHead,
+    proFeatures,
+    Button(label="Choose plan", variant="default", on={press: Event("choose_plan", {plan: "pro", billing: $/billing})})
+  ])
+])
+
+teamHead = Stack(gap="xs", children=[
+  Heading(text="Team", level="h3"),
+  Text(text="For collaborating teams", variant="muted"),
+  Heading(text=cond(if=eq($/billing, "yearly"), then="$24", else="$30"), level="h2"),
+  Text(text="per user / month", variant="caption")
+])
+teamFeatures = Stack(gap="xs", children=[
+  Text(text="Everything in Pro"),
+  Text(text="Shared workspaces"),
+  Text(text="Roles and permissions"),
+  Text(text="Dedicated support")
+])
+teamCard = Card(children=[
+  Stack(gap="md", children=[
+    teamHead,
+    teamFeatures,
+    Button(label="Choose plan", variant="outline", on={press: Event("choose_plan", {plan: "team", billing: $/billing})})
+  ])
+])
+
+root = Page(title="Pricing", subtitle="Pick the plan that fits", children=[
+  Stack(gap="lg", children=[
+    billingToggle,
+    Grid(columns={base: 1, md: 3}, gap="md", children=[freeCard, proCard, teamCard])
+  ])
+])
+</a2ui>

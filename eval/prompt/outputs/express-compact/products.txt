@@ -1,35 +1,14 @@
 <a2ui>
 surface("main")
-search = Input(label="Search products", name="search", type="search", placeholder="Search products", on={change: Event("search_products", {query: $/search})})
-
-img1 = Image(src="https://example.com/images/headphones.jpg", alt="Wireless headphones", aspectRatio=1.33, fit="cover")
-name1 = Heading(text="Wireless Headphones", level="h3")
-price1 = Text(text="$129.00", variant="lead")
-rating1 = Rating(value=4.5, max=5, readOnly=true)
-btn1 = Button(label="Add to cart", icon="shopping-cart", on={press: Event("add_to_cart", {productId: "p1"})})
-card1 = Card(children=[Stack(direction="vertical", gap="sm", children=[img1, name1, price1, rating1, btn1])])
-
-img2 = Image(src="https://example.com/images/watch.jpg", alt="Smart watch", aspectRatio=1.33, fit="cover")
-name2 = Heading(text="Smart Watch", level="h3")
-price2 = Text(text="$249.00", variant="lead")
-rating2 = Rating(value=4, max=5, readOnly=true)
-btn2 = Button(label="Add to cart", icon="shopping-cart", on={press: Event("add_to_cart", {productId: "p2"})})
-card2 = Card(children=[Stack(direction="vertical", gap="sm", children=[img2, name2, price2, rating2, btn2])])
-
-img3 = Image(src="https://example.com/images/backpack.jpg", alt="Travel backpack", aspectRatio=1.33, fit="cover")
-name3 = Heading(text="Travel Backpack", level="h3")
-price3 = Text(text="$79.00", variant="lead")
-rating3 = Rating(value=5, max=5, readOnly=true)
-btn3 = Button(label="Add to cart", icon="shopping-cart", on={press: Event("add_to_cart", {productId: "p3"})})
-card3 = Card(children=[Stack(direction="vertical", gap="sm", children=[img3, name3, price3, rating3, btn3])])
-
-img4 = Image(src="https://example.com/images/speaker.jpg", alt="Bluetooth speaker", aspectRatio=1.33, fit="cover")
-name4 = Heading(text="Bluetooth Speaker", level="h3")
-price4 = Text(text="$59.00", variant="lead")
-rating4 = Rating(value=3.5, max=5, readOnly=true)
-btn4 = Button(label="Add to cart", icon="shopping-cart", on={press: Event("add_to_cart", {productId: "p4"})})
-card4 = Card(children=[Stack(direction="vertical", gap="sm", children=[img4, name4, price4, rating4, btn4])])
-
-grid = Grid(columns={base: 1, sm: 2, lg: 4}, gap="md", children=[card1, card2, card3, card4])
-root = Page(title="Product Catalogue", children=[Stack(direction="vertical", gap="md", children=[search, grid])])
+$/search = ""
+$/products = [{name: "Trail Backpack", price: "$89.00", rating: 4.5, image: "https://example.com/img/backpack.jpg"}, {name: "Insulated Bottle", price: "$24.00", rating: 4, image: "https://example.com/img/bottle.jpg"}, {name: "Merino Beanie", price: "$32.00", rating: 5, image: "https://example.com/img/beanie.jpg"}, {name: "Camp Lantern", price: "$45.00", rating: 3.5, image: "https://example.com/img/lantern.jpg"}]
+searchField = Input(label="Search products", name="search", type="search", placeholder="Search products", value=$/search)
+productImage = Image(src=$image, alt=$name, fit="cover", aspectRatio=1.5)
+productName = Text(text=$name, variant="title")
+productPrice = Text(text=$price, variant="lead")
+productRating = Rating(value=$rating, max=5, readOnly=true)
+addButton = Button(label="Add to cart", icon="shopping-cart", on={press: Event("add_to_cart", {name: $name, price: $price})})
+productCard = Card(children=[productImage, productName, productPrice, productRating, addButton])
+productGrid = Grid(columns={base: 1, sm: 2, lg: 4}, gap="md", children=_template($/products, productCard))
+root = Page(title="Products", children=[Stack(direction="vertical", gap="md", children=[searchField, productGrid])])
 </a2ui>

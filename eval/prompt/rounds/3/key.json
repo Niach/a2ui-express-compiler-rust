@@ -1,0 +1,34 @@
+{
+  "login": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "dashboard": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "settings": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "chat": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "products": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "empty": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "checkout": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "issue": {
+    "A": "express-compact",
+    "B": "eui-json"
+  }
+}

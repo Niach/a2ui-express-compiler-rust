@@ -1,0 +1,10 @@
+<a2ui>
+surface("main")
+name = Input(label="Name", name="name", value=$/form/name)
+email = Input(label="Email", name="email", type="email", value=$/form/email, checks=[?email("Enter a valid email address")])
+subject = Select(label="Subject", name="subject", options=[{label: "Sales", value: "sales"}, {label: "Support", value: "support"}, {label: "Other", value: "other"}], value=$/form/subject)
+message = Textarea(label="Message", name="message", rows=5, value=$/form/message, checks=[?required("Message is required"), ?length(0, 500, "At most 500 characters")])
+actions = FormActions(submit="Send message")
+form = Form(name="contact", children=[name, email, subject, message, actions], on={submit: Event("send_contact", {name: $/form/name, email: $/form/email, subject: $/form/subject, message: $/form/message})})
+root = Page(title="Contact us", children=[form])
+</a2ui>

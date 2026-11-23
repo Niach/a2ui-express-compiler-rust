@@ -1,0 +1,11 @@
+<a2ui>
+surface("main")
+$/form/task = ""
+$/remaining = 3
+$/tasks = [{id: "t1", text: "Buy groceries", done: true}, {id: "t2", text: "Write the report", done: false}, {id: "t3", text: "Call the dentist", done: false}, {id: "t4", text: "Water the plants", done: false}]
+addBar = Toolbar(children=[Input(label="New task", name="task", placeholder="What needs doing?", value=$/form/task, on={submit: Event("add_task", {text: $/form/task})}), Button(label="Add", on={press: Event("add_task", {text: $/form/task})})])
+taskRow = Stack(direction="horizontal", align="center", justify="between", children=[Checkbox(label=$text, name="done", checked=$done, on={change: Event("toggle_task", {id: $id, done: $done})}), Button(icon="trash-2", variant="ghost", size="icon", on={press: Event("delete_task", {id: $id})})])
+taskList = List(divided=true, children=_template($/tasks, taskRow))
+footer = Text(text=concat([$/remaining, " tasks left"]), variant="muted")
+root = Card(title="To-do", children=[Stack(gap="md", children=[addBar, taskList, Separator(), footer])])
+</a2ui>

@@ -1,42 +1,87 @@
 {
   "login": {
-    "A": {"fidelity": 3, "components": 4, "notes": "Validation checks are broken: required/email are applied to the error-message string instead of the field value, and the inputs are unbound."},
-    "B": {"fidelity": 5, "components": 5, "notes": "All elements present; checks validate the bound /email and /password values; Card-wrapped form is idiomatic."},
-    "winner": "B"
+    "A": {"fidelity": 5, "components": 5, "notes": "All fields with required+email checks, checkbox, explicit 'Sign in' button and link, neatly wrapped in a Card."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Validation correct, but the submit button is an unlabeled FormActions and the forgot-password link sits outside the form without a card."},
+    "winner": "A"
   },
   "dashboard": {
-    "A": {"fidelity": 4, "components": 5, "notes": "Header, tiles and bound order data present, but the up/down trend percentages are not shown on the tiles; titled Card around the Table is a good fit."},
-    "B": {"fidelity": 4, "components": 4, "notes": "Same omission of the tile trends; the Table sits bare in the Stack with no section title."},
+    "A": {"fidelity": 4, "components": 5, "notes": "Header, three stat tiles and a bound 5-row orders table inside a titled Card; trend deltas not visible in the outline."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Same content and bound table but the table is bare, with no card or title to separate it from the tiles; trends also not visible."},
     "winner": "A"
   },
   "settings": {
-    "A": {"fidelity": 4, "components": 5, "notes": "Sections, switches, select and slider all present, but the switches are not bound to the existing data model values."},
-    "B": {"fidelity": 4, "components": 5, "notes": "Effectively identical to A, with the same unbound switches."},
+    "A": {"fidelity": 5, "components": 5, "notes": "Both sections, switches, a 3-option select, a slider and Save/Cancel actions, all bound to form data."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Structurally identical to A, with equivalent bindings and actions."},
     "winner": "tie"
   },
   "chat": {
-    "A": {"fidelity": 4, "components": 5, "notes": "ScrollArea of three bubbles plus a Composer, but no visible send action and no draft binding."},
-    "B": {"fidelity": 4, "components": 4, "notes": "Same structure, Composer bound to /draft; no visible send event, and an extra Box wrapper adds nesting."},
-    "winner": "B"
+    "A": {"fidelity": 5, "components": 5, "notes": "Page with a scrollable bubble list, the assistant shown with an avatar, and a bound composer pinned in a Box below."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Scroll area, three bubbles and a bound composer, but no page frame and no visible way to tell user from assistant."},
+    "winner": "A"
   },
   "products": {
-    "A": {"fidelity": 4, "components": 4, "notes": "Search field and four hard-coded cards with every field, but the images have no source and Add to cart has no action."},
-    "B": {"fidelity": 4, "components": 5, "notes": "Search bound to /query and a data-driven card template over four products; the Image still lacks a bound source and Add to cart has no action."},
-    "winner": "B"
+    "A": {"fidelity": 5, "components": 5, "notes": "Bound search field and a Grid of templated product cards with image, Heading name, price, rating and an add-to-cart button."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Equivalent templated grid and search; uses a title-variant Text for the name and has no item ids, a negligible difference."},
+    "winner": "tie"
   },
   "empty": {
-    "A": {"fidelity": 5, "components": 5, "notes": "EmptyState with folder icon, title, one-sentence description and Create project action."},
-    "B": {"fidelity": 5, "components": 5, "notes": "Equivalent EmptyState with every requested element."},
+    "A": {"fidelity": 5, "components": 5, "notes": "EmptyState with folder icon, title, a one-sentence description and the Create project action."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Identical structure, with an equally good description."},
     "winner": "tie"
   },
   "checkout": {
-    "A": {"fidelity": 5, "components": 5, "notes": "All fields bound with correct required checks, radio delivery choice, computed summary rows, and everything grouped in titled Cards."},
-    "B": {"fidelity": 3, "components": 4, "notes": "Text inputs are unbound and their required checks test literal message strings (broken); otherwise all sections are present, using Heading/Separator layout."},
+    "A": {"fidelity": 5, "components": 5, "notes": "Full address form with required checks, country select, delivery radio, computed summary rows and actions; the data model initializes every field."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same complete structure with a Separator before the total; the data model leaves the address fields uninitialized but the bindings still work."},
     "winner": "A"
   },
   "issue": {
-    "A": {"fidelity": 4, "components": 3, "notes": "All content present, but there is no Page header and the layout is ad-hoc nested Stacks with a static timeline."},
-    "B": {"fidelity": 5, "components": 5, "notes": "Page header with the Close button in the trailing slot, data-bound badges and tabs, and a List template over three events."},
+    "A": {"fidelity": 5, "components": 5, "notes": "Bound title, status and priority badges, a Close button in the trailing slot, tabs with a Markdown description, an assignee Row with avatar, and templated events with details."},
+    "B": {"fidelity": 5, "components": 4, "notes": "Covers everything, with tab state bound to data, but the event rows show only a title and the assignee is a loose Avatar+Text stack."},
+    "winner": "A"
+  },
+  "signup": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Email check, required + min-8 on both passwords, and the terms checkbox correctly checked with eq(agree, true)."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Good checks overall, but 'required' on a boolean checkbox may accept false, so it may not actually enforce agreeing to the terms."},
+    "winner": "A"
+  },
+  "inbox": {
+    "A": {"fidelity": 4, "components": 5, "notes": "Page header, mark-all action, templated rows with avatar and New badge; time is not displayed and is stored as ISO rather than relative."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Same templated list with relative times in the data but not shown, and a hand-built Heading stack instead of a Page."},
+    "winner": "A"
+  },
+  "pricing": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Segmented toggle drives the prices, three titled cards with taglines, check-icon feature Lists, a Recommended badge on Pro, and Choose plan buttons."},
+    "B": {"fidelity": 5, "components": 4, "notes": "All content present with a toggle-driven price and a recommended badge, but features are plain Text stacks instead of a List."},
+    "winner": "A"
+  },
+  "profile": {
+    "A": {"fidelity": 4, "components": 4, "notes": "Prefilled fields, avatar with Change photo, timezone select and actions, but no validation on the email."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same prefilled form plus required-name and email checks, with a cleaner grouped layout."},
+    "winner": "B"
+  },
+  "todo": {
+    "A": {"fidelity": 4, "components": 4, "notes": "Add toolbar, templated task rows with a checkbox, text and delete icon, and a remaining-count footer; the checkbox has an empty label and the count is static."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Same features in a Card, with the Add button in the toolbar's trailing slot and the checkbox labeled by the task text; the count is also static."},
+    "winner": "B"
+  },
+  "kanban": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Three columns with counts derived from data via len, and templated task cards with title and avatar."},
+    "B": {"fidelity": 5, "components": 3, "notes": "Visually complete, but every card and count is hardcoded with no data model or templates."},
+    "winner": "A"
+  },
+  "contact": {
+    "A": {"fidelity": 4, "components": 4, "notes": "All fields and checks present, but the length check appears to be min:0 (the 500 max is unclear) and there is no data model."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Email check, required + max-length on the message, a subject placeholder and an initialized data model."},
+    "winner": "B"
+  },
+  "files": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Breadcrumb, bound search, a 4-column table over six files and a Rename/Delete menu in the actions slot."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Equivalent, with the search in a Toolbar and a labeled actions trigger."},
+    "winner": "tie"
+  },
+  "music": {
+    "A": {"fidelity": 1, "components": 1, "notes": "The reply did not parse, so nothing rendered."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Cover, bound title and artist, progress bar, prev/play-pause/next controls, and a templated four-track queue."},
     "winner": "B"
   }
 }
