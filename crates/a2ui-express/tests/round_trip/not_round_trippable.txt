@@ -1,0 +1,29 @@
+# Inputs of tests/round_trip.rs that compile(decompile(x)) does not
+# reproduce, because x is not what the compiler writes. One per line:
+#
+#   <case> -- <why>
+#
+# <case> is a conformance case name (compiler.yaml `expect`, decompiler.yaml
+# `messages`), or `eui/<flow> / step <n>` for a step of eui's
+# a2ui10-messages.json. The test fails when a listed input round-trips, so
+# remove its line when it does.
+
+# The expect leaves out what the harness checks with expect_present.
+test_compile_express_check_without_a_message_still_carries_one -- the expect omits the default check message, which expect_present checks and deletes
+# Several messages the decompiler joins into one surface block.
+test_decompile_express_merges_messages_for_same_surface -- split messages of one surface recompile as one createSurface
+# Legacy bare mixin keys on v1.0, which recompile under their `@` key.
+test_decompile_express_legacy_bare_metadata_on_v1_0 -- bare `metadata` recompiles as `@metadata`
+test_decompile_express_legacy_bare_checks_on_v1_0 -- bare `checks` recompiles as `@checks`
+test_decompile_express_legacy_bare_catalog_id_on_v1_0 -- bare `catalogId` recompiles as `@catalogId`
+
+# An Express block opens a surface with its root: a createSurface without
+# components (and so without a root) has no Express form.
+eui/§1.4 a seen id is INTEGRITY_ERROR, even after deleteSurface / step 0 -- createSurface without components
+eui/updateComponents and updateDataModel / step 2 -- createSurface without components
+eui/§5.2 the entry check: one INVALID_MESSAGE per entry, the rest applies / step 0 -- createSurface without components
+eui/mixed catalogs: an entry's own catalogId, basic child ids / step 0 -- createSurface without components
+eui/§6.9 callRendererFunction / step 0 -- createSurface with a dataModel but no components recompiles as updateDataModel
+# Other shapes.
+eui/updateComponents and updateDataModel / step 8 -- `value: null` at the root (clear the model) is written `$/ = {}`, as upstream's decompiler does
+eui/mixed catalogs: an entry's own catalogId, basic child ids / step 1 -- names catalogs other than eui's core one (the basic catalog and an unknown one)

@@ -127,6 +127,7 @@ fn eui_catalog_and_fixtures_load() {
         "dashboard.data",
         "demo-surface",
         "kitchen-sink",
+        "a2ui10-messages",
     ] {
         read_json(&eui.join(format!("fixtures/{fixture}.json")));
     }
