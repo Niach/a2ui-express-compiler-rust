@@ -22,6 +22,7 @@ files=(
   fixtures/dashboard.data.json
   fixtures/demo-surface.json
   fixtures/kitchen-sink.json
+  fixtures/a2ui10-messages.json
 )
 
 tmp="$(mktemp -d)"
