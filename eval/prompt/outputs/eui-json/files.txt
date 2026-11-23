@@ -1,1 +1,32 @@
-[{"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},{"version":"v0.9","updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Page","title":"Files","children":["stack"]},{"id":"stack","component":"Stack","direction":"vertical","gap":"md","children":["crumbs","toolbar","table"]},{"id":"crumbs","component":"Breadcrumb","items":[{"label":"Home","value":"home"},{"label":"Projects","value":"projects"},{"label":"Website","value":"website"}]},{"id":"toolbar","component":"Toolbar","children":["search"]},{"id":"search","component":"Input","name":"query","label":"Search","type":"search","placeholder":"Search files","value":{"path":"/query"}},{"id":"table","component":"Table","columns":[{"key":"name","label":"Name","type":"text","sortable":true},{"key":"size","label":"Size","type":"text","align":"end"},{"key":"modified","label":"Modified","type":"date","sortable":true},{"key":"actions","label":"","type":"slot","slot":"actions","align":"end","width":56}],"rows":{"path":"/files"},"rowKey":"id","slots":{"actions":"rowMenu"}},{"id":"rowMenu","component":"Menu","items":[{"label":"Rename","value":"rename","icon":"pencil"},{"label":"Delete","value":"delete","icon":"trash-2","destructive":true}],"children":["menuBtn"],"on":{"select":{"event":{"name":"fileAction","context":{"id":{"path":"id"},"action":{"path":"value"}}}}}},{"id":"menuBtn","component":"Button","icon":"ellipsis","variant":"ghost","size":"icon","label":"Actions"}]}},{"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{"query":"","files":[{"id":"1","name":"index.html","size":"4.2 KB","modified":"2025-03-02"},{"id":"2","name":"styles.css","size":"12.8 KB","modified":"2025-03-01"},{"id":"3","name":"app.js","size":"86 KB","modified":"2025-02-27"},{"id":"4","name":"logo.svg","size":"3.1 KB","modified":"2025-02-20"},{"id":"5","name":"hero.jpg","size":"1.4 MB","modified":"2025-02-18"},{"id":"6","name":"README.md","size":"1.9 KB","modified":"2025-02-10"}]}}}]
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{"query":"","files":[
+    {"id":"f1","name":"index.html","size":"4.2 KB","modified":"2025-03-02"},
+    {"id":"f2","name":"styles.css","size":"12.8 KB","modified":"2025-03-01"},
+    {"id":"f3","name":"app.js","size":"86 KB","modified":"2025-02-27"},
+    {"id":"f4","name":"logo.svg","size":"2.1 KB","modified":"2025-02-20"},
+    {"id":"f5","name":"hero.png","size":"1.4 MB","modified":"2025-02-18"},
+    {"id":"f6","name":"README.md","size":"1.1 KB","modified":"2025-02-10"}
+  ]}}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Files","children":["body"]},
+    {"id":"body","component":"Stack","gap":"md","children":["crumbs","search","table"]},
+    {"id":"crumbs","component":"Breadcrumb","items":[
+      {"label":"Home","value":"home"},
+      {"label":"Projects","value":"projects"},
+      {"label":"Website","value":"website"}
+    ]},
+    {"id":"search","component":"Input","label":"Search files","name":"query","type":"search","placeholder":"Search files","value":{"path":"/query"}},
+    {"id":"table","component":"Table","caption":"Website","rowKey":"id","columns":[
+      {"key":"name","label":"Name","type":"text","sortable":true},
+      {"key":"size","label":"Size","type":"text","align":"end"},
+      {"key":"modified","label":"Modified","type":"date","sortable":true},
+      {"key":"actions","label":"","type":"slot","slot":"actions","width":56,"align":"end"}
+    ],"rows":{"call":"filter","args":{"items":{"path":"/files"},"query":{"path":"/query"},"fields":["name"]}},"slots":{"actions":"rowMenu"}},
+    {"id":"rowMenu","component":"Menu","label":"Row actions","items":[
+      {"label":"Rename","value":"rename","icon":"pencil"},
+      {"label":"Delete","value":"delete","icon":"trash-2","destructive":true}
+    ],"children":["rowMenuBtn"]},
+    {"id":"rowMenuBtn","component":"Button","variant":"ghost","size":"icon","icon":"ellipsis","label":"Actions"}
+  ]}}
+]

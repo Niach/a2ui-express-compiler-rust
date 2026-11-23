@@ -1,0 +1,19 @@
+<a2ui>
+surface("main")
+$/form/productUpdates = true
+$/form/weeklyDigest = false
+$/form/theme = "system"
+$/form/fontSize = 16
+
+productUpdates = Switch(label="Product updates", name="productUpdates", checked=$/form/productUpdates)
+weeklyDigest = Switch(label="Weekly digest", name="weeklyDigest", checked=$/form/weeklyDigest)
+emailSection = Section(title="Email", children=[productUpdates, weeklyDigest])
+
+theme = Select(label="Theme", name="theme", options=[{label: "Light", value: "light"}, {label: "Dark", value: "dark"}, {label: "System", value: "system"}], value=$/form/theme)
+fontSize = Slider(label="Font size", min=12, max=20, step=1, value=$/form/fontSize, showValue=true)
+appearanceSection = Section(title="Appearance", children=[theme, fontSize])
+
+actions = FormActions(submit="Save", cancel=true, on={cancel: Event("cancel_settings")})
+form = Form(name="notifications", children=[emailSection, appearanceSection, actions], on={submit: Event("save_settings", {productUpdates: $/form/productUpdates, weeklyDigest: $/form/weeklyDigest, theme: $/form/theme, fontSize: $/form/fontSize})})
+root = Page(title="Notification settings", children=[form])
+</a2ui>

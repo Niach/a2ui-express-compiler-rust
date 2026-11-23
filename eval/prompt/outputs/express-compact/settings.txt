@@ -1,19 +1,25 @@
 <a2ui>
 surface("main")
-$/form/productUpdates = true
-$/form/weeklyDigest = false
-$/form/theme = "system"
-$/form/fontSize = 16
+$/settings/productUpdates = true
+$/settings/weeklyDigest = false
+$/settings/theme = "system"
+$/settings/fontSize = 16
 
-productUpdates = Switch(label="Product updates", name="productUpdates", checked=$/form/productUpdates)
-weeklyDigest = Switch(label="Weekly digest", name="weeklyDigest", checked=$/form/weeklyDigest)
-emailSection = Section(title="Email", children=[productUpdates, weeklyDigest])
+emailCard = Card(title="Email", children=[
+  Switch(label="Product updates", name="productUpdates", checked=$/settings/productUpdates, description="News about new features and improvements", on={change: Event("update_setting", {key: "productUpdates", value: $/settings/productUpdates})}),
+  Switch(label="Weekly digest", name="weeklyDigest", checked=$/settings/weeklyDigest, description="A summary of your activity every week", on={change: Event("update_setting", {key: "weeklyDigest", value: $/settings/weeklyDigest})})
+])
 
-theme = Select(label="Theme", name="theme", options=[{label: "Light", value: "light"}, {label: "Dark", value: "dark"}, {label: "System", value: "system"}], value=$/form/theme)
-fontSize = Slider(label="Font size", min=12, max=20, step=1, value=$/form/fontSize, showValue=true)
-appearanceSection = Section(title="Appearance", children=[theme, fontSize])
+appearanceCard = Card(title="Appearance", children=[
+  Select(label="Theme", name="theme", options=[{label: "Light", value: "light"}, {label: "Dark", value: "dark"}, {label: "System", value: "system"}], value=$/settings/theme),
+  Slider(label="Font size", min=12, max=20, step=1, value=$/settings/fontSize, showValue=true)
+])
 
-actions = FormActions(submit="Save", cancel=true, on={cancel: Event("cancel_settings")})
-form = Form(name="notifications", children=[emailSection, appearanceSection, actions], on={submit: Event("save_settings", {productUpdates: $/form/productUpdates, weeklyDigest: $/form/weeklyDigest, theme: $/form/theme, fontSize: $/form/fontSize})})
+form = Form(name="notification_settings", children=[
+  emailCard,
+  appearanceCard,
+  FormActions(submit="Save", cancel=true, on={cancel: Event("cancel_settings")})
+], on={submit: Event("save_settings", {productUpdates: $/settings/productUpdates, weeklyDigest: $/settings/weeklyDigest, theme: $/settings/theme, fontSize: $/settings/fontSize})})
+
 root = Page(title="Notification settings", children=[form])
 </a2ui>

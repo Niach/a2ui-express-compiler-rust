@@ -1,0 +1,22 @@
+{
+  "booking": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Covers every field with required checks on name and phone, uses a Select for time, puts date and time side by side in a FieldGroup, and adds helpful placeholders."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Covers every field with required checks on name and phone, and a horizontal Radio suits the four time options well; slightly plainer, with no placeholders."},
+    "winner": "tie"
+  },
+  "orders": {
+    "A": {"fidelity": 4, "components": 5, "notes": "Rows are pressable with a status badge, number, date, item count and total, but the filter is only bound to data and fires no change behaviour."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same idiomatic Segmented plus List of Rows with badges, and the filter also emits a change event, so filtering actually works."},
+    "winner": "B"
+  },
+  "team": {
+    "A": {"fidelity": 5, "components": 5, "notes": "A Toolbar holds the search field and the member count, a responsive grid shows person cards with Avatar, Heading and role, and Message sends a stable id."},
+    "B": {"fidelity": 5, "components": 4, "notes": "Has every required element, but nests the person cards inside an outer Card, and the message event passes the name rather than an id."},
+    "winner": "A"
+  },
+  "onboarding": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Has a Stepper on Workspace, a required name field, a Radio for team size, a Switch, and Back/Continue in a Toolbar inside a carded form; the default size 'solo' doesn't match any option."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Builds the same complete set inside a described Card, with the buttons right-aligned; it shares the 'solo' default mismatch."},
+    "winner": "tie"
+  }
+}

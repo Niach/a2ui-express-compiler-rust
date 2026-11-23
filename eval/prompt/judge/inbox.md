@@ -6,30 +6,31 @@ Request: A notifications inbox: a header 'Notifications' with a 'Mark all as rea
 
 ```
 Page title="Notifications"
-  Button label="Mark all as read" variant="outline"
-  List
+  [slot trailing]
+    Button label="Mark all as read" variant="outline" on=[press→event markAllRead]
+  List divided=true children=[template item, once per item of $/notifications]
 [template item: repeated once per item of its list]
-  Row title={"@path":"message"}
+  Row title=$message meta=$time
     [slot leading]
-      Avatar name={"@path":"sender"}
+      Avatar name=$sender seed=$id
     [slot trailing]
       Badge text="New" variant="default"
-[data model] /notifications = [{"id":"n1","sender":"Ada Lovelace","message":"Ada commented on your pull request","time":"2026-11-23T09:55:00Z","unread":true},{"id":"n2","sender":"Grace Hopper","message":"Grace assigned you to EXP-42","time":"2026-11-23T09:20:00Z","unread":true},{"id":"n3","sender":"Alan Turing","message":"Alan merged the release branch","time":"2026-11-23T07:30:00Z","unread":false},{"id":"n4","sender":"Linus Torvalds","message":"Linus mentioned you in a review","time":"2026-11-22T16:00:00Z","unread":false},{"id":"n5","sender":"Margaret Hamilton","message":"Margaret shared a document with you","time":"2026-11-21T11:00:00Z","unread":false}]
+[data model] /notifications = [{"id":"n1","sender":"Maya Chen","message":"Maya Chen commented on your pull request","time":"2m ago","unread":true},{"id":"n2","sender":"Jonas Weber","message":"Jonas Weber mentioned you in Design review","time":"15m ago","unread":true},{"id":"n3","sender":"Priya Nair","message":"Priya Nair assigned you to EXP-142","time":"1h ago","unread":false},{"id":"n4","sender":"Luca Romano","message":"Luca Romano approved your changes","time":"3h ago","unread":false},{"id":"n5","sender":"Sofia Alvarez","message":"Sofia Alvarez shared a file with you","time":"Yesterday","unread":false}]
 ```
 
 ## Sample B
 
 ```
-Stack
-  Stack
-    Heading text="Notifications"
-    Button label="Mark all as read" variant="outline"
-  List
+Page title="Notifications"
+  [slot trailing]
+    Button label="Mark all as read" variant="outline" on=[press→event mark_all_read]
+  Card
+    List divided=true children=[template item, once per item of $/notifications]
 [template item: repeated once per item of its list]
-  Row title={"@path":"message"}
+  Row title=$message subtitle=$sender meta=$time
     [slot leading]
-      Avatar name={"@path":"sender"}
+      Avatar name=$sender
     [slot trailing]
       Badge text="New"
-[data model] {"items":[{"sender":"Ava Chen","message":"Ava Chen commented on your pull request","time":"2 min ago","unread":true},{"sender":"Marcus Lee","message":"Marcus Lee mentioned you in Q3 planning","time":"18 min ago","unread":true},{"sender":"Priya Nair","message":"Priya Nair approved your design review","time":"1 hour ago","unread":false},{"sender":"Tom Becker","message":"Tom Becker assigned you an issue","time":"3 hours ago","unread":false},{"sender":"Sofia Rossi","message":"Sofia Rossi shared a file with you","time":"Yesterday","unread":false}]}
+[data model] {"notifications":[{"sender":"Maya Chen","message":"Maya Chen commented on your pull request","time":"2m ago","unread":true},{"sender":"Luis Ortega","message":"Luis Ortega assigned you to Billing refactor","time":"18m ago","unread":true},{"sender":"Priya Nair","message":"Priya Nair mentioned you in #design-review","time":"1h ago","unread":false},{"sender":"Tom Becker","message":"Tom Becker approved your deploy request","time":"3h ago","unread":false},{"sender":"Ana Souza","message":"Ana Souza shared the Q3 roadmap with you","time":"Yesterday","unread":false}]}
 ```

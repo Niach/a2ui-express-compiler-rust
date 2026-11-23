@@ -1,0 +1,31 @@
+[
+  {"version": "v0.9", "createSurface": {"surfaceId": "main", "catalogId": "https://ui.exponential.at/catalogs/core/v1"}},
+  {"version": "v0.9", "updateComponents": {"surfaceId": "main", "components": [
+    {"id": "root", "component": "Page", "title": "Edit profile", "children": ["form"]},
+    {"id": "form", "component": "Form", "name": "profile", "children": ["fields"],
+      "on": {"submit": {"event": {"name": "saveProfile", "context": {"name": {"path": "/profile/name"}, "email": {"path": "/profile/email"}, "bio": {"path": "/profile/bio"}, "timezone": {"path": "/profile/timezone"}}}}}},
+    {"id": "fields", "component": "Stack", "gap": "md", "children": ["photoRow", "name", "email", "bio", "timezone", "actions"]},
+    {"id": "photoRow", "component": "Stack", "direction": "horizontal", "gap": "md", "children": ["avatar", "changePhoto"]},
+    {"id": "avatar", "component": "Avatar", "name": {"path": "/profile/name"}, "size": "xl"},
+    {"id": "changePhoto", "component": "Button", "label": "Change photo", "variant": "outline",
+      "on": {"press": {"event": {"name": "changePhoto"}}}},
+    {"id": "name", "component": "Input", "name": "name", "label": "Display name", "value": {"path": "/profile/name"},
+      "checks": [{"condition": {"call": "required", "args": {"value": {"path": "/profile/name"}}}, "message": "Display name is required"}]},
+    {"id": "email", "component": "Input", "name": "email", "label": "Email", "type": "email", "value": {"path": "/profile/email"},
+      "checks": [{"condition": {"call": "email", "args": {"value": {"path": "/profile/email"}}}, "message": "Enter a valid email address"}]},
+    {"id": "bio", "component": "Textarea", "name": "bio", "label": "Bio", "rows": 4, "value": {"path": "/profile/bio"}},
+    {"id": "timezone", "component": "Select", "name": "timezone", "label": "Timezone", "value": {"path": "/profile/timezone"},
+      "options": [
+        {"label": "Europe/London", "value": "Europe/London"},
+        {"label": "Europe/Paris", "value": "Europe/Paris"},
+        {"label": "Europe/Berlin", "value": "Europe/Berlin"},
+        {"label": "America/New_York", "value": "America/New_York"},
+        {"label": "America/Los_Angeles", "value": "America/Los_Angeles"},
+        {"label": "Asia/Tokyo", "value": "Asia/Tokyo"},
+        {"label": "UTC", "value": "UTC"}
+      ]},
+    {"id": "actions", "component": "FormActions", "submit": "Save", "cancel": true,
+      "on": {"cancel": {"event": {"name": "cancelEdit"}}}}
+  ]}},
+  {"version": "v0.9", "updateDataModel": {"surfaceId": "main", "path": "/profile", "value": {"name": "Ada Lovelace", "email": "ada@example.com", "bio": "Analyst of engines", "timezone": "Europe/London"}}}
+]

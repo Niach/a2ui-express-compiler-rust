@@ -1,0 +1,23 @@
+<a2ui>
+surface("main")
+$/player/playing = true
+$/player/position = 84
+$/player/duration = 215
+$/track/title = "Midnight Drive"
+$/track/artist = "Neon Harbor"
+$/track/cover = "https://example.com/covers/midnight-drive.jpg"
+$/queue = [{title: "Golden Hour", artist: "Luma Vale", length: "3:42"}, {title: "Paper Planes", artist: "The Quiet Hours", length: "4:05"}, {title: "Static Bloom", artist: "Oriel", length: "2:58"}, {title: "Low Tide", artist: "Sable Coast", length: "3:31"}]
+
+cover = Image(src=$/track/cover, alt="Album cover", fit="cover", aspectRatio=1, fallback="music", style={borderRadius: 12, width: "100%", maxWidth: 320})
+title = Heading(text=$/track/title, level="h2")
+artist = Text(text=$/track/artist, variant="muted")
+progress = Progress(value=$/player/position, max=$/player/duration, valueText=formatDuration(hours($/player/position)), detail=formatDuration(hours($/player/duration)))
+prev = Button(icon="media-skip-previous", variant="ghost", size="icon", on={press: Event("previous_track")})
+play = Button(icon=cond($/player/playing, "pause", "play"), size="icon", on={press: Event("toggle_play")})
+next = Button(icon="media-skip-next", variant="ghost", size="icon", on={press: Event("next_track")})
+controls = Stack(direction="horizontal", gap="md", align="center", justify="center", children=[prev, play, next])
+nowPlaying = Stack(gap="md", align="center", children=[cover, Stack(gap="xs", align="center", children=[title, artist]), progress, controls])
+queueItem = Row(title=$title, subtitle=$artist, meta=$length, icon="music", on={press: Event("play_track", {title: $title})})
+queue = Section(title="Up next", count=4, children=[List(divided=true, children=_template($/queue, queueItem))])
+root = Card(children=[Stack(gap="lg", children=[nowPlaying, queue])])
+</a2ui>

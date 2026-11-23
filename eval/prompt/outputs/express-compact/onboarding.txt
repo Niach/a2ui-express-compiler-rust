@@ -1,0 +1,17 @@
+<a2ui>
+surface("main")
+$/form/name = ""
+$/form/size = "solo"
+$/form/work = true
+
+steps = Stepper(steps=[{label: "Account"}, {label: "Workspace"}, {label: "Invite"}], current=1)
+name = Input(label="Workspace name", name="name", placeholder="Acme Inc.", value=$/form/name, checks=[?required("Workspace name is required")])
+size = Radio(label="Team size", name="size", orientation="horizontal", value=$/form/size, options=[{label: "Just me", value: "solo"}, {label: "2-10", value: "small"}, {label: "11-50", value: "medium"}, {label: "51+", value: "large"}])
+work = Switch(label="Use for work", name="work", checked=$/form/work)
+back = Button(label="Back", variant="outline", on={press: Event("onboarding_back")})
+next = Button(label="Continue", submit=true)
+actions = Toolbar(children=[back, next])
+form = Form(name="workspace", children=[name, size, work, actions], on={submit: Event("onboarding_continue", {name: $/form/name, size: $/form/size, work: $/form/work})})
+card = Card(title="Set up your workspace", children=[form])
+root = Page(title="Create your workspace", subtitle="Step 2 of 3", children=[steps, card])
+</a2ui>

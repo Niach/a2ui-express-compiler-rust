@@ -1,0 +1,87 @@
+{
+  "login": {
+    "A": {"fidelity": 5, "components": 5, "notes": "All fields with required+email checks, checkbox, explicit 'Sign in' button and link, neatly wrapped in a Card."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Validation correct, but the submit button is an unlabeled FormActions and the forgot-password link sits outside the form without a card."},
+    "winner": "A"
+  },
+  "dashboard": {
+    "A": {"fidelity": 4, "components": 5, "notes": "Header, three stat tiles and a bound 5-row orders table inside a titled Card; trend deltas not visible in the outline."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Same content and bound table but the table is bare, with no card or title to separate it from the tiles; trends also not visible."},
+    "winner": "A"
+  },
+  "settings": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Both sections, switches, a 3-option select, a slider and Save/Cancel actions, all bound to form data."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Structurally identical to A, with equivalent bindings and actions."},
+    "winner": "tie"
+  },
+  "chat": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Page with a scrollable bubble list, the assistant shown with an avatar, and a bound composer pinned in a Box below."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Scroll area, three bubbles and a bound composer, but no page frame and no visible way to tell user from assistant."},
+    "winner": "A"
+  },
+  "products": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Bound search field and a Grid of templated product cards with image, Heading name, price, rating and an add-to-cart button."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Equivalent templated grid and search; uses a title-variant Text for the name and has no item ids, a negligible difference."},
+    "winner": "tie"
+  },
+  "empty": {
+    "A": {"fidelity": 5, "components": 5, "notes": "EmptyState with folder icon, title, a one-sentence description and the Create project action."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Identical structure, with an equally good description."},
+    "winner": "tie"
+  },
+  "checkout": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Full address form with required checks, country select, delivery radio, computed summary rows and actions; the data model initializes every field."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same complete structure with a Separator before the total; the data model leaves the address fields uninitialized but the bindings still work."},
+    "winner": "A"
+  },
+  "issue": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Bound title, status and priority badges, a Close button in the trailing slot, tabs with a Markdown description, an assignee Row with avatar, and templated events with details."},
+    "B": {"fidelity": 5, "components": 4, "notes": "Covers everything, with tab state bound to data, but the event rows show only a title and the assignee is a loose Avatar+Text stack."},
+    "winner": "A"
+  },
+  "signup": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Email check, required + min-8 on both passwords, and the terms checkbox correctly checked with eq(agree, true)."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Good checks overall, but 'required' on a boolean checkbox may accept false, so it may not actually enforce agreeing to the terms."},
+    "winner": "A"
+  },
+  "inbox": {
+    "A": {"fidelity": 4, "components": 5, "notes": "Page header, mark-all action, templated rows with avatar and New badge; time is not displayed and is stored as ISO rather than relative."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Same templated list with relative times in the data but not shown, and a hand-built Heading stack instead of a Page."},
+    "winner": "A"
+  },
+  "pricing": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Segmented toggle drives the prices, three titled cards with taglines, check-icon feature Lists, a Recommended badge on Pro, and Choose plan buttons."},
+    "B": {"fidelity": 5, "components": 4, "notes": "All content present with a toggle-driven price and a recommended badge, but features are plain Text stacks instead of a List."},
+    "winner": "A"
+  },
+  "profile": {
+    "A": {"fidelity": 4, "components": 4, "notes": "Prefilled fields, avatar with Change photo, timezone select and actions, but no validation on the email."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same prefilled form plus required-name and email checks, with a cleaner grouped layout."},
+    "winner": "B"
+  },
+  "todo": {
+    "A": {"fidelity": 4, "components": 4, "notes": "Add toolbar, templated task rows with a checkbox, text and delete icon, and a remaining-count footer; the checkbox has an empty label and the count is static."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Same features in a Card, with the Add button in the toolbar's trailing slot and the checkbox labeled by the task text; the count is also static."},
+    "winner": "B"
+  },
+  "kanban": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Three columns with counts derived from data via len, and templated task cards with title and avatar."},
+    "B": {"fidelity": 5, "components": 3, "notes": "Visually complete, but every card and count is hardcoded with no data model or templates."},
+    "winner": "A"
+  },
+  "contact": {
+    "A": {"fidelity": 4, "components": 4, "notes": "All fields and checks present, but the length check appears to be min:0 (the 500 max is unclear) and there is no data model."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Email check, required + max-length on the message, a subject placeholder and an initialized data model."},
+    "winner": "B"
+  },
+  "files": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Breadcrumb, bound search, a 4-column table over six files and a Rename/Delete menu in the actions slot."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Equivalent, with the search in a Toolbar and a labeled actions trigger."},
+    "winner": "tie"
+  },
+  "music": {
+    "A": {"fidelity": 1, "components": 1, "notes": "The reply did not parse, so nothing rendered."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Cover, bound title and artist, progress bar, prev/play-pause/next controls, and a templated four-track queue."},
+    "winner": "B"
+  }
+}

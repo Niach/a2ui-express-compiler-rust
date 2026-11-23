@@ -6,73 +6,53 @@ Request: A small kanban board: three columns (To do, Doing, Done), each with a h
 
 ```
 Page title="Kanban board"
-  Grid
-    Stack
-      Stack
-        Heading text="To do"
-        Badge text={"@call":"len","args":{"value":{"@path":"/todo"}}} variant="secondary"
-      List
-    Stack
-      Stack
-        Heading text="Doing"
-        Badge text={"@call":"len","args":{"value":{"@path":"/doing"}}} variant="secondary"
-      List
-    Stack
-      Stack
-        Heading text="Done"
-        Badge text={"@call":"len","args":{"value":{"@path":"/done"}}} variant="secondary"
-      List
-[template card: repeated once per item of its list]
-  Card
-    Stack
-      Avatar name={"@path":"assignee"}
-      Text text={"@path":"title"}
-[data model] {"todo":[{"title":"Draft launch checklist","assignee":"Maya Chen"},{"title":"Review pricing page","assignee":"Omar Reyes"},{"title":"Update onboarding copy","assignee":"Lena Fischer"}],"doing":[{"title":"Build billing webhook","assignee":"Omar Reyes"},{"title":"Design empty states","assignee":"Priya Nair"}],"done":[{"title":"Set up CI pipeline","assignee":"Lena Fischer"},{"title":"Write API docs","assignee":"Maya Chen"},{"title":"Fix login redirect","assignee":"Priya Nair"}]}
+  Grid columns={base: 1, md: 3} gap="md"
+    Section title="To do" count=3 tint="neutral"
+      Row title="Write onboarding copy" surface="card"
+        [slot leading]
+          Avatar name="Ada Lovelace" size="sm"
+      Row title="Set up CI pipeline" surface="card"
+        [slot leading]
+          Avatar name="Grace Hopper" size="sm"
+      Row title="Draft release notes" surface="card"
+        [slot leading]
+          Avatar name="Alan Turing" size="sm"
+    Section title="Doing" count=2 tint="info"
+      Row title="Design settings page" surface="card"
+        [slot leading]
+          Avatar name="Linus Torvalds" size="sm"
+      Row title="Fix login redirect bug" surface="card"
+        [slot leading]
+          Avatar name="Margaret Hamilton" size="sm"
+    Section title="Done" count=3 tint="success"
+      Row title="Create project repo" surface="card"
+        [slot leading]
+          Avatar name="Ada Lovelace" size="sm"
+      Row title="Pick a color palette" surface="card"
+        [slot leading]
+          Avatar name="Grace Hopper" size="sm"
+      Row title="Kickoff meeting" surface="card"
+        [slot leading]
+          Avatar name="Alan Turing" size="sm"
 ```
 
 ## Sample B
 
 ```
-Page title="Kanban"
-  Grid
-    Stack
-      Stack
-        Heading text="To do"
-        Badge text="3" variant="secondary"
-      Card
-        Stack
-          Text text="Draft onboarding copy"
-          Avatar name="Ada Lovelace"
-      Card
-        Stack
-          Text text="Set up CI pipeline"
-          Avatar name="Grace Hopper"
-      Card
-        Stack
-          Text text="Review pricing page"
-          Avatar name="Alan Turing"
-    Stack
-      Stack
-        Heading text="Doing"
-        Badge text="2" variant="secondary"
-      Card
-        Stack
-          Text text="Build login form"
-          Avatar name="Linus Torvalds"
-      Card
-        Stack
-          Text text="Fix upload bug"
-          Avatar name="Margaret Hamilton"
-    Stack
-      Stack
-        Heading text="Done"
-        Badge text="2" variant="secondary"
-      Card
-        Stack
-          Text text="Design system audit"
-          Avatar name="Ada Lovelace"
-      Card
-        Stack
-          Text text="Ship v1 landing page"
-          Avatar name="Grace Hopper"
+Page title="Kanban board"
+  Grid columns={base: 1, md: 3} gap="md"
+    Card
+      Section title="To do" count=len(value=$/todo)
+        List gap="sm" children=[template taskCard, once per item of $/todo]
+    Card
+      Section title="Doing" count=len(value=$/doing)
+        List gap="sm" children=[template taskCard, once per item of $/doing]
+    Card
+      Section title="Done" count=len(value=$/done)
+        List gap="sm" children=[template taskCard, once per item of $/done]
+[template taskCard: repeated once per item of its list]
+  Row title=$title surface="card"
+    [slot leading]
+      Avatar name=$assignee size="sm"
+[data model] {"todo":[{"title":"Draft launch email","assignee":"Maya Chen"},{"title":"Review pricing page","assignee":"Omar Haddad"},{"title":"Plan user interviews","assignee":"Lena Fischer"}],"doing":[{"title":"Build onboarding flow","assignee":"Priya Nair"},{"title":"Fix login redirect bug","assignee":"Tom Becker"}],"done":[{"title":"Set up CI pipeline","assignee":"Sam Okafor"},{"title":"Write release notes","assignee":"Maya Chen"},{"title":"Migrate database","assignee":"Lena Fischer"}]}
 ```

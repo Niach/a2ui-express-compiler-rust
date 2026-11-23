@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // AXC-20: scores the sample UIs a model wrote from each prompt.
 //
-//   bun eval/prompt/score.ts <eui-package-dir> [--blind]
+//   bun eval/prompt/score.ts <eui-package-dir> [--blind [--keep-key]]
 //
 // <eui-package-dir> is packages/exponential-ui of a checkout of
 // github.com/Niach/exponential (the version vendor/eui/UPSTREAM pins). Both
@@ -105,26 +105,87 @@ interface Node {
   props: Record<string, unknown>
   children: Node[]
   slots?: Record<string, Node>
+  /** A data template's children: one `component` per item at `path`. */
+  template?: { component: string; path: string }
+  /** eui keeps a component's actions here, beside its props. */
+  on?: Record<string, unknown>
+  style?: Record<string, unknown>
 }
 
-const TEXT_PROPS = [`title`, `label`, `text`, `heading`, `subtitle`, `description`, `placeholder`, `value`, `message`, `actionLabel`, `name`, `variant`, `kind`, `type`, `icon`]
+/** Props the outline leaves out: the tree, events and checks are drawn apart. */
+const SKIP_PROPS = new Set([`id`, `component`, `children`, `slots`, `on`, `checks`, `@checks`, `style`, `accessibility`])
+/** Long values are cut here (#AXC-22: was 60, and 80 for a check, which hid
+ *  a check's later arguments). */
+const MAX_VALUE = 240
+
+const cut = (s: string) => (s.length > MAX_VALUE ? `${s.slice(0, MAX_VALUE)}…` : s)
+
+/** A dynamic value as the judge reads it: a binding `$/path`, a call
+ *  `name(arg=…)`, else the literal. */
+function value(v: unknown): string {
+  if (v && typeof v === `object` && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>
+    const path = o[`@path`] ?? o.path
+    if (typeof path === `string` && Object.keys(o).length === 1) return `$${path}`
+    const call = o[`@call`] ?? o.call
+    if (typeof call === `string`) {
+      const args = o.args && typeof o.args === `object` ? (o.args as Record<string, unknown>) : {}
+      const list = Array.isArray(o.args)
+        ? (o.args as unknown[]).map(value)
+        : Object.entries(args).map(([k, a]) => `${k}=${value(a)}`)
+      return `${call}(${list.join(`, `)})`
+    }
+    return `{${Object.entries(o).map(([k, x]) => `${k}: ${value(x)}`).join(`, `)}}`
+  }
+  if (Array.isArray(v)) return `[${v.map(value).join(`, `)}]`
+  return JSON.stringify(v)
+}
+
+/** A prop as the outline shows it: every value, lists of items by their
+ *  label, long values cut at MAX_VALUE. */
+function prop(k: string, v: unknown): string {
+  if (Array.isArray(v) && v.some((x) => x && typeof x === `object`)) {
+    const names = v.map((x) => {
+      const o = (x ?? {}) as Record<string, unknown>
+      const n = o.label ?? o.title ?? o.name ?? o.key ?? o.value
+      return n === undefined ? value(x) : value(n)
+    })
+    return `${k}[${v.length}: ${cut(names.join(` | `))}]`
+  }
+  return `${k}=${cut(value(v))}`
+}
 
 /** The rendered tree as an indented outline: the judge's view of a sample. */
 function outline(node: Node, depth = 0, lines: string[] = []): string[] {
-  const shown = TEXT_PROPS.filter((k) => node.props?.[k] !== undefined)
-    .map((k) => {
-      const v = node.props[k]
-      return `${k}=${typeof v === `string` ? JSON.stringify(v) : JSON.stringify(v).slice(0, 60)}`
-    })
+  const props = node.props ?? {}
+  const shown = Object.entries(props)
+    .filter(([k, v]) => !SKIP_PROPS.has(k) && v !== undefined)
+    .map(([k, v]) => prop(k, v))
     .join(` `)
-  const lists = [`columns`, `options`, `items`, `tabs`, `rows`, `series`]
-    .filter((k) => Array.isArray(node.props?.[k]))
-    .map((k) => `${k}[${(node.props[k] as unknown[]).length}]`)
+  // #AXC-22: eui keeps `on` on the node, not in its props; the outline
+  // used to read only the props and so showed no actions at all.
+  const onMap = node.on ?? props.on
+  const on = onMap && typeof onMap === `object` ? Object.entries(onMap as Record<string, unknown>) : []
+  const events = on.map(([k, a]) => {
+    const act = (a ?? {}) as Record<string, Record<string, unknown>>
+    const target = act.event ? `event ${String(act.event.name)}${act.event.context ? ` ${value(act.event.context)}` : ``}` : act.functionCall ? value(act.functionCall) : value(a)
+    return `${k}→${cut(target)}`
+  })
+  const rawChecks = props.checks ?? props[`@checks`]
+  const checks = Array.isArray(rawChecks)
+    ? (rawChecks as Record<string, unknown>[]).map((c) => `${value(c?.condition)}${c?.message !== undefined ? ` ${JSON.stringify(c.message)}` : ``}`)
+    : []
+  const styleMap = node.style ?? props.style
+  const style = styleMap && typeof styleMap === `object` ? Object.keys(styleMap as object) : []
+  const extra = [
+    node.template ? `children=[template ${node.template.component}, once per item of $${node.template.path}]` : ``,
+    events.length ? `on=[${events.join(`, `)}]` : ``,
+    checks.length ? `checks=[${checks.join(`, `)}]` : ``,
+    style.length ? `style{${style.join(`, `)}}` : ``,
+  ]
+    .filter(Boolean)
     .join(` `)
-  const on = node.props?.on && typeof node.props.on === `object` ? Object.keys(node.props.on as object) : []
-  const checks = Array.isArray(node.props?.checks) ? (node.props.checks as unknown[]).map((c) => JSON.stringify(c).slice(0, 80)) : []
-  const extra = [on.length ? `on=[${on.join(`, `)}]` : ``, checks.length ? `checks=[${checks.join(`, `)}]` : ``].filter(Boolean).join(` `)
-  lines.push(`${`  `.repeat(depth)}${node.component}${shown ? ` ${shown}` : ``}${lists ? ` ${lists}` : ``}${extra ? ` ${extra}` : ``}`)
+  lines.push(`${`  `.repeat(depth)}${node.component}${shown ? ` ${shown}` : ``}${extra ? ` ${extra}` : ``}`)
   for (const [name, slot] of Object.entries(node.slots ?? {})) {
     lines.push(`${`  `.repeat(depth + 1)}[slot ${name}]`)
     outline(slot, depth + 2, lines)
@@ -218,7 +279,7 @@ for (const arm of ARMS) {
     row.outline = [
       ...outline(authored.root as Node),
       ...templates.flatMap(([id, t]) => [`[template ${id}: repeated once per item of its list]`, ...outline(t, 1)]),
-      ...(data.length ? [`[data model] ${data.join(`; `).slice(0, 800)}`] : []),
+      ...(data.length ? [`[data model] ${data.join(`; `).slice(0, 1500)}`] : []),
     ].join(`\n`)
     rows.push(row)
   }
@@ -232,9 +293,15 @@ writeFileSync(
 if (blind) {
   // Shuffle the arms per request; the key is written apart from the packets.
   mkdirSync(join(HERE, `judge`), { recursive: true })
+  // --keep-key: requests already in judge/key.json keep their labels, so a
+  // verdict on them stays valid when new requests are added (#AXC-22).
+  const keyFile = join(HERE, `judge`, `key.json`)
+  const kept: Record<string, Record<string, Arm>> =
+    process.argv.includes(`--keep-key`) && existsSync(keyFile) ? JSON.parse(readFileSync(keyFile, `utf8`)) : {}
   const key: Record<string, Record<string, Arm>> = {}
   for (const req of requests) {
-    const arms = [...ARMS].sort(() => Math.random() - 0.5)
+    const old = kept[req.id]
+    const arms = old ? Object.keys(old).sort().map((l) => old[l]) : [...ARMS].sort(() => Math.random() - 0.5)
     key[req.id] = {}
     const parts = [`# ${req.title}\n\nRequest: ${req.request}\n`]
     arms.forEach((arm, i) => {
@@ -245,7 +312,7 @@ if (blind) {
     })
     writeFileSync(join(HERE, `judge`, `${req.id}.md`), parts.join(`\n`))
   }
-  writeFileSync(join(HERE, `judge`, `key.json`), `${JSON.stringify(key, null, 2)}\n`)
+  writeFileSync(keyFile, `${JSON.stringify(key, null, 2)}\n`)
 }
 
 for (const r of rows)

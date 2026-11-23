@@ -1,5 +1,5 @@
 <a2ui>
 surface("main")
-empty = EmptyState(icon="folder", title="No projects yet", description="Projects you create will show up here so you can find them quickly.", actionLabel="Create project", size="page", on={press: Event("create_project")})
+empty = EmptyState(icon="folder", title="No projects yet", description="Projects you create will show up here, so you can keep related work together.", actionLabel="Create project", size="page", on={press: Event("create_project")})
 root = Page(title="Projects", children=[empty])
 </a2ui>

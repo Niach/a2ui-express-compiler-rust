@@ -1,1 +1,20 @@
-[{"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},{"version":"v0.9","updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Page","title":"Sign in","children":["card"]},{"id":"card","component":"Card","children":["form"]},{"id":"form","component":"Form","name":"signin","children":["email","password","remember","submit","forgot"]},{"id":"email","component":"Input","name":"email","label":"Email","type":"email","value":{"path":"/email"},"checks":[{"condition":{"call":"required","args":{"value":{"path":"/email"}}},"message":"Email is required"},{"condition":{"call":"email","args":{"value":{"path":"/email"}}},"message":"Enter a valid email address"}]},{"id":"password","component":"Input","name":"password","label":"Password","type":"password","value":{"path":"/password"},"checks":[{"condition":{"call":"required","args":{"value":{"path":"/password"}}},"message":"Password is required"}]},{"id":"remember","component":"Checkbox","name":"remember","label":"Remember me","checked":{"path":"/remember"}},{"id":"submit","component":"Button","label":"Sign in","variant":"default","submit":true},{"id":"forgot","component":"Link","label":"Forgot password?","on":{"press":{"event":{"name":"forgotPassword"}}}}]}},{"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{"email":"","password":"","remember":false}}}]
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{"email":"","password":"","remember":false}}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Sign in","children":["card"]},
+    {"id":"card","component":"Card","title":"Welcome back","description":"Sign in to your account to continue.","children":["form"]},
+    {"id":"form","component":"Form","name":"signin","children":["fields"],"on":{"submit":{"event":{"name":"signin","context":{"email":{"path":"/email"},"password":{"path":"/password"},"remember":{"path":"/remember"}}}}}},
+    {"id":"fields","component":"Stack","gap":"md","children":["email","password","remember","submit","forgot"]},
+    {"id":"email","component":"Input","name":"email","label":"Email","type":"email","placeholder":"you@example.com","value":{"path":"/email"},"validateOn":"blur","checks":[
+      {"condition":{"call":"required","args":{"value":{"path":"/email"}}},"message":"Email is required."},
+      {"condition":{"call":"email","args":{"value":{"path":"/email"}}},"message":"Enter a valid email address."}
+    ]},
+    {"id":"password","component":"Input","name":"password","label":"Password","type":"password","value":{"path":"/password"},"checks":[
+      {"condition":{"call":"required","args":{"value":{"path":"/password"}}},"message":"Password is required."}
+    ]},
+    {"id":"remember","component":"Checkbox","name":"remember","label":"Remember me","checked":{"path":"/remember"}},
+    {"id":"submit","component":"Button","label":"Sign in","variant":"default","submit":true},
+    {"id":"forgot","component":"Link","label":"Forgot password?","on":{"press":{"event":{"name":"forgotPassword"}}}}
+  ]}}
+]

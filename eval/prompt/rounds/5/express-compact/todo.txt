@@ -1,0 +1,16 @@
+<a2ui>
+surface("main")
+$/newTask = ""
+$/remaining = 3
+$/tasks = [{id: "t1", title: "Buy groceries", done: false}, {id: "t2", title: "Write project report", done: true}, {id: "t3", title: "Call the dentist", done: false}, {id: "t4", title: "Water the plants", done: false}]
+addInput = Input(label="New task", name="newTask", placeholder="What needs doing?", value=$/newTask, on={submit: Event("add_task", {title: $/newTask})})
+addButton = Button(label="Add", on={press: Event("add_task", {title: $/newTask})})
+addRow = Toolbar(children=[addInput, addButton])
+taskCheck = Checkbox(label="", name="done", checked=$done, on={change: Event("toggle_task", {id: $id})})
+taskText = Text(text=$title)
+taskDelete = Button(icon="trash-2", variant="ghost", size="icon", on={press: Event("delete_task", {id: $id})})
+taskRow = Stack(direction="horizontal", align="center", justify="between", children=[taskCheck, taskText, taskDelete])
+taskList = List(divided=true, children=_template($/tasks, taskRow))
+footer = Text(text=formatString("${/remaining} tasks left"), variant="muted")
+root = Page(title="To-do", children=[Stack(gap="md", children=[addRow, taskList, footer])])
+</a2ui>

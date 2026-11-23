@@ -2,9 +2,9 @@
 surface("main")
 $/draft = ""
 m1 = MessageBubble(text="Hi! Can you help me plan a trip to Lisbon?", side="out", time="09:41", status="read")
-m2 = MessageBubble(text="Of course! How many days will you be there, and what do you enjoy most: food, history or nightlife?", side="in", author="Assistant", time="09:41")
-m3 = MessageBubble(text="Four days, mostly food and history.", side="out", time="09:42", status="sent")
-messages = ScrollArea(direction="vertical", maxHeight=520, children=[Stack(direction="vertical", gap="md", children=[m1, m2, m3])])
-composer = Composer(placeholder="Type a message", value=$/draft, submitLabel="Send", on={submit: Event("send_message", {text: $/draft})})
-root = Stack(direction="vertical", gap="md", children=[messages, composer])
+m2 = MessageBubble(text="Of course! How many days are you staying, and what do you enjoy most: food, history or beaches?", side="in", time="09:42", author="Assistant")
+m3 = MessageBubble(text="Four days, mostly food and history.", side="out", time="09:43", status="sent")
+messages = ScrollArea(direction="vertical", maxHeight=480, children=[Stack(direction="vertical", gap="md", children=[m1, m2, m3])])
+composer = Composer(placeholder="Write a message", value=$/draft, submitLabel="Send", on={change: Event("draft_changed", {draft: $/draft}), submit: Event("send_message", {text: $/draft}, userMessage=$/draft)})
+root = Page(title="Chat", children=[Stack(direction="vertical", gap="md", children=[messages, composer])])
 </a2ui>

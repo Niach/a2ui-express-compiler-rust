@@ -8,11 +8,14 @@
 //!   to spell out (after its `$defs` entry when it has one, else after the
 //!   property) and lists it once, under `### Shared Types`; a map that has
 //!   another's keys but a few reads `Other without a, b`;
+//! - lists a long enum (an icon registry) with runs of values that share a
+//!   prefix grouped, `ui-{add|back}`;
 //! - lists once, under `### Common Properties`, a property line several
 //!   components share, and leaves out of the signatures the properties
 //!   nearly every component takes;
 //! - marks the properties that take a data binding with `~` instead of
-//!   marking the others `(static)`, and writes an action slot `Action`;
+//!   marking the others `(static)`, shows one bound beside one literal-only
+//!   property, and writes an action slot `Action`;
 //! - cuts component descriptions to their first sentence and leaves out
 //!   property, argument and function descriptions.
 
@@ -45,8 +48,21 @@ const UNIVERSAL_MIN_COMPONENTS: usize = 8;
 /// The heading and lead-in of the compact component signatures.
 pub(super) const COMPONENTS_HEADING: &str = "## Component Signatures\n\nInstantiate components with these signatures, naming every argument (`Button(label=\"Save\", variant=\"outline\")`, `Stack(children=[a, b])`). Do not name any other key.";
 
-/// The legend printed before the compact signatures.
-const LEGEND: &str = "Notation: `name?` is optional; `name~` also takes a data binding ($/path) or a function call, any other property takes a literal only; `:n` marks a number (write 1.5, not \"1.5\"), `:b` a boolean. Under a signature, `- prop: type` gives a property's values: `a|b|c` is one of these strings (write \"a\"), `{key, key: type}` is a map with those keys (`{a|b: type}`: keys a and b, both of that type), `[type]` a list, `Action` an Event(...) or function call, and a capitalized name a type from Shared Types.";
+/// The legend printed before the compact signatures. `literal` is a
+/// component call that binds one property and gives another, which takes
+/// no binding, a literal (`Progress(value=$/progress, max=5)`); `folded` says a long
+/// enum groups values by prefix.
+fn legend(literal: Option<&str>, folded: bool) -> String {
+    let example = literal.map_or(String::new(), |c| format!(": {c}"));
+    let fold = if folded {
+        " In a long list, `pre-{a|b}` stands for pre-a|pre-b."
+    } else {
+        ""
+    };
+    format!(
+        "Notation: `name?` is optional; `name~` also takes a data binding ($/path) or a function call; a property without `~` takes a literal only, never $ or a call{example}. `:n` marks a number (write 1.5, not \"1.5\"), `:b` a boolean. Under a signature, `- prop: type` gives a property's values: `a|b|c` is one of these strings (write \"a\"), `{{key, key: type}}` is a map with those keys (`{{a|b: type}}`: keys a and b, both of that type), `[type]` a list, `Action` an Event(...) or function call, and a capitalized name a type from Shared Types.{fold}"
+    )
+}
 
 /// A shape the model has to be told: the allowed values of an enum, the
 /// keys of a map (a list of maps is its item map), or an action.
@@ -124,6 +140,48 @@ fn pascal_case(name: &str) -> String {
 
 fn enum_text(values: &[Value]) -> String {
     values.iter().map(enum_value).collect::<Vec<_>>().join("|")
+}
+
+/// An enum at least this long (an icon registry) is listed with the values
+/// that share a prefix grouped: `pre-{a|b|c}`.
+const FOLD_MIN_VALUES: usize = 40;
+
+/// A prefix (up to and including its first `-`) is grouped when at least
+/// this many values in a row share it.
+const FOLD_MIN_GROUP: usize = 3;
+
+/// A long enum's values, runs that share a prefix grouped (`ui-{add|back}`):
+/// `None` when the enum is short or nothing groups.
+fn folded_enum_text(values: &[Value]) -> Option<String> {
+    if values.len() < FOLD_MIN_VALUES {
+        return None;
+    }
+    let names: Vec<String> = values.iter().map(enum_value).collect();
+    let prefix = |v: &str| v.find('-').map(|i| v[..=i].to_owned());
+    let mut parts = Vec::new();
+    let mut folded = false;
+    let mut i = 0;
+    while i < names.len() {
+        let Some(pre) = prefix(&names[i]).filter(|p| p.len() < names[i].len()) else {
+            parts.push(names[i].clone());
+            i += 1;
+            continue;
+        };
+        let run = names[i..]
+            .iter()
+            .take_while(|v| v.starts_with(&pre) && v.len() > pre.len())
+            .count();
+        if run >= FOLD_MIN_GROUP {
+            let rest: Vec<&str> = names[i..i + run].iter().map(|v| &v[pre.len()..]).collect();
+            parts.push(format!("{pre}{{{}}}", rest.join("|")));
+            folded = true;
+            i += run;
+        } else {
+            parts.push(names[i].clone());
+            i += 1;
+        }
+    }
+    folded.then(|| parts.join("|"))
 }
 
 struct Entry {
@@ -284,7 +342,10 @@ impl<'c> Types<'c> {
             .filter_map(|(i, name)| {
                 let body = match Shape::of(self.catalog, &self.entries[i].schema)? {
                     Shape::Action => return None,
-                    Shape::Enum(values) => format!("one of {}", enum_text(&values)),
+                    Shape::Enum(values) => format!(
+                        "one of {}",
+                        folded_enum_text(&values).unwrap_or_else(|| enum_text(&values))
+                    ),
                     Shape::Map(props, _) => {
                         // A map with another's keys but a few.
                         let base = maps.iter().find(|(other, theirs)| {
@@ -416,6 +477,41 @@ fn action_hint(list: &[&Component], args: &[Vec<Arg>]) -> Option<String> {
     Some(hint)
 }
 
+/// A call that binds a component's number and gives a literal to another
+/// optional number of it that takes no binding
+/// (`Progress(value=$/progress, max=5)`): the component with the fewest
+/// properties that has a required bindable number and an optional literal
+/// one.
+fn literal_example(list: &[&Component], args: &[Vec<Arg>]) -> Option<String> {
+    // A required bindable number (`value~:n`) or an optional literal one
+    // (`max?:n`).
+    let number = |a: &Arg, bindable: bool| {
+        let base = a.label.trim_end_matches(":n");
+        a.label.ends_with(":n")
+            && if bindable {
+                base.ends_with('~') && !base.ends_with("?~")
+            } else {
+                base.ends_with('?')
+            }
+    };
+    let name = |a: &Arg| {
+        a.label
+            .split(['?', '~', ':', ' '])
+            .next()
+            .unwrap_or_default()
+            .to_owned()
+    };
+    list.iter()
+        .zip(args)
+        .filter_map(|(c, args)| {
+            let bound = args.iter().find(|a| number(a, true))?;
+            let literal = args.iter().find(|a| number(a, false))?;
+            Some((args.len(), c.name(), name(bound), name(literal)))
+        })
+        .min_by_key(|(n, ..)| *n)
+        .map(|(_, c, bound, literal)| format!("{c}({bound}=$/{}, {literal}=5)", c.to_lowercase()))
+}
+
 /// The compact component section: the legend, the shared types, the common
 /// properties and one signature per component.
 pub(super) fn components(catalog: &Catalog) -> String {
@@ -506,11 +602,12 @@ pub(super) fn components(catalog: &Catalog) -> String {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let mut out = vec![LEGEND.to_owned()];
+    let defs = types.definitions();
+    let folded = defs.iter().any(|d| d.contains("-{"));
+    let mut out = vec![legend(literal_example(&list, &args).as_deref(), folded)];
     if let Some(hint) = action_hint(&list, &args) {
         out.push(hint);
     }
-    let defs = types.definitions();
     if !defs.is_empty() {
         out.push(format!("\n### Shared Types\n{}", defs.join("\n")));
     }
@@ -665,8 +762,9 @@ impl<'c> BindingNames<'c> {
 
 /// Upstream's rules, adapted to the compact signatures: the rules about
 /// `(static)` and the `action` argument go when they do not apply, rule 7
-/// says what a check reads, and a rule after the templates says to keep
-/// data in the data model and bind to it. Not renumbered.
+/// says what a check reads, and rules after the templates say to keep data
+/// in the data model and bind to it, and how a screen is laid out (#AXC-22).
+/// Not renumbered.
 pub(super) fn adapt_rules(rules: &str, catalogs: &[Catalog], writes_data: bool) -> String {
     let mut rules = remove_rule(rules, STATIC_RULE);
     let takes_action = catalogs
@@ -709,14 +807,85 @@ pub(super) fn adapt_rules(rules: &str, catalogs: &[Catalog], writes_data: bool) 
             "Repeated content (cards, rows, messages, events) is one template over a list, not copies: {fill}{list}({slot}=_template($/items, item)), item = {item}({prop}=$title) or any tree reading the item ($title). Only `~` properties take a binding, in a template too; give the others a literal."
         ));
     }
+    if writes_data {
+        if let Some((_, prop)) = names.check {
+            data.push(format!(
+                "Give every bound path a starting value: $/form/name = \"\" for `{prop}=$/form/name`."
+            ));
+        }
+    }
     if data.len() > 1 && rules.contains(TEMPLATE_RULE_END) {
+        let layout = layout_rule(catalogs)
+            .map(|l| format!("\n\n99. Layout: {l}"))
+            .unwrap_or_default();
         rules = rules.replacen(
             TEMPLATE_RULE_END,
-            &format!("{TEMPLATE_RULE_END}\n\n99. Data: {}", data.join(" ")),
+            &format!(
+                "{TEMPLATE_RULE_END}\n\n99. Data: {}{layout}",
+                data.join(" ")
+            ),
             1,
         );
     }
     rules
+}
+
+/// The layout a catalog's screens are built from, by the components'
+/// conventional names, each part only when the catalog has its components:
+/// a screen frame (`Page`), a titled box for each block (`Card`), list rows
+/// (`List` of `Row`) instead of stacked text, and a labelled checkbox.
+fn layout_rule(catalogs: &[Catalog]) -> Option<String> {
+    let find = |name: &str| {
+        catalogs
+            .iter()
+            .find_map(|c| c.component(name).map(|x| (c, x)))
+    };
+    let takes = |name: &str, prop: &str| {
+        find(name).is_some_and(|(_, x)| x.properties().iter().any(|p| p == prop))
+    };
+    let mut parts = Vec::new();
+    if takes("Page", "title") {
+        parts.push("one Page(title=\"…\") frames the screen".to_owned());
+    }
+    if takes("Card", "title") {
+        parts.push(
+            "a form, a table or a group of related content sits in a Card(title=\"…\")".to_owned(),
+        );
+    }
+    if let (Some(_), Some((catalog, row))) = (find("List"), find("Row")) {
+        let fields: Vec<String> = ["title", "subtitle", "meta"]
+            .into_iter()
+            .filter(|p| {
+                row.property_schema(p)
+                    .is_some_and(|s| catalog.admits_path(s))
+            })
+            .map(|p| format!("{p}=${p}"))
+            .collect();
+        if !fields.is_empty() {
+            parts.push(format!(
+                "items, features or links are List rows, Row({}), not stacked Text",
+                fields.join(", ")
+            ));
+        }
+    }
+    let labelled = catalogs.iter().flat_map(Catalog::components).find(|x| {
+        x.is_checkable() && x.is_required("label") && x.properties().iter().any(|p| p == "checked")
+    });
+    if let Some(x) = labelled {
+        parts.push(format!(
+            "every control has a visible label, {}(label=$title) in a template too",
+            x.name()
+        ));
+    }
+    (!parts.is_empty()).then(|| {
+        let mut text = parts.join("; ");
+        text.push('.');
+        let mut chars = text.chars();
+        chars
+            .next()
+            .map(|c| c.to_uppercase().collect::<String>() + chars.as_str())
+            .unwrap_or_default()
+    })
 }
 
 /// The compact signatures of the named functions, in the order given: the

@@ -1,0 +1,70 @@
+{
+  "login": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "dashboard": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "settings": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "chat": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "products": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "empty": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "checkout": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "issue": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "signup": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "inbox": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "pricing": {
+    "A": "eui-json",
+    "B": "express-compact"
+  },
+  "profile": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "todo": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "kanban": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "contact": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "files": {
+    "A": "express-compact",
+    "B": "eui-json"
+  },
+  "music": {
+    "A": "express-compact",
+    "B": "eui-json"
+  }
+}

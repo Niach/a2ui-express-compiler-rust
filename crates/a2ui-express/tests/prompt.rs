@@ -178,7 +178,9 @@ fn eui_compact_prompt_fits_the_budget() {
     }
     assert_eq!(text.matches("a-large-small").count(), 1);
     assert_eq!(text.matches("\n- Style: {display: ").count(), 1);
-    assert!(text.contains("\n- Icon: one of a-large-small|"));
+    // The icon registry groups names that share a prefix.
+    assert!(text.contains("\n- Icon: one of a-large-small|action-{chat|create|default|repository|run|suggestion}|activity|"));
+    assert!(text.contains("In a long list, `pre-{a|b}` stands for pre-a|pre-b."));
     assert!(text.contains("Every component also takes style? (Style), visible?~"));
     assert!(text.contains("\n- icon: Icon\n"));
     assert!(text.contains("aspectRatio?:n"));
@@ -215,8 +217,18 @@ fn compact_rules_teach_binding_and_checks() {
     assert!(rules.contains("Only `~` properties take a binding, in a template too"));
     assert!(rules.contains("\n\n12. Data: Keep data in the data model and bind to it. Bind every input's `value` to a path"));
     assert!(rules.contains("List(children=_template($/items, item)), item = Text(text=$title)"));
-    assert!(rules.contains("\n\n15. Surface targeting:"));
-    assert!(!rules.contains("\n\n16. "));
+    assert!(rules.contains("Give every bound path a starting value: $/form/name = \"\""));
+    // #AXC-22: the layout the catalog's screens are built from, by its
+    // components' names.
+    assert!(rules.contains("\n\n13. Layout: One Page(title=\"…\") frames the screen; a form, a table or a group of related content sits in a Card(title=\"…\"); items, features or links are List rows, Row(title=$title, subtitle=$subtitle, meta=$meta), not stacked Text; every control has a visible label, Checkbox(label=$title) in a template too."));
+    // The few functions that cannot be called standalone are named, not
+    // the many that can.
+    assert!(rules.contains("Any function under Function Signatures but `openUrl`, `set`, `bind` can be called this way."));
+    assert!(!rules.contains("Only these functions can be called this way"));
+    assert!(rules.contains("\n\n16. Surface targeting:"));
+    assert!(!rules.contains("\n\n17. "));
+    // The legend shows a literal-only property beside a bound one.
+    assert!(text.contains("a property without `~` takes a literal only, never $ or a call: Progress(value=$/progress, max=5)."));
 
     // The default style keeps upstream's rules.
     let upstream = prompt(
@@ -225,6 +237,8 @@ fn compact_rules_teach_binding_and_checks() {
     );
     assert!(upstream.contains("Static properties"));
     assert!(!upstream.contains("Data: Keep data"));
+    assert!(!upstream.contains("Layout: "));
+    assert!(upstream.contains("Only these functions can be called this way: `required`"));
 }
 
 #[test]

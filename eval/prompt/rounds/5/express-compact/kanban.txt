@@ -1,0 +1,14 @@
+<a2ui>
+surface("main")
+$/todo = [{title: "Draft launch checklist", assignee: "Maya Chen"}, {title: "Review pricing page", assignee: "Omar Reyes"}, {title: "Update onboarding copy", assignee: "Lena Fischer"}]
+$/doing = [{title: "Build billing webhook", assignee: "Omar Reyes"}, {title: "Design empty states", assignee: "Priya Nair"}]
+$/done = [{title: "Set up CI pipeline", assignee: "Lena Fischer"}, {title: "Write API docs", assignee: "Maya Chen"}, {title: "Fix login redirect", assignee: "Priya Nair"}]
+card = Card(children=[Stack(direction="horizontal", gap="sm", align="center", children=[Avatar(name=$assignee, size="sm"), Text(text=$title)])])
+todoHeader = Stack(direction="horizontal", gap="sm", align="center", children=[Heading(text="To do", level="h3"), Badge(text=len(value=$/todo), variant="secondary")])
+doingHeader = Stack(direction="horizontal", gap="sm", align="center", children=[Heading(text="Doing", level="h3"), Badge(text=len(value=$/doing), variant="secondary")])
+doneHeader = Stack(direction="horizontal", gap="sm", align="center", children=[Heading(text="Done", level="h3"), Badge(text=len(value=$/done), variant="secondary")])
+todoCol = Stack(direction="vertical", gap="md", children=[todoHeader, List(gap="sm", children=_template($/todo, card))])
+doingCol = Stack(direction="vertical", gap="md", children=[doingHeader, List(gap="sm", children=_template($/doing, card))])
+doneCol = Stack(direction="vertical", gap="md", children=[doneHeader, List(gap="sm", children=_template($/done, card))])
+root = Page(title="Kanban board", children=[Grid(columns={base: 1, md: 3}, gap="lg", children=[todoCol, doingCol, doneCol])])
+</a2ui>

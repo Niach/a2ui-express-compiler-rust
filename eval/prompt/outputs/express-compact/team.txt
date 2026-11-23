@@ -1,0 +1,11 @@
+<a2ui>
+surface("main")
+$/query = ""
+$/people = [{name: "Ava Chen", role: "Engineering Lead"}, {name: "Marcus Webb", role: "Product Designer"}, {name: "Priya Nair", role: "Backend Engineer"}, {name: "Tomas Silva", role: "Frontend Engineer"}, {name: "Hannah Brooks", role: "Product Manager"}, {name: "Kenji Sato", role: "Data Analyst"}]
+search = Input(label="Search people", name="query", type="search", placeholder="Search by name or role", value=$/query)
+count = Text(text=concat([len($/people), " members"]), variant="muted")
+person = Card(children=[Stack(direction="vertical", gap="sm", align="center", children=[Avatar(name=$name, size="lg"), Text(text=$name, variant="title"), Text(text=$role, variant="muted"), Button(label="Message", variant="outline", on={press: Event("message", {person: $name})})])])
+people = Grid(columns={base: 1, sm: 2, lg: 3}, gap="md", children=_template($/people, person))
+directory = Card(title="Team directory", children=[Stack(direction="vertical", gap="md", children=[search, count, people])])
+root = Page(title="Team", children=[directory])
+</a2ui>

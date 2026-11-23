@@ -214,13 +214,42 @@ impl Generator<'_> {
 
         let has_callable_rule = call_renderer_allowed && !callable.is_empty();
         if has_callable_rule {
-            let listed = callable
+            let quote = |names: &[&str]| {
+                names
+                    .iter()
+                    .map(|n| format!("`{n}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            let callable_refs: Vec<&str> = callable.iter().map(String::as_str).collect();
+            // Compact: name the few catalog functions that cannot be called
+            // this way rather than the many that can.
+            let others: Vec<&str> = self
+                .catalogs
+                .catalogs()
                 .iter()
-                .map(|n| format!("`{n}`"))
-                .collect::<Vec<_>>()
-                .join(", ");
+                .flat_map(Catalog::functions)
+                .filter(|f| !f.is_system() && !callable.iter().any(|c| c == f.name()))
+                .map(|f| f.name())
+                .collect();
+            let which =
+                if self.options.style == PromptStyle::Compact && others.len() < callable.len() {
+                    if others.is_empty() {
+                        "Any function under Function Signatures can be called this way.".to_owned()
+                    } else {
+                        format!(
+                            "Any function under Function Signatures but {} can be called this way.",
+                            quote(&others)
+                        )
+                    }
+                } else {
+                    format!(
+                        "Only these functions can be called this way: {}.",
+                        quote(&callable_refs)
+                    )
+                };
             let call_rule = format!(
-                "To have the renderer run a function right away, output the call as a standalone command (no variable assignment):\n    {}(...)\n    Only these functions can be called this way: {listed}.",
+                "To have the renderer run a function right away, output the call as a standalone command (no variable assignment):\n    {}(...)\n    {which}",
                 callable[0]
             );
             rules = rules.replacen(

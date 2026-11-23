@@ -1,0 +1,18 @@
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{"workspace":{"name":"","size":"solo","work":true}}}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Set up your workspace","subtitle":"Step 2 of 3","children":["body"]},
+    {"id":"body","component":"Stack","gap":"lg","children":["stepper","form"]},
+    {"id":"stepper","component":"Stepper","steps":[{"label":"Account"},{"label":"Workspace"},{"label":"Invite"}],"current":1},
+    {"id":"form","component":"Form","name":"workspace","children":["card"],"on":{"submit":{"event":{"name":"continue","context":{"name":{"path":"/workspace/name"},"size":{"path":"/workspace/size"},"work":{"path":"/workspace/work"}}}}}},
+    {"id":"card","component":"Card","title":"Workspace details","description":"Tell us a little about your workspace.","children":["fields"]},
+    {"id":"fields","component":"Stack","gap":"lg","children":["nameInput","sizeRadio","workSwitch","actions"]},
+    {"id":"nameInput","component":"Input","name":"workspaceName","label":"Workspace name","placeholder":"Acme Inc.","value":{"path":"/workspace/name"},"checks":[{"condition":{"call":"required","args":{"value":{"path":"/workspace/name"}}},"message":"Workspace name is required"}]},
+    {"id":"sizeRadio","component":"Radio","name":"teamSize","label":"Team size","orientation":"horizontal","value":{"path":"/workspace/size"},"options":[{"label":"Just me","value":"solo"},{"label":"2-10","value":"small"},{"label":"11-50","value":"medium"},{"label":"51+","value":"large"}]},
+    {"id":"workSwitch","component":"Switch","name":"useForWork","label":"Use for work","checked":{"path":"/workspace/work"}},
+    {"id":"actions","component":"Stack","direction":"horizontal","justify":"end","gap":"sm","children":["backBtn","continueBtn"]},
+    {"id":"backBtn","component":"Button","label":"Back","variant":"outline","on":{"press":{"event":{"name":"back"}}}},
+    {"id":"continueBtn","component":"Button","label":"Continue","submit":true}
+  ]}}
+]

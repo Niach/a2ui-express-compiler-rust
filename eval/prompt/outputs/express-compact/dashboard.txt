@@ -1,26 +1,11 @@
 <a2ui>
 surface("main")
-$/orders = [
-  {id: "#10482", customer: "Ava Thompson", amount: 128.5, status: "Paid"},
-  {id: "#10481", customer: "Liam Carter", amount: 342, status: "Paid"},
-  {id: "#10480", customer: "Noah Patel", amount: 59.9, status: "Pending"},
-  {id: "#10479", customer: "Mia Rossi", amount: 214.25, status: "Refunded"},
-  {id: "#10478", customer: "Ethan Kim", amount: 87, status: "Paid"}
-]
+$/orders = [{id: "#10482", customer: "Acme Corp", amount: 1280.5, status: "Paid"}, {id: "#10481", customer: "Globex", amount: 645, status: "Pending"}, {id: "#10480", customer: "Initech", amount: 2310.75, status: "Paid"}, {id: "#10479", customer: "Umbrella Ltd", amount: 189.99, status: "Refunded"}, {id: "#10478", customer: "Stark Industries", amount: 4520, status: "Paid"}]
 revenue = StatTile(label="Revenue", value="$1.2M", delta="+8%", tone="success")
 orders = StatTile(label="Orders", value="3,420", delta="+3%", tone="success")
 refunds = StatTile(label="Refunds", value="41", delta="-12%", tone="success")
-tiles = Grid(columns={base: 1, md: 3}, gap="md", children=[revenue, orders, refunds])
-recent = Table(
-  columns=[
-    {key: "id", label: "Order", type: "text"},
-    {key: "customer", label: "Customer", type: "text"},
-    {key: "amount", label: "Amount", type: "currency", currency: "USD", align: "end"},
-    {key: "status", label: "Status", type: "badge"}
-  ],
-  rows=$/orders,
-  rowKey="id",
-  caption="Most recent orders"
-)
-root = Page(title="Q3 overview", children=[tiles, recent])
+tiles = Grid(columns={base: 1, sm: 3}, gap="md", children=[revenue, orders, refunds])
+ordersTable = Table(columns=[{key: "id", label: "Order ID", type: "text"}, {key: "customer", label: "Customer", type: "text"}, {key: "amount", label: "Amount", type: "currency", currency: "USD", decimals: 2, align: "end"}, {key: "status", label: "Status", type: "badge"}], rows=$/orders, rowKey="id", caption="Five most recent orders")
+ordersCard = Card(title="Recent orders", children=[ordersTable])
+root = Page(title="Q3 overview", children=[tiles, ordersCard])
 </a2ui>

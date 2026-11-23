@@ -1,0 +1,19 @@
+<a2ui>
+surface("main")
+$/query = ""
+$/files = [
+  {id: "f1", name: "index.html", size: "4.2 KB", modified: "2026-03-10T09:15:00Z"},
+  {id: "f2", name: "styles.css", size: "12.8 KB", modified: "2026-03-11T14:02:00Z"},
+  {id: "f3", name: "app.js", size: "86 KB", modified: "2026-03-12T16:40:00Z"},
+  {id: "f4", name: "logo.png", size: "23 KB", modified: "2026-03-05T11:30:00Z"},
+  {id: "f5", name: "README.md", size: "1.1 KB", modified: "2026-03-01T08:00:00Z"},
+  {id: "f6", name: "sitemap.xml", size: "2.4 KB", modified: "2026-03-13T18:25:00Z"}
+]
+crumbs = Breadcrumb(items=[{label: "Home", value: "home"}, {label: "Projects", value: "projects"}, {label: "Website", value: "website"}], on={select: Event("navigate")})
+search = Input(label="Search files", name="query", type="search", placeholder="Search files", value=$/query, on={change: Event("search", {query: $/query})})
+actionBtn = Button(icon="ellipsis", variant="ghost", size="icon")
+rowMenu = Menu(items=[{label: "Rename", value: "rename", icon: "pencil"}, {label: "Delete", value: "delete", icon: "trash-2", destructive: true}], children=[actionBtn], on={select: Event("file_action", {id: $id})})
+table = Table(columns=[{key: "name", label: "Name", type: "text", sortable: true}, {key: "size", label: "Size", type: "text", align: "end"}, {key: "modified", label: "Modified", type: "date", sortable: true}, {key: "actions", label: "", type: "slot", slot: "actions", width: 56, align: "end"}], rows=$/files, rowKey="id", slots={actions: rowMenu}, emptyText="No files found")
+content = Stack(direction="vertical", gap="md", children=[crumbs, search, table])
+root = Page(title="Files", children=[content])
+</a2ui>

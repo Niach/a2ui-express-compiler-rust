@@ -1,0 +1,20 @@
+<a2ui>
+surface("main")
+$/form/delivery = "standard"
+$/order/subtotal = 48
+fullName = Input(label="Full name", name="fullName", value=$/form/fullName, checks=[?required])
+street = Input(label="Street", name="street", value=$/form/street, checks=[?required])
+city = Input(label="City", name="city", value=$/form/city, checks=[?required])
+postal = Input(label="Postal code", name="postal", value=$/form/postal, checks=[?required])
+country = Select(label="Country", name="country", value=$/form/country, placeholder="Select a country", options=[{label: "United States", value: "US"}, {label: "Canada", value: "CA"}, {label: "United Kingdom", value: "GB"}, {label: "Germany", value: "DE"}, {label: "France", value: "FR"}], checks=[?required])
+cityRow = FieldGroup(columns=2, children=[city, postal])
+addressCard = Card(title="Shipping address", children=[Stack(children=[fullName, street, cityRow, country])])
+delivery = Radio(label="Delivery option", name="delivery", value=$/form/delivery, options=[{label: "Standard (free)", value: "standard"}, {label: "Express ($9.90)", value: "express"}])
+deliveryCard = Card(title="Delivery", children=[delivery])
+subtotalRow = Row(title="Subtotal", value=formatCurrency($/order/subtotal, "USD"))
+shippingRow = Row(title="Shipping", value=cond(eq($/form/delivery, "express"), formatCurrency(9.9, "USD"), "Free"))
+totalRow = Row(title="Total", value=formatCurrency(add($/order/subtotal, cond(eq($/form/delivery, "express"), 9.9, 0)), "USD"))
+summaryCard = Card(title="Order summary", children=[Stack(children=[subtotalRow, shippingRow, Separator(), totalRow])])
+form = Form(name="checkout", children=[Stack(children=[addressCard, deliveryCard, summaryCard, FormActions(submit="Place order")])], on={submit: Event("place_order", {fullName: $/form/fullName, street: $/form/street, city: $/form/city, postal: $/form/postal, country: $/form/country, delivery: $/form/delivery})})
+root = Page(title="Checkout", children=[form])
+</a2ui>
