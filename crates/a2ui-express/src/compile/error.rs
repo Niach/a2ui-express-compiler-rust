@@ -92,6 +92,13 @@ pub enum CompileErrorKind {
         /// The id.
         id: String,
     },
+    /// While streaming, a value refers to a variable that is not assigned
+    /// yet. The streaming compiler holds the statement back; it never
+    /// reaches a caller.
+    Pending {
+        /// The variable.
+        variable: String,
+    },
 }
 
 /// An error compiling an Express block.
@@ -238,6 +245,20 @@ impl CompileError {
         .with_help(format!(
             "Property '{property}' on '{component}' must be a static literal value, not a dynamic databinding ($path)."
         ))
+    }
+
+    pub(crate) fn pending(variable: &str) -> Self {
+        CompileError::new(
+            CompileErrorKind::Pending {
+                variable: variable.to_owned(),
+            },
+            format!("Variable '{variable}' is not assigned yet."),
+        )
+    }
+
+    /// Whether this is a pending variable (streaming only).
+    pub(crate) fn is_pending(&self) -> bool {
+        matches!(self.kind, CompileErrorKind::Pending { .. })
     }
 
     pub(crate) fn id_collision(id: &str) -> Self {

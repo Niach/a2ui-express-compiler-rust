@@ -57,13 +57,15 @@ mod data;
 mod error;
 mod pass;
 mod sentinel;
+pub(crate) use sentinel::strip_sentinel_tags;
+pub(crate) mod session;
 
 use std::collections::{HashMap, HashSet};
 
 use serde_json::{Map, Value, json};
 
 use crate::schema::{Catalog, CatalogError, CatalogSet, CatalogVersion, LoadOptions, SymbolKind};
-use crate::syntax::{self, Call, Expr, ExprKind, Program, StatementForm, Target};
+use crate::syntax::{self, Call, Expr, ExprKind, Program, Statement, StatementForm, Target};
 
 pub use error::{Category, CompileError, CompileErrorKind};
 
@@ -144,7 +146,7 @@ impl Compiler {
         program: &Program,
         surface_id: &str,
     ) -> Result<Vec<Value>, CompileError> {
-        let (scopes, units) = self.build_units(program, surface_id)?;
+        let (scopes, units) = self.build_units(&program.statements, surface_id)?;
         if units.is_empty() {
             return Err(CompileError::undefined_root("root"));
         }
@@ -251,15 +253,15 @@ impl Compiler {
 
     // ---- units ------------------------------------------------------------
 
-    fn build_units<'a>(
+    pub(crate) fn build_units<'a>(
         &self,
-        program: &'a Program,
+        statements: impl IntoIterator<Item = &'a Statement>,
         surface_id: &str,
     ) -> Result<(Vec<Scope<'a>>, Vec<Unit<'a>>), CompileError> {
         let mut scopes: Vec<Scope<'a>> = Vec::new();
         let mut units = Vec::new();
         let mut current: Option<usize> = None;
-        for statement in &program.statements {
+        for statement in statements {
             match statement.form() {
                 StatementForm::Assign(target, value) => {
                     let i = *current.get_or_insert_with(|| {
@@ -319,6 +321,7 @@ impl Compiler {
         }
 
         let mut scope = Scope::new(surface_id.to_owned());
+        scope.directive = true;
         for &(key, value) in &args.kw {
             match key {
                 "catalogId" => {
@@ -378,7 +381,7 @@ impl Compiler {
     // ---- scopes -----------------------------------------------------------
 
     /// The id of every variable holding a component: its `id=`, else its name.
-    fn collect_component_ids(&self, scope: &Scope<'_>) -> Result<CompIds, CompileError> {
+    pub(crate) fn collect_component_ids(&self, scope: &Scope<'_>) -> Result<CompIds, CompileError> {
         let mut ids = CompIds::default();
         let mut seen = HashSet::new();
         for (var, ast) in scope.syms.iter() {
@@ -504,7 +507,7 @@ impl Compiler {
         Ok(out)
     }
 
-    fn create_messages(
+    pub(crate) fn create_messages(
         &self,
         scope: &Scope<'_>,
         components: Vec<Value>,
@@ -553,7 +556,7 @@ impl Compiler {
         out
     }
 
-    fn compile_standalone_call(
+    pub(crate) fn compile_standalone_call(
         &self,
         call: &Call,
         scope: Option<&Scope<'_>>,
@@ -642,20 +645,23 @@ impl CompIds {
 }
 
 #[derive(Debug)]
-struct Scope<'a> {
-    surface_id: String,
-    send_data_model: Option<bool>,
-    update: bool,
-    raw_extensions: Option<&'a Expr>,
-    syms: Symbols<'a>,
+pub(crate) struct Scope<'a> {
+    pub(crate) surface_id: String,
+    /// Opened by a `surface(...)` line, not implicitly.
+    pub(crate) directive: bool,
+    pub(crate) send_data_model: Option<bool>,
+    pub(crate) update: bool,
+    pub(crate) raw_extensions: Option<&'a Expr>,
+    pub(crate) syms: Symbols<'a>,
     /// Data path assignments; a reassignment moves the path to the end.
-    data: Vec<(String, &'a Expr)>,
+    pub(crate) data: Vec<(String, &'a Expr)>,
 }
 
 impl<'a> Scope<'a> {
     fn new(surface_id: String) -> Self {
         Scope {
             surface_id,
+            directive: false,
             send_data_model: None,
             update: false,
             raw_extensions: None,
@@ -676,7 +682,7 @@ impl<'a> Scope<'a> {
     }
 }
 
-enum Unit<'a> {
+pub(crate) enum Unit<'a> {
     Scope(usize),
     Delete(String),
     /// A standalone call, with the scope it was written in.
