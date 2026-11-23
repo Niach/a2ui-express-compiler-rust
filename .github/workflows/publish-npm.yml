@@ -1,0 +1,54 @@
+# Publishes packages/npm as @niach/a2ui-express. DISABLED: it runs only by
+# hand (Actions → publish-npm → Run workflow), and only as a dry run unless
+# `dry_run` is unchecked. Before the first real publish:
+#
+# 1. Create the `@niach` scope on npmjs.com (or rename the package).
+# 2. Add an automation token as the `NPM_TOKEN` repository secret (or set up
+#    npm trusted publishing for this workflow and drop the token).
+# 3. Bump `version` in packages/npm/package.json (and the workspace).
+# 4. To publish on tags, uncomment the `push: tags` trigger below.
+name: publish-npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "npm publish --dry-run (uncheck to publish for real)"
+        type: boolean
+        default: true
+  # push:
+  #   tags: ["npm-v*"]
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: scripts/build-npm.sh
+      - run: npm ci && npm test
+        working-directory: packages/npm
+      - name: Publish
+        working-directory: packages/npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            npm publish --dry-run
+          else
+            npm publish --provenance --access public
+          fi

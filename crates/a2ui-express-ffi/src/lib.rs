@@ -11,14 +11,18 @@
 //! - catalogs: one catalog document, or a list of them;
 //! - a parsed part: `{"text": …}`, `{"a2ui": [messages]}` or
 //!   `{"error": {"category", "message"}}`;
+//! - prompt options: `{surfaceId?, examples?: [[messages]], allowedMessages?}`;
 //! - a raw part ([`unwrap`], [`wrap`]): `{"text": …}` or
 //!   `{"a2ui_raw": …}`, with `"is_final": false` on a block whose close tag
 //!   never came.
 
 use a2ui_express::compile::{Category as CompileCategory, CompileError, Compiler};
 use a2ui_express::decompile::{self as dec, DecompileOptions, Order};
+use a2ui_express::prompt;
 use a2ui_express::response::{self, AfterRejectedBlock, ExpressParser, Part, ResponseError};
 use a2ui_express::schema::{Catalog, CatalogError, CatalogSet, CatalogVersion};
+use std::sync::Mutex;
+
 use serde_json::{Map, Value, json};
 
 /// The surface a block without a `surface(...)` line targets by default.
@@ -175,8 +179,7 @@ pub fn compile(
     surface_id: Option<&str>,
     version: Option<&str>,
 ) -> Result<Vec<Value>> {
-    let compiler = compiler(catalogs, version)?;
-    Ok(compiler.compile(source, surface_id.unwrap_or(DEFAULT_SURFACE_ID))?)
+    Catalogs::new(catalogs, version)?.compile(source, surface_id)
 }
 
 /// Parses a decompile order: `"upstream"` (default) or `"top-down"`.
@@ -197,6 +200,16 @@ pub fn decompile(
     keyword_args: bool,
     order: Option<&str>,
 ) -> Result<String> {
+    let set = CatalogSet::new(load_catalogs(catalogs)?)?;
+    decompile_with(&set, messages, keyword_args, order)
+}
+
+fn decompile_with(
+    set: &CatalogSet,
+    messages: Value,
+    keyword_args: bool,
+    order: Option<&str>,
+) -> Result<String> {
     let Value::Array(messages) = messages else {
         return Err(FfiError::argument("messages must be a list"));
     };
@@ -204,8 +217,87 @@ pub fn decompile(
         keyword_args,
         order: parse_order(order)?,
     };
+    Ok(dec::decompile(set, &messages, &options)?)
+}
+
+/// What a prompt is generated from, besides the catalogs.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PromptOptions {
+    /// The surface the agent writes to (default `default_surface`).
+    pub surface_id: Option<String>,
+    /// Examples: one list of A2UI messages per turn, in order.
+    pub examples: Vec<Vec<Value>>,
+    /// The message types the agent may write; `None` allows all.
+    pub allowed_messages: Option<Vec<String>>,
+}
+
+fn string_list(value: &Value, what: &str) -> Result<Vec<String>> {
+    let bad = || FfiError::argument(format!("{what} must be a list of strings"));
+    value
+        .as_array()
+        .ok_or_else(bad)?
+        .iter()
+        .map(|v| v.as_str().map(str::to_owned).ok_or_else(bad))
+        .collect()
+}
+
+/// Reads prompt examples: a list of turns, each a list of messages.
+pub fn prompt_examples(value: Value) -> Result<Vec<Vec<Value>>> {
+    let bad = || FfiError::argument("examples must be a list of lists of A2UI messages");
+    match value {
+        Value::Null => Ok(Vec::new()),
+        Value::Array(turns) => turns
+            .into_iter()
+            .map(|t| match t {
+                Value::Array(messages) => Ok(messages),
+                _ => Err(bad()),
+            })
+            .collect(),
+        _ => Err(bad()),
+    }
+}
+
+impl PromptOptions {
+    /// Reads `{surfaceId?, examples?, allowedMessages?}`.
+    pub fn from_json(options: &Value) -> Result<Self> {
+        let known = ["surfaceId", "examples", "allowedMessages"];
+        let Some(map) = options_map(options, &known, "prompt")? else {
+            return Ok(PromptOptions::default());
+        };
+        Ok(PromptOptions {
+            surface_id: string_option(map, "surfaceId")?.map(str::to_owned),
+            examples: prompt_examples(map.get("examples").cloned().unwrap_or(Value::Null))?,
+            allowed_messages: match map.get("allowedMessages") {
+                None | Some(Value::Null) => None,
+                Some(v) => Some(string_list(v, "allowedMessages")?),
+            },
+        })
+    }
+}
+
+/// Generates the system-prompt section that teaches a model Express for
+/// `catalogs`.
+pub fn generate_prompt(catalogs: Value, options: &PromptOptions) -> Result<String> {
     let set = CatalogSet::new(load_catalogs(catalogs)?)?;
-    Ok(dec::decompile(&set, &messages, &options)?)
+    generate_prompt_with(&set, options)
+}
+
+fn generate_prompt_with(set: &CatalogSet, options: &PromptOptions) -> Result<String> {
+    let options = prompt::PromptOptions {
+        surface_id: options
+            .surface_id
+            .clone()
+            .unwrap_or_else(|| DEFAULT_SURFACE_ID.to_owned()),
+        examples: options.examples.clone(),
+        allowed_messages: options.allowed_messages.clone(),
+    };
+    Ok(prompt::generate_prompt(set, &options)?)
+}
+
+/// The functions an agent may call standalone, across the catalogs.
+pub fn agent_callable_functions(catalogs: Value) -> Result<Vec<String>> {
+    let set = CatalogSet::new(load_catalogs(catalogs)?)?;
+    Ok(prompt::agent_callable_functions(&set))
 }
 
 /// Splits a response into raw text and block parts.
@@ -401,17 +493,6 @@ impl ResponseOptions {
         out.version = string_option(map, "version")?.map(str::to_owned);
         Ok(out)
     }
-
-    fn parser(&self, catalogs: Value) -> Result<ExpressParser> {
-        let parser = ExpressParser::new(
-            compiler(catalogs, self.version.as_deref())?,
-            &self.surface_id,
-        );
-        Ok(match &self.progressive_keys {
-            Some(keys) => parser.with_progressive_keys(keys.iter().cloned()),
-            None => parser,
-        })
-    }
 }
 
 /// Reads a whole response and compiles each block.
@@ -420,10 +501,141 @@ pub fn parse_response(
     content: &str,
     options: &ResponseOptions,
 ) -> Result<Vec<Value>> {
-    let parser = options.parser(catalogs)?;
-    Ok(parts_to_json(
-        parser.parse_response(content, options.wrapped)?,
-    ))
+    Catalogs::new(catalogs, options.version.as_deref())?.parse_response(content, options)
+}
+
+/// Loaded catalogs: a catalog is read once and used for any number of
+/// compiles, responses and streams (loading a large catalog costs far more
+/// than compiling a block against it).
+#[derive(Debug)]
+pub struct Catalogs {
+    /// The parser for the default options, which also holds the compiler.
+    base: ExpressParser,
+    /// Parsers by (surface id, progressive keys); usually one.
+    parsers: Mutex<Vec<CachedParser>>,
+}
+
+/// A parser for one surface id and set of progressive keys.
+type CachedParser = (String, Option<Vec<String>>, ExpressParser);
+
+impl Catalogs {
+    /// Loads catalog documents (one, or a list) for `version` (default:
+    /// the catalogs' own).
+    pub fn new(catalogs: Value, version: Option<&str>) -> Result<Self> {
+        Self::with_surface(catalogs, version, None)
+    }
+
+    /// Like [`Catalogs::new`], with the parser for `surface_id` (default
+    /// `default_surface`) set up front. Responses and streams for another
+    /// surface id set up their own parser on first use, which copies the
+    /// catalogs (about what loading them costs).
+    pub fn with_surface(
+        catalogs: Value,
+        version: Option<&str>,
+        surface_id: Option<&str>,
+    ) -> Result<Self> {
+        let surface_id = surface_id.unwrap_or(DEFAULT_SURFACE_ID);
+        let base = ExpressParser::new(compiler(catalogs, version)?, surface_id);
+        Ok(Catalogs {
+            parsers: Mutex::new(vec![(surface_id.to_owned(), None, base.clone())]),
+            base,
+        })
+    }
+
+    /// The protocol version messages are compiled for (`"1.0"`, `"v0.9"`…).
+    pub fn version(&self) -> &'static str {
+        self.base.compiler().version().wire()
+    }
+
+    /// The catalog ids, in order.
+    pub fn ids(&self) -> Vec<String> {
+        let set = self.base.compiler().catalogs();
+        set.catalogs().iter().map(|c| c.id().to_owned()).collect()
+    }
+
+    /// Compiles one Express block (sentinel tags optional).
+    pub fn compile(&self, source: &str, surface_id: Option<&str>) -> Result<Vec<Value>> {
+        Ok(self
+            .base
+            .compiler()
+            .compile(source, surface_id.unwrap_or(DEFAULT_SURFACE_ID))?)
+    }
+
+    /// Writes A2UI messages back as one Express block.
+    pub fn decompile(
+        &self,
+        messages: Value,
+        keyword_args: bool,
+        order: Option<&str>,
+    ) -> Result<String> {
+        decompile_with(
+            self.base.compiler().catalogs(),
+            messages,
+            keyword_args,
+            order,
+        )
+    }
+
+    /// The system-prompt section for these catalogs.
+    pub fn generate_prompt(&self, options: &PromptOptions) -> Result<String> {
+        generate_prompt_with(self.base.compiler().catalogs(), options)
+    }
+
+    /// The functions an agent may call standalone.
+    pub fn agent_callable_functions(&self) -> Vec<String> {
+        prompt::agent_callable_functions(self.base.compiler().catalogs())
+    }
+
+    /// Reads a whole response and compiles each block.
+    pub fn parse_response(&self, content: &str, options: &ResponseOptions) -> Result<Vec<Value>> {
+        let parser = self.parser(options)?;
+        Ok(parts_to_json(
+            parser.parse_response(content, options.wrapped)?,
+        ))
+    }
+
+    /// Opens a stream against a new renderer state.
+    pub fn stream(&self, options: &ResponseOptions) -> Result<Stream> {
+        let parser = self.parser(options)?;
+        let state = parser.new_state();
+        Ok(Stream {
+            inner: parser.open_stream_with(options.wrapped, options.after_rejected_block, state),
+        })
+    }
+
+    /// Fails unless `version` is unset or the one these catalogs compile
+    /// for (a version is chosen when the catalogs are loaded).
+    pub fn check_version(&self, version: Option<&str>) -> Result<()> {
+        match parse_version(version)? {
+            Some(v) if v != self.base.compiler().version() => Err(FfiError::argument(format!(
+                "these catalogs compile for version {}; load them again for another",
+                self.version()
+            ))),
+            _ => Ok(()),
+        }
+    }
+
+    fn parser(&self, options: &ResponseOptions) -> Result<ExpressParser> {
+        self.check_version(options.version.as_deref())?;
+        let mut parsers = self.parsers.lock().unwrap_or_else(|e| e.into_inner());
+        let cached = parsers.iter().find(|(surface, keys, _)| {
+            *surface == options.surface_id && *keys == options.progressive_keys
+        });
+        if let Some((_, _, parser)) = cached {
+            return Ok(parser.clone());
+        }
+        let parser = ExpressParser::new(self.base.compiler().clone(), &options.surface_id);
+        let parser = match &options.progressive_keys {
+            Some(keys) => parser.with_progressive_keys(keys.iter().cloned()),
+            None => parser,
+        };
+        parsers.push((
+            options.surface_id.clone(),
+            options.progressive_keys.clone(),
+            parser.clone(),
+        ));
+        Ok(parser)
+    }
 }
 
 /// A response read as it streams in.
@@ -435,11 +647,7 @@ pub struct Stream {
 impl Stream {
     /// Opens a stream against a new renderer state.
     pub fn new(catalogs: Value, options: &ResponseOptions) -> Result<Self> {
-        let parser = options.parser(catalogs)?;
-        let state = parser.new_state();
-        Ok(Stream {
-            inner: parser.open_stream_with(options.wrapped, options.after_rejected_block, state),
-        })
+        Catalogs::new(catalogs, options.version.as_deref())?.stream(options)
     }
 
     /// Feeds a chunk; returns the parts it made ready.
@@ -523,6 +731,49 @@ mod tests {
             parse_response(catalog(), "before <a2ui>root = Nope()</a2ui>", &options).unwrap_err();
         assert_eq!(e.category, Category::Validation);
         assert_eq!(e.partial, vec![json!({"text": "before"})]);
+    }
+
+    #[test]
+    fn generates_a_prompt() {
+        let options = PromptOptions::from_json(&json!({"examples": [[]]})).unwrap();
+        let text = generate_prompt(catalog(), &options).unwrap();
+        assert!(text.contains("Text("), "{text}");
+        let e = generate_prompt(json!([]), &PromptOptions::default()).unwrap_err();
+        assert_eq!(e.category, Category::Catalog);
+        assert!(agent_callable_functions(catalog()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn loaded_catalogs_are_reused() {
+        let catalogs = Catalogs::new(catalog(), None).unwrap();
+        assert_eq!(catalogs.version(), "1.0");
+        assert_eq!(catalogs.ids(), vec!["demo".to_owned()]);
+        let options = ResponseOptions::default();
+        for _ in 0..2 {
+            let mut stream = catalogs.stream(&options).unwrap();
+            assert!(
+                !stream
+                    .push("<a2ui>root = Text(\"x\")</a2ui>")
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+        assert_eq!(catalogs.parsers.lock().unwrap().len(), 1);
+        let main = ResponseOptions {
+            surface_id: "main".into(),
+            ..ResponseOptions::default()
+        };
+        catalogs.stream(&main).unwrap();
+        catalogs.stream(&main).unwrap();
+        assert_eq!(catalogs.parsers.lock().unwrap().len(), 2);
+        let other = ResponseOptions {
+            version: Some("0.9".into()),
+            ..ResponseOptions::default()
+        };
+        assert_eq!(
+            catalogs.stream(&other).unwrap_err().category,
+            Category::Argument
+        );
     }
 
     #[test]

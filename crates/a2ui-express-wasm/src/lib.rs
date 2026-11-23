@@ -8,8 +8,18 @@
 //!
 //! Values cross the boundary as JSON (`JSON.stringify` / `JSON.parse`), so
 //! messages are plain objects with their keys in emission order.
+//!
+//! Features (both default): `decompile` and `prompt` (`generatePrompt`,
+//! `agentCallableFunctions`). Without them (`--no-default-features`) the
+//! module is the renderer build, ~48 KB smaller gzipped. The TypeScript
+//! declarations are written out below (the generated ones cannot say an
+//! options argument is optional).
 
+#[cfg(feature = "prompt")]
+use a2ui_express_ffi::PromptOptions;
 use a2ui_express_ffi::{self as ffi, FfiError, ResponseOptions};
+use std::rc::Rc;
+
 use js_sys::{JSON, Reflect};
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
@@ -23,7 +33,7 @@ const TS_TYPES: &str = r#"
 /** A catalog document (A2UI catalog JSON). */
 export type CatalogDocument = Record<string, unknown>;
 /** One catalog document, or a list of them. */
-export type Catalogs = CatalogDocument | CatalogDocument[];
+export type CatalogDocuments = CatalogDocument | CatalogDocument[];
 /** An A2UI message, as compiled (`createSurface`, `updateComponents`, …). */
 export type A2uiMessage = Record<string, unknown>;
 /** The error categories: the suite's two, plus catalog and argument errors. */
@@ -47,12 +57,6 @@ export interface CompileOptions {
   /** The protocol version, `"1.0"` or `"0.9"` (default: the catalogs'). */
   version?: string;
 }
-export interface DecompileOptions {
-  /** Write arguments as `name=value` instead of positionally. */
-  keywordArgs?: boolean;
-  /** `"upstream"` (message order, default) or `"top-down"` (`root` first, for streaming). */
-  order?: "upstream" | "top-down";
-}
 export interface ResponseOptions {
   /** The surface a block without `surface(...)` targets (default `default_surface`). */
   surfaceId?: string;
@@ -64,6 +68,106 @@ export interface ResponseOptions {
   afterRejectedBlock?: "end" | "continue";
   /** The protocol version, `"1.0"` or `"0.9"` (default: the catalogs'). */
   version?: string;
+}
+
+/** Compiles one Express block (`<a2ui>` tags optional) to A2UI messages. */
+export function compile(catalogs: CatalogDocuments, source: string, options?: CompileOptions): A2uiMessage[];
+/** Reads a whole response (prose with `<a2ui>` blocks) and compiles each block. */
+export function parseResponse(catalogs: CatalogDocuments, text: string, options?: ResponseOptions): Part[];
+/** Splits a response into text and raw block parts. */
+export function unwrap(text: string): RawPart[];
+/** Writes raw parts back out as a model would have emitted them. */
+export function wrap(parts: RawPart[]): string;
+/** Whether a response holds an `<a2ui>` block (`complete`: a closed one). */
+export function hasFormatContent(text: string, complete?: boolean): boolean;
+
+export interface CatalogsOptions {
+  /** The protocol version, `"1.0"` or `"0.9"` (default: the catalogs'). */
+  version?: string;
+  /**
+   * The surface id streams and responses mostly use (default `default_surface`):
+   * its parser is set up with the catalogs. Another surface id's is set up on
+   * first use, which costs about what loading the catalogs does.
+   */
+  surfaceId?: string;
+}
+
+/**
+ * Loaded catalogs: a catalog is read once, then compiled against any number of
+ * times. Prefer it to the free functions for a large catalog (loading eui's
+ * catalog takes ~70 ms; compiling a block against it, about a millisecond per
+ * statement). Options' `version`, if given, must be the one loaded.
+ */
+export class Catalogs {
+  constructor(catalogs: CatalogDocuments, options?: CatalogsOptions);
+  /** The protocol version messages are compiled for (`"1.0"`, `"v0.9"`). */
+  readonly version: string;
+  /** The catalog ids, in order. */
+  readonly ids: string[];
+  compile(source: string, options?: CompileOptions): A2uiMessage[];
+  parseResponse(text: string, options?: ResponseOptions): Part[];
+  /** Opens a `StreamCompiler` on these catalogs. */
+  stream(options?: ResponseOptions): StreamCompiler;
+  free(): void;
+  [Symbol.dispose](): void;
+}
+
+/**
+ * Reads a model response as it streams in: each `push` returns the parts that
+ * chunk made ready, so a surface renders while the model types. Streamed in
+ * any chunk size, a response yields the same surfaces as `parseResponse`.
+ */
+export class StreamCompiler {
+  constructor(catalogs: CatalogDocuments, options?: ResponseOptions);
+  /** Feeds a chunk; returns the parts it made ready. Throws an `ExpressError`. */
+  push(chunk: string): Part[];
+  /** Ends the response; returns what was still held back. Throws an `ExpressError`. */
+  finish(): Part[];
+  /** Whether the stream is inside an `<a2ui>` block. */
+  readonly inBlock: boolean;
+  /** Frees the wasm memory now (else the finalizer does). */
+  free(): void;
+  [Symbol.dispose](): void;
+}
+"#;
+
+#[cfg(feature = "decompile")]
+#[wasm_bindgen(typescript_custom_section)]
+const TS_DECOMPILE: &str = r#"
+export interface DecompileOptions {
+  /** Write arguments as `name=value` instead of positionally. */
+  keywordArgs?: boolean;
+  /** `"upstream"` (message order, default) or `"top-down"` (`root` first, for streaming). */
+  order?: "upstream" | "top-down";
+}
+/** Writes A2UI messages back as one Express block (without tags). */
+export function decompile(catalogs: CatalogDocuments, messages: A2uiMessage[], options?: DecompileOptions): string;
+export interface Catalogs {
+  /** Writes A2UI messages back as one Express block (without tags). */
+  decompile(messages: A2uiMessage[], options?: DecompileOptions): string;
+}
+"#;
+
+#[cfg(feature = "prompt")]
+#[wasm_bindgen(typescript_custom_section)]
+const TS_PROMPT: &str = r#"
+export interface PromptOptions {
+  /** The surface the agent writes to (default `default_surface`). */
+  surfaceId?: string;
+  /** Examples: one list of A2UI messages per turn, rewritten into Express in the prompt. */
+  examples?: A2uiMessage[][];
+  /** The message types the agent may write (`createSurface`, `updateComponents`, …); default all. */
+  allowedMessages?: string[];
+}
+/** Generates the system-prompt section that teaches a model Express for the catalogs. */
+export function generatePrompt(catalogs: CatalogDocuments, options?: PromptOptions): string;
+/** The functions an agent may call standalone (`callRendererFunction`), across the catalogs. */
+export function agentCallableFunctions(catalogs: CatalogDocuments): string[];
+export interface Catalogs {
+  /** The system-prompt section that teaches a model Express for these catalogs. */
+  generatePrompt(options?: PromptOptions): string;
+  /** The functions an agent may call standalone, across these catalogs. */
+  agentCallableFunctions(): string[];
 }
 "#;
 
@@ -99,12 +203,8 @@ fn ok<T>(result: ffi::Result<T>) -> JsResult<T> {
 }
 
 /// Compiles one Express block (sentinel tags optional) to A2UI messages.
-#[wasm_bindgen(unchecked_return_type = "A2uiMessage[]")]
-pub fn compile(
-    #[wasm_bindgen(unchecked_param_type = "Catalogs")] catalogs: JsValue,
-    source: &str,
-    #[wasm_bindgen(unchecked_param_type = "CompileOptions")] options: Option<JsValue>,
-) -> JsResult<JsValue> {
+#[wasm_bindgen(skip_typescript)]
+pub fn compile(catalogs: JsValue, source: &str, options: Option<JsValue>) -> JsResult<JsValue> {
     let (surface_id, version) = ok(ffi::compile_options(&opt(options)?))?;
     let messages = ok(ffi::compile(
         from_js(&catalogs)?,
@@ -116,11 +216,12 @@ pub fn compile(
 }
 
 /// Writes A2UI messages back as one Express block (without tags).
-#[wasm_bindgen]
+#[cfg(feature = "decompile")]
+#[wasm_bindgen(skip_typescript)]
 pub fn decompile(
-    #[wasm_bindgen(unchecked_param_type = "Catalogs")] catalogs: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "A2uiMessage[]")] messages: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "DecompileOptions")] options: Option<JsValue>,
+    catalogs: JsValue,
+    messages: JsValue,
+    options: Option<JsValue>,
 ) -> JsResult<String> {
     let (keyword_args, order) = ok(ffi::decompile_options(&opt(options)?))?;
     ok(ffi::decompile(
@@ -133,11 +234,11 @@ pub fn decompile(
 
 /// Reads a whole response (prose with `<a2ui>` blocks) and compiles each
 /// block.
-#[wasm_bindgen(js_name = parseResponse, unchecked_return_type = "Part[]")]
+#[wasm_bindgen(js_name = parseResponse, skip_typescript)]
 pub fn parse_response(
-    #[wasm_bindgen(unchecked_param_type = "Catalogs")] catalogs: JsValue,
+    catalogs: JsValue,
     text: &str,
-    #[wasm_bindgen(unchecked_param_type = "ResponseOptions")] options: Option<JsValue>,
+    options: Option<JsValue>,
 ) -> JsResult<JsValue> {
     let options = ok(ResponseOptions::from_json(&opt(options)?))?;
     let parts = ok(ffi::parse_response(from_js(&catalogs)?, text, &options))?;
@@ -145,32 +246,137 @@ pub fn parse_response(
 }
 
 /// Splits a response into text and raw block parts.
-#[wasm_bindgen(unchecked_return_type = "RawPart[]")]
+#[wasm_bindgen(skip_typescript)]
 pub fn unwrap(text: &str) -> JsValue {
     to_js(&ffi::unwrap(text))
 }
 
 /// Writes raw parts back out as a model would have emitted them.
-#[wasm_bindgen]
-pub fn wrap(
-    #[wasm_bindgen(unchecked_param_type = "RawPart[]")] parts: JsValue,
-) -> JsResult<String> {
+#[wasm_bindgen(skip_typescript)]
+pub fn wrap(parts: JsValue) -> JsResult<String> {
     ok(ffi::wrap(&from_js(&parts)?))
 }
 
 /// Whether a response holds an `<a2ui>` block (`complete`: a closed one).
-#[wasm_bindgen(js_name = hasFormatContent)]
+#[wasm_bindgen(js_name = hasFormatContent, skip_typescript)]
 pub fn has_format_content(text: &str, complete: Option<bool>) -> bool {
     ffi::has_format_content(text, complete.unwrap_or(false))
+}
+
+/// Generates the system-prompt section that teaches a model Express for
+/// the catalogs.
+#[cfg(feature = "prompt")]
+#[wasm_bindgen(js_name = generatePrompt, skip_typescript)]
+pub fn generate_prompt(catalogs: JsValue, options: Option<JsValue>) -> JsResult<String> {
+    let options = ok(PromptOptions::from_json(&opt(options)?))?;
+    ok(ffi::generate_prompt(from_js(&catalogs)?, &options))
+}
+
+/// The functions an agent may call standalone, across the catalogs.
+#[cfg(feature = "prompt")]
+#[wasm_bindgen(js_name = agentCallableFunctions, skip_typescript)]
+pub fn agent_callable_functions(catalogs: JsValue) -> JsResult<JsValue> {
+    let names = ok(ffi::agent_callable_functions(from_js(&catalogs)?))?;
+    let names: Vec<Value> = names.into_iter().map(Value::String).collect();
+    Ok(to_js(&names))
 }
 
 fn opt(options: Option<JsValue>) -> JsResult<Value> {
     options.as_ref().map_or(Ok(Value::Null), from_js)
 }
 
+/// Loaded catalogs: a catalog is read once, then compiled against any
+/// number of times. Prefer it to the free functions when the catalog is
+/// large (loading eui's catalog costs ~70 ms; a compile against it, ~1 ms
+/// a statement).
+#[wasm_bindgen(skip_typescript)]
+pub struct Catalogs {
+    inner: Rc<ffi::Catalogs>,
+}
+
+#[wasm_bindgen]
+impl Catalogs {
+    /// Loads catalog documents (one, or a list).
+    #[wasm_bindgen(constructor)]
+    pub fn new(catalogs: JsValue, options: Option<JsValue>) -> JsResult<Catalogs> {
+        let options = opt(options)?;
+        let map = ok(ffi::options_map(
+            &options,
+            &["version", "surfaceId"],
+            "catalogs",
+        ))?;
+        let get = |key| map.and_then(|m| m.get(key)).and_then(Value::as_str);
+        let loaded =
+            ffi::Catalogs::with_surface(from_js(&catalogs)?, get("version"), get("surfaceId"));
+        Ok(Catalogs {
+            inner: Rc::new(ok(loaded)?),
+        })
+    }
+
+    /// The protocol version messages are compiled for.
+    #[wasm_bindgen(getter)]
+    pub fn version(&self) -> String {
+        self.inner.version().to_owned()
+    }
+
+    /// The catalog ids, in order.
+    #[wasm_bindgen(getter)]
+    pub fn ids(&self) -> Vec<String> {
+        self.inner.ids()
+    }
+
+    /// Compiles one Express block.
+    pub fn compile(&self, source: &str, options: Option<JsValue>) -> JsResult<JsValue> {
+        let (surface_id, version) = ok(ffi::compile_options(&opt(options)?))?;
+        ok(self.inner.check_version(version.as_deref()))?;
+        Ok(to_js(&ok(self
+            .inner
+            .compile(source, surface_id.as_deref()))?))
+    }
+
+    /// Reads a whole response and compiles each block.
+    #[wasm_bindgen(js_name = parseResponse)]
+    pub fn parse_response(&self, text: &str, options: Option<JsValue>) -> JsResult<JsValue> {
+        let options = ok(ResponseOptions::from_json(&opt(options)?))?;
+        Ok(to_js(&ok(self.inner.parse_response(text, &options))?))
+    }
+
+    /// Opens a stream.
+    pub fn stream(&self, options: Option<JsValue>) -> JsResult<StreamCompiler> {
+        let options = ok(ResponseOptions::from_json(&opt(options)?))?;
+        Ok(StreamCompiler {
+            inner: ok(self.inner.stream(&options))?,
+        })
+    }
+
+    /// Writes A2UI messages back as one Express block.
+    #[cfg(feature = "decompile")]
+    pub fn decompile(&self, messages: JsValue, options: Option<JsValue>) -> JsResult<String> {
+        let (keyword_args, order) = ok(ffi::decompile_options(&opt(options)?))?;
+        ok(self
+            .inner
+            .decompile(from_js(&messages)?, keyword_args, order.as_deref()))
+    }
+
+    /// The system-prompt section for these catalogs.
+    #[cfg(feature = "prompt")]
+    #[wasm_bindgen(js_name = generatePrompt)]
+    pub fn generate_prompt(&self, options: Option<JsValue>) -> JsResult<String> {
+        let options = ok(PromptOptions::from_json(&opt(options)?))?;
+        ok(self.inner.generate_prompt(&options))
+    }
+
+    /// The functions an agent may call standalone.
+    #[cfg(feature = "prompt")]
+    #[wasm_bindgen(js_name = agentCallableFunctions)]
+    pub fn agent_callable_functions(&self) -> Vec<String> {
+        self.inner.agent_callable_functions()
+    }
+}
+
 /// Reads a model response as it streams in: each `push` returns the parts
 /// that chunk made ready, so a surface renders while the model types.
-#[wasm_bindgen]
+#[wasm_bindgen(skip_typescript)]
 pub struct StreamCompiler {
     inner: ffi::Stream,
 }
@@ -179,10 +385,7 @@ pub struct StreamCompiler {
 impl StreamCompiler {
     /// Opens a stream against a new renderer state.
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        #[wasm_bindgen(unchecked_param_type = "Catalogs")] catalogs: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "ResponseOptions")] options: Option<JsValue>,
-    ) -> JsResult<StreamCompiler> {
+    pub fn new(catalogs: JsValue, options: Option<JsValue>) -> JsResult<StreamCompiler> {
         let options = ok(ResponseOptions::from_json(&opt(options)?))?;
         Ok(StreamCompiler {
             inner: ok(ffi::Stream::new(from_js(&catalogs)?, &options))?,
@@ -190,13 +393,13 @@ impl StreamCompiler {
     }
 
     /// Feeds a chunk; returns the parts it made ready.
-    #[wasm_bindgen(unchecked_return_type = "Part[]")]
+    #[wasm_bindgen(skip_typescript)]
     pub fn push(&mut self, chunk: &str) -> JsResult<JsValue> {
         Ok(to_js(&ok(self.inner.push(chunk))?))
     }
 
     /// Ends the response; returns what was still held back.
-    #[wasm_bindgen(unchecked_return_type = "Part[]")]
+    #[wasm_bindgen(skip_typescript)]
     pub fn finish(&mut self) -> JsResult<JsValue> {
         Ok(to_js(&ok(self.inner.finish())?))
     }

@@ -1,0 +1,8 @@
+# wasm32 builds (the npm package) optimise for size: `opt-level = "z"` is
+# ~25% smaller gzipped than -O3. A later `-C opt-level` overrides the
+# profile's, and the LTO step takes it too. Native builds keep the profile's.
+#
+# Note: a RUSTFLAGS environment variable replaces this list (Cargo does not
+# merge them); unset it when building the wasm package.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "opt-level=z"]

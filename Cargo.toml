@@ -21,9 +21,9 @@ thiserror = "2"
 serde_yaml_ng = "0.10"
 regex = "1"
 
-# Release builds of the bindings (wasm, Python wheel): one codegen unit and
-# fat LTO keep the wasm small; wasm-opt -Oz runs on top (see
-# crates/a2ui-express-wasm).
+# Release builds: one codegen unit and fat LTO. wasm32 builds are also
+# optimised for size (`.cargo/config.toml`), and wasm-opt -Oz runs on top
+# (crates/a2ui-express-wasm); native builds (the Python wheel) stay at -O3.
 [profile.release]
 lto = true
 codegen-units = 1

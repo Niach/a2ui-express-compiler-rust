@@ -12,6 +12,13 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["decompile", "prompt"]
+# `decompile`: A2UI JSON back to Express.
+decompile = []
+# `generatePrompt` / `agentCallableFunctions`.
+prompt = []
+
 [dependencies]
 a2ui-express-ffi = { path = "../a2ui-express-ffi" }
 serde_json.workspace = true
@@ -25,4 +32,4 @@ js-sys = "0.3.107"
 talc = "5.1"
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
+wasm-opt = ["-Oz", "--converge", "--low-memory-unused", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

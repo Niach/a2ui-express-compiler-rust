@@ -1,0 +1,47 @@
+{
+  "name": "@niach/a2ui-express",
+  "version": "0.1.0",
+  "description": "A2UI Express compiler (Rust, WebAssembly): compile, stream, parse and decompile the Express inference format",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Niach/a2ui-express-compiler-rust.git",
+    "directory": "packages/npm"
+  },
+  "keywords": ["a2ui", "express", "genui", "wasm", "streaming"],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/full/a2ui_express.js",
+  "types": "./dist/full/a2ui_express.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/full/a2ui_express.d.ts",
+      "default": "./dist/full/a2ui_express.js"
+    },
+    "./renderer": {
+      "types": "./dist/renderer/a2ui_express.d.ts",
+      "default": "./dist/renderer/a2ui_express.js"
+    },
+    "./a2ui_express_bg.wasm": "./dist/full/a2ui_express_bg.wasm",
+    "./renderer/a2ui_express_bg.wasm": "./dist/renderer/a2ui_express_bg.wasm",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/*/a2ui_express.js",
+    "dist/*/a2ui_express.d.ts",
+    "dist/*/a2ui_express_bg.wasm",
+    "dist/*/a2ui_express_bg.wasm.d.ts",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "../../scripts/build-npm.sh",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "yaml": "^2.8.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

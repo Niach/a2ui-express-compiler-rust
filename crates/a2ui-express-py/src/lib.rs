@@ -250,6 +250,171 @@ fn has_format_content(text: &str, complete: bool) -> bool {
     ffi::has_format_content(text, complete)
 }
 
+/// Generates the system-prompt section that teaches a model Express for the
+/// catalogs. `examples` is a list of turns, each a list of A2UI messages.
+#[pyfunction]
+#[pyo3(signature = (catalogs, *, surface_id=None, examples=None, allowed_messages=None))]
+fn generate_prompt(
+    py: Python<'_>,
+    catalogs: &Bound<'_, PyAny>,
+    surface_id: Option<String>,
+    examples: Option<&Bound<'_, PyAny>>,
+    allowed_messages: Option<Vec<String>>,
+) -> PyResult<String> {
+    let options = prompt_options(py, surface_id, examples, allowed_messages)?;
+    ok(py, ffi::generate_prompt(from_py(catalogs)?, &options))
+}
+
+fn prompt_options(
+    py: Python<'_>,
+    surface_id: Option<String>,
+    examples: Option<&Bound<'_, PyAny>>,
+    allowed_messages: Option<Vec<String>>,
+) -> PyResult<ffi::PromptOptions> {
+    let examples = match examples {
+        Some(e) => ok(py, ffi::prompt_examples(from_py(e)?))?,
+        None => Vec::new(),
+    };
+    Ok(ffi::PromptOptions {
+        surface_id,
+        examples,
+        allowed_messages,
+    })
+}
+
+/// The functions an agent may call standalone (`callRendererFunction`),
+/// across the catalogs.
+#[pyfunction]
+fn agent_callable_functions(py: Python<'_>, catalogs: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
+    ok(py, ffi::agent_callable_functions(from_py(catalogs)?))
+}
+
+/// Loaded catalogs: a catalog is read once, then compiled against any number
+/// of times. Prefer it to the free functions in a loop (loading a large
+/// catalog costs far more than compiling a block against it).
+#[pyclass(frozen, module = "a2ui_express")]
+struct Catalogs {
+    inner: ffi::Catalogs,
+}
+
+#[pymethods]
+impl Catalogs {
+    /// `surface_id`: the surface id streams and responses mostly use; its
+    /// parser is set up with the catalogs (another one's on first use).
+    #[new]
+    #[pyo3(signature = (catalogs, *, version=None, surface_id=None))]
+    fn new(
+        py: Python<'_>,
+        catalogs: &Bound<'_, PyAny>,
+        version: Option<&str>,
+        surface_id: Option<&str>,
+    ) -> PyResult<Self> {
+        let catalogs = from_py(catalogs)?;
+        Ok(Catalogs {
+            inner: ok(
+                py,
+                ffi::Catalogs::with_surface(catalogs, version, surface_id),
+            )?,
+        })
+    }
+
+    /// The protocol version messages are compiled for.
+    #[getter]
+    fn version(&self) -> &'static str {
+        self.inner.version()
+    }
+
+    /// The catalog ids, in order.
+    #[getter]
+    fn ids(&self) -> Vec<String> {
+        self.inner.ids()
+    }
+
+    #[pyo3(signature = (source, *, surface_id=None))]
+    fn compile(
+        &self,
+        py: Python<'_>,
+        source: &str,
+        surface_id: Option<&str>,
+    ) -> PyResult<Py<PyAny>> {
+        let messages = ok(py, self.inner.compile(source, surface_id))?;
+        to_py_list(py, messages)
+    }
+
+    #[pyo3(signature = (messages, *, keyword_args=false, order="upstream"))]
+    fn decompile(
+        &self,
+        py: Python<'_>,
+        messages: &Bound<'_, PyAny>,
+        keyword_args: bool,
+        order: &str,
+    ) -> PyResult<String> {
+        let messages = from_py(messages)?;
+        ok(
+            py,
+            self.inner.decompile(messages, keyword_args, Some(order)),
+        )
+    }
+
+    #[pyo3(signature = (text, *, surface_id=None, wrapped=true, progressive_keys=None))]
+    fn parse_response(
+        &self,
+        py: Python<'_>,
+        text: &str,
+        surface_id: Option<&str>,
+        wrapped: bool,
+        progressive_keys: Option<Vec<String>>,
+    ) -> PyResult<Py<PyAny>> {
+        let options = ok(
+            py,
+            response_options(surface_id, wrapped, progressive_keys, "end", None),
+        )?;
+        let parts = ok(py, self.inner.parse_response(text, &options))?;
+        to_py_list(py, parts)
+    }
+
+    /// Opens a `StreamCompiler` on these catalogs.
+    #[pyo3(signature = (*, surface_id=None, wrapped=true, progressive_keys=None, after_rejected_block="end"))]
+    fn stream(
+        &self,
+        py: Python<'_>,
+        surface_id: Option<&str>,
+        wrapped: bool,
+        progressive_keys: Option<Vec<String>>,
+        after_rejected_block: &str,
+    ) -> PyResult<StreamCompiler> {
+        let options = ok(
+            py,
+            response_options(
+                surface_id,
+                wrapped,
+                progressive_keys,
+                after_rejected_block,
+                None,
+            ),
+        )?;
+        Ok(StreamCompiler {
+            inner: ok(py, self.inner.stream(&options))?,
+        })
+    }
+
+    #[pyo3(signature = (*, surface_id=None, examples=None, allowed_messages=None))]
+    fn generate_prompt(
+        &self,
+        py: Python<'_>,
+        surface_id: Option<String>,
+        examples: Option<&Bound<'_, PyAny>>,
+        allowed_messages: Option<Vec<String>>,
+    ) -> PyResult<String> {
+        let options = prompt_options(py, surface_id, examples, allowed_messages)?;
+        ok(py, self.inner.generate_prompt(&options))
+    }
+
+    fn agent_callable_functions(&self) -> Vec<String> {
+        self.inner.agent_callable_functions()
+    }
+}
+
 /// Reads a model response as it streams in: each `push` returns the parts
 /// that chunk made ready.
 ///
@@ -322,6 +487,9 @@ fn a2ui_express(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(unwrap, m)?)?;
     m.add_function(wrap_pyfunction!(wrap, m)?)?;
     m.add_function(wrap_pyfunction!(has_format_content, m)?)?;
+    m.add_function(wrap_pyfunction!(generate_prompt, m)?)?;
+    m.add_function(wrap_pyfunction!(agent_callable_functions, m)?)?;
     m.add_class::<StreamCompiler>()?;
+    m.add_class::<Catalogs>()?;
     Ok(())
 }

@@ -23,4 +23,3 @@ test = ["pytest>=7", "pyyaml>=6"]
 
 [tool.maturin]
 module-name = "a2ui_express"
-features = []
