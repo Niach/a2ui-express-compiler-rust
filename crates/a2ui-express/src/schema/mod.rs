@@ -57,6 +57,7 @@ pub use common::common_types;
 pub use refs::{
     ENVELOPE_MIXIN_NAMES, common_def_name, envelope_key, envelope_read_key, envelope_value,
 };
+pub(crate) use resolve::is_object_or_ref_schema;
 pub use resolve::{Segment, SlotKind};
 pub use version::CatalogVersion;
 

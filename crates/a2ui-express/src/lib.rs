@@ -10,6 +10,7 @@
 
 pub mod compile;
 pub mod decompile;
+pub mod prompt;
 pub mod schema;
 pub mod syntax;
 
