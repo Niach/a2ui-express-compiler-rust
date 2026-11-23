@@ -24,7 +24,7 @@
 //! A step is atomic: if it fails, the session is left as it was.
 
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use serde_json::{Map, Value, json};
 
@@ -45,13 +45,13 @@ enum Dep {
 }
 
 /// A compiled component, shared between the cache and what was emitted.
-type Comp = Rc<Map<String, Value>>;
+type Comp = Arc<Map<String, Value>>;
 
 #[derive(Debug, Clone)]
 struct CompCache {
     /// The statement the variable's value came from; held, so a value at
     /// the same address is the same value.
-    stmt: Rc<Statement>,
+    stmt: Arc<Statement>,
     components: Vec<Comp>,
     deps: Vec<(String, Dep)>,
     inline_start: usize,
@@ -61,7 +61,7 @@ struct CompCache {
 
 #[derive(Debug, Clone)]
 struct DataCache {
-    stmt: Rc<Statement>,
+    stmt: Arc<Statement>,
     value: Value,
     deps: Vec<(String, Dep)>,
 }
@@ -101,7 +101,7 @@ pub(crate) struct Step {
 /// The statement cache before a step replaced it.
 struct CacheUndo {
     prefix: String,
-    statements: Vec<Rc<Statement>>,
+    statements: Vec<Arc<Statement>>,
     added_known: Vec<String>,
 }
 
@@ -114,7 +114,7 @@ pub(crate) struct ScopeSession {
     /// Whether a step has emitted anything.
     pub has_emitted: bool,
     cached_prefix: String,
-    cached: Vec<Rc<Statement>>,
+    cached: Vec<Arc<Statement>>,
     known: HashSet<String>,
     /// Components (surface, id) that a later step re-emitted under another
     /// id, and that no other scope holds: the caller drops them from its
@@ -233,7 +233,7 @@ impl ScopeSession {
 
     /// The statements of `text`, parsing only what follows the text the
     /// last cached step saw.
-    fn statements(&self, text: &str) -> Result<Vec<Rc<Statement>>, CompileError> {
+    fn statements(&self, text: &str) -> Result<Vec<Arc<Statement>>, CompileError> {
         if !self.cached_prefix.is_empty()
             && text.starts_with(&self.cached_prefix)
             && is_prefix_boundary(text, self.cached_prefix.len())
@@ -243,12 +243,12 @@ impl ScopeSession {
             if !delta.trim().is_empty() {
                 let parsed = syntax::parse_at(delta, syntax::Pos::START, &self.known);
                 let program = parsed.into_result()?;
-                out.extend(program.statements.into_iter().map(Rc::new));
+                out.extend(program.statements.into_iter().map(Arc::new));
             }
             return Ok(out);
         }
         let program = syntax::parse(text).into_result()?;
-        Ok(program.statements.into_iter().map(Rc::new).collect())
+        Ok(program.statements.into_iter().map(Arc::new).collect())
     }
 
     fn step(
@@ -365,7 +365,7 @@ impl ScopeSession {
     fn scope_delta(
         &mut self,
         compiler: &Compiler,
-        statements: &[Rc<Statement>],
+        statements: &[Arc<Statement>],
         idx: usize,
         scope: &Scope<'_>,
         ctx: &mut Ctx,
@@ -492,7 +492,7 @@ impl ScopeSession {
             if state
                 .emitted_components
                 .get(&id)
-                .is_some_and(|e| Rc::ptr_eq(e, &c) || **e == *c)
+                .is_some_and(|e| Arc::ptr_eq(e, &c) || **e == *c)
             {
                 continue;
             }
@@ -586,7 +586,7 @@ impl ScopeSession {
     fn ready_components(
         &mut self,
         compiler: &Compiler,
-        statements: &[Rc<Statement>],
+        statements: &[Arc<Statement>],
         idx: usize,
         scope: &Scope<'_>,
         ids: &CompIds,
@@ -636,7 +636,7 @@ impl ScopeSession {
                         Err(e) => return Err(e),
                     };
                     let components: Vec<Comp> = match component {
-                        Some(c) => std::iter::once(c).chain(extras).map(Rc::new).collect(),
+                        Some(c) => std::iter::once(c).chain(extras).map(Arc::new).collect(),
                         None => Vec::new(),
                     };
                     let deps = Self::deps(scope, ids, &mut ctx.referenced);
@@ -702,7 +702,7 @@ impl ScopeSession {
     fn ready_data(
         &mut self,
         compiler: &Compiler,
-        statements: &[Rc<Statement>],
+        statements: &[Arc<Statement>],
         idx: usize,
         scope: &Scope<'_>,
         ids: &CompIds,
@@ -756,14 +756,14 @@ fn same_value(stmt: &Statement, ast: &Expr) -> bool {
 }
 
 /// The statement assigning `ast`, from the step's statements.
-fn statement_of(statements: &[Rc<Statement>], ast: &Expr) -> Rc<Statement> {
+fn statement_of(statements: &[Arc<Statement>], ast: &Expr) -> Arc<Statement> {
     statements
         .iter()
         .rev()
         .find(|s| value_of(s).is_some_and(|v| std::ptr::eq(v, ast)))
         .cloned()
         .unwrap_or_else(|| {
-            Rc::new(Statement {
+            Arc::new(Statement {
                 kind: StatementKind::Assign {
                     target: Target::Variable {
                         name: String::new(),

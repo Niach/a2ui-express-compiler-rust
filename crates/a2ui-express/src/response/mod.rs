@@ -300,3 +300,21 @@ impl ExpressParser {
         ResponseStream::new(self.inner.clone(), wrapped, after, state)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Hosts run decoders on transport threads and hand them across FFI
+    /// boundaries (UniFFI objects must be `Send + Sync`).
+    #[test]
+    fn parsers_streams_and_states_are_send_and_sync() {
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<Compiler>();
+        send_sync::<ExpressParser>();
+        send_sync::<ResponseStream>();
+        send_sync::<RendererState>();
+        send_sync::<Part>();
+        send_sync::<ResponseError>();
+    }
+}
