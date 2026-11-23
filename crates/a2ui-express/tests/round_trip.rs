@@ -336,7 +336,7 @@ fn eui_v1_messages_round_trip() {
                 continue;
             }
             let label = format!("{flow_name} / step {index}");
-            let result = round_trip_all(&compiler, surface_id, &[message.clone()]);
+            let result = round_trip_all(&compiler, surface_id, std::slice::from_ref(message));
             match (result, listed.contains_key(label.as_str())) {
                 (Ok(()), false) => checked += 1,
                 (Ok(()), true) => unexpected_passes.push(label.clone()),
