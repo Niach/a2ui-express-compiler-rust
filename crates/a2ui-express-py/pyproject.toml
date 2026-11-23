@@ -1,0 +1,25 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "a2ui-express"
+description = "A2UI Express compiler: compile, stream, parse and decompile the Express inference format (Rust, via pyo3)"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.9"
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[project.urls]
+Repository = "https://github.com/Niach/a2ui-express-compiler-rust"
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pyyaml>=6"]
+
+[tool.maturin]
+module-name = "a2ui_express"

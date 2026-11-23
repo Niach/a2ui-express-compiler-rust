@@ -34,6 +34,63 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo build -p a2ui-express --target wasm32-unknown-unknown
 
+  npm:
+    name: npm package (wasm-pack, node tests, size budget)
+    runs-on: ubuntu-latest
+    env:
+      # RUSTFLAGS would replace the wasm32 size flags in .cargo/config.toml.
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build (wasm-pack --target web, full and renderer)
+        run: scripts/build-npm.sh | tee "$RUNNER_TEMP/sizes.txt"
+      - name: Size budget (renderer build < 200 KB gzipped)
+        run: |
+          gz=$(gzip -9c packages/npm/dist/renderer/a2ui_express_bg.wasm | wc -c)
+          echo "::notice title=wasm size::$(tr '\n' ';' < "$RUNNER_TEMP/sizes.txt")"
+          if [ "$gz" -ge 200000 ]; then
+            echo "::error title=wasm size budget::renderer build is $gz bytes gzipped (budget 200000)"
+            exit 1
+          fi
+      - run: npm ci
+        working-directory: packages/npm
+      - name: Conformance cases + API through the wasm binding
+        run: npm test
+        working-directory: packages/npm
+      - name: Package contents
+        run: npm pack --dry-run
+        working-directory: packages/npm
+
+  python:
+    name: Python binding (maturin, pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build into a virtualenv
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install "maturin>=1.9,<2" pytest pyyaml
+          cd crates/a2ui-express-py
+          VIRTUAL_ENV="$PWD/../../.venv" ../../.venv/bin/maturin develop --release
+      - name: Conformance cases + API through the Python binding
+        run: ../../.venv/bin/pytest -q tests
+        working-directory: crates/a2ui-express-py
+
   vendor:
     name: vendor/ is reproducible
     runs-on: ubuntu-latest

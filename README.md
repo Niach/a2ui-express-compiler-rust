@@ -6,7 +6,126 @@ Google's A2UI agent SDK, built to embed in eui-core (iOS, Android, desktop)
 and to ship as wasm for the web.
 
 Crate: [`a2ui-express`](crates/a2ui-express). Runtime dependencies are limited
-to `serde`, `serde_json` (`preserve_order`) and `thiserror`.
+to `serde`, `serde_json` (`preserve_order`) and `thiserror`. The same compiler
+ships to JavaScript (wasm, `@niach/a2ui-express`) and Python (`a2ui-express`);
+see [Bindings](#bindings).
+
+## Streaming
+
+`response::ExpressParser` reads model output: prose with Express blocks
+between `<a2ui>` tags (or a bare Express body).
+
+```rust
+let parser = ExpressParser::new(compiler, "main");
+let mut stream = parser.open_stream();
+for chunk in model_output {
+    for part in stream.push(chunk)? {   // Part::Text | Part::A2ui(messages) | Part::Error
+        render(part);
+    }
+}
+render_all(stream.finish()?);
+```
+
+Each statement compiles as soon as it is complete: a new surface's
+`createSurface` once `root` is there, then `updateComponents` /
+`updateDataModel` deltas. A component may name a child that comes later (it
+renders once the child arrives), and an open string of a `text` property heals,
+so a sentence types in live. Every message is checked against a
+`state::RendererState` mirror of what the renderer holds before it is
+returned. Streamed in any chunk size, a response leaves the renderer with the
+same surfaces as `parse_response` on the whole text
+([`tests/streaming.rs`](crates/a2ui-express/tests/streaming.rs) checks every
+conformance input one character at a time). A step costs about what its
+statement costs: eui's kitchen-sink surface (251 components, 30 KB) streams
+character by character in ~0.2 s in release builds
+(`cargo run --release -p a2ui-express --example stream_bench`).
+
+`response::{unwrap, wrap, has_format_content}` split a whole response into
+text and raw blocks and back.
+
+Samples meant for streaming should be written top-down (`root` first):
+`decompile` with `Order::TopDown`.
+
+## Bindings
+
+One implementation everywhere: both bindings are thin shells over
+[`a2ui-express-ffi`](crates/a2ui-express-ffi), a JSON-in/JSON-out layer, so
+they take the same options and return the same shapes:
+
+- a parsed part: `{text}` | `{a2ui: [messages]}` | `{error: {category, message}}`;
+- a raw part (`unwrap`/`wrap`): `{text}` | `{a2ui_raw, is_final?}`;
+- an error: category `ParseError` | `ValidationError` | `CatalogError` (plus
+  `ArgumentError` for a malformed call), message, and `partial`, the parts a
+  response read made ready before it failed.
+
+Both run every compile, decompile, parse_response, streaming (as written and
+one character at a time) and prompt conformance case in CI
+([`conformance/bindings_skip.txt`](conformance/bindings_skip.txt) lists the
+four that check harness-only behaviour), so neither can drift from the crate.
+
+### JavaScript / wasm: [`packages/npm`](packages/npm)
+
+```js
+import init, { compile, StreamCompiler, parseResponse, decompile, generatePrompt } from "@niach/a2ui-express";
+await init(); // or initSync({ module: wasmBytes })
+
+const stream = new StreamCompiler(catalog, { surfaceId: "main" });
+for await (const chunk of modelOutput) {
+  for (const part of stream.push(chunk)) render(part); // throws an Error with .category/.partial
+}
+stream.finish().forEach(render);
+```
+
+`compile(catalogs, source, {surfaceId?, version?})`,
+`decompile(catalogs, messages, {keywordArgs?, order?: "upstream" | "top-down"})`,
+`parseResponse(catalogs, text, {surfaceId?, wrapped?, progressiveKeys?})`,
+`new StreamCompiler(catalogs, {surfaceId?, wrapped?, progressiveKeys?, afterRejectedBlock?: "end" | "continue"})`
+with `push`/`finish`/`inBlock`, `unwrap`/`wrap`/`hasFormatContent`,
+`generatePrompt(catalogs, {examples?, allowedMessages?, style?: "upstream" | "compact"})`,
+`agentCallableFunctions(catalogs)`. TypeScript types included.
+
+Each free function loads its catalogs anew. For a large catalog load them
+once into a `Catalogs` and compile against that: eui's catalog takes ~0.1–0.2 s
+to load in wasm, a 30 KB block ~20 ms to compile against it, and opening a
+stream on it nothing.
+
+```js
+const catalogs = new Catalogs(euiCatalog, { surfaceId: "main" });
+const stream = catalogs.stream();       // also catalogs.compile / parseResponse / decompile / generatePrompt
+```
+
+The crate is [`crates/a2ui-express-wasm`](crates/a2ui-express-wasm) and
+builds with plain `wasm-pack build --target web` (or `cargo build --target
+wasm32-unknown-unknown --release` + `wasm-bindgen --target web` +
+`wasm-opt -Oz`). `scripts/build-npm.sh` builds the package's two flavours:
+
+| build | entry | calls | wasm, gzip -9 | brotli |
+|---|---|---|---|---|
+| full (default features) | `@niach/a2ui-express` | all | 228 KB | 187 KB |
+| renderer (`--no-default-features`) | `@niach/a2ui-express/renderer` | compile, stream, parse, unwrap/wrap | 180 KB | 149 KB |
+
+The web renderers load the renderer build; CI fails it at 200 KB gzipped
+(the decompiler and prompt generator are agent-side and add ~48 KB). eui's
+catalog is a runtime input, not bundled (741 KB JSON, 62 KB gzipped).
+wasm32 builds are optimised for size (`.cargo/config.toml`: `opt-level=z`,
+fat LTO, wasm-opt `-Oz`), which makes them about 2.5× slower than native
+`-O3`: eui's kitchen-sink surface (251 components) streamed one character at
+a time, the worst case, takes ~0.6 s. Publishing is a manual workflow
+([`.github/workflows/publish-npm.yml`](.github/workflows/publish-npm.yml)).
+
+### Python: [`crates/a2ui-express-py`](crates/a2ui-express-py)
+
+A pyo3 + maturin abi3 wheel (CPython ≥ 3.9), `import a2ui_express`:
+`compile`, `decompile(order="top-down")`, `parse_response`, `StreamCompiler`,
+`unwrap`/`wrap`/`has_format_content`, `generate_prompt`,
+`agent_callable_functions`, and `Catalogs` (load once, call its methods in a
+loop), raising `ParseError` / `ValidationError` /
+`CatalogError` (subclasses of `ExpressError`, with `.category` and
+`.partial`). See its [README](crates/a2ui-express-py/README.md).
+
+```sh
+cd crates/a2ui-express-py && maturin develop --release && pytest tests
+```
 
 ## Streaming
 
@@ -148,6 +267,8 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo build -p a2ui-express --target wasm32-unknown-unknown
+scripts/build-npm.sh && (cd packages/npm && npm ci && npm test)   # wasm binding
+(cd crates/a2ui-express-py && maturin develop --release && pytest tests)   # Python binding
 ```
 
 ## License

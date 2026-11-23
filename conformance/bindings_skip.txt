@@ -1,0 +1,14 @@
+# Conformance cases the binding tests (crates/a2ui-express-py/tests,
+# packages/npm/test) do not run. They run every compile, decompile,
+# parse_response, parse_chunk and generate_prompt_snippet case as written
+# (v1.0) except these, which check what upstream's harness adds on top of
+# the compiler and the bindings do not expose. The crate's own conformance
+# test (`cargo test -p a2ui-express --test conformance`) runs them all.
+
+# `expect_present`: a pointer the harness checks and deletes before comparing.
+test_compile_express_check_without_a_message_still_carries_one
+# The harness's `compile_checked` validates the emitted messages against
+# the catalog's functions (`validate_payload`), beyond `compile`.
+test_compile_express_map_with_call_like_keys_still_rejects_bindings
+test_compile_express_standalone_call_renderer_only_function_is_validation_error
+test_compile_express_standalone_call_user_activation_function_is_validation_error
