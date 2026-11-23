@@ -34,7 +34,7 @@ The host compiler will compile your A2UI Express output into the correct JSON en
    Prefix relative list scopes with '$', e.g., $firstName.
    A lone '$' represents an empty relative path which resolves to the root of the current context (e.g. inside a template, representing the entire item itself).
 
-7. Logic and validation: prefix client check rules with '?', e.g., ?required or ?regex("^[0-9]{5}$"). To specify a custom error message for validation failures, append it as an extra string argument, e.g. ?regex("^[0-9]{5}$", "Postal code must be 5 digits").
+7. Logic and validation: prefix client check rules with '?', e.g., ?required or ?regex("^[0-9]{5}$"). To specify a custom error message for validation failures, append it as an extra string argument, e.g. ?regex("^[0-9]{5}$", "Postal code must be 5 digits"). A check reads the value its component binds to `value` (`value=$/form/email`), so bind it; on a component that binds none, name the value first: ?required($/form/terms, "Required"). Check arguments are positional, never named: ?length(8, "Too short").
 
 8. Action events: represent server-side actions using the Event helper, `Event(name, context?, userMessage=...)`:
    Event("save_deal", {rep: $/form/rep})
@@ -51,18 +51,16 @@ The host compiler will compile your A2UI Express output into the correct JSON en
     And define the template component variable on another line, utilizing relative path references prefixed with $:
     itemTemplate = Image($url)
 
-12. To delete a user interface surface, output the standalone `deleteSurface(surfaceId)` command (no variable assignment):
+12. Data: Keep data in the data model and bind to it. Bind every input's `value` to a path (`value=$/form/name`) and send it in events: Event("save", {name: $/form/name}). Repeated content (cards, rows, messages, events) is one template over a list, not copies: $/items = [{title: "A"}, {title: "B"}], List(children=_template($/items, item)), item = Text(text=$title) or any tree reading the item ($title). Only `~` properties take a binding, in a template too; give the others a literal.
+
+13. To delete a user interface surface, output the standalone `deleteSurface(surfaceId)` command (no variable assignment):
     deleteSurface("dashboard-surface-1")
 
-13. To have the renderer run a function right away, output the call as a standalone command (no variable assignment):
+14. To have the renderer run a function right away, output the call as a standalone command (no variable assignment):
     required(...)
     Only these functions can be called this way: `required`, `regex`, `length`, `numeric`, `email`, `formatString`, `formatNumber`, `formatCurrency`, `formatDate`, `pluralize`, `and`, `or`, `not`, `percent`, `add`, `sub`, `eq`, `lt`, `clamp`, `cond`, `fallback`, `concat`, `coalesce`, `text`, `map`, `len`, `fill`, `formatPercent`, `formatRelativeTime`, `filter`, `mul`, `div`, `mod`, `round`, `floor`, `ceil`, `abs`, `min`, `max`, `today`, `now`, `dateTime`, `dateAdd`, `dateDiff`, `startOf`, `endOf`, `weekday`, `isoWeek`, `hours`, `formatDuration`, `orElse`, `expr`.
 
-14. Static properties: Arguments annotated with '(static)' in the signatures below MUST be defined as literal values or arrays inline. You CANNOT use a dynamic data binding path (prefixed by $) for these arguments.
-
-15. Required actions: Parameters named 'action' (or annotated in component signatures) are strictly required. You must pass a valid Event (e.g. Event("click")) or function call. If no specific action is described in the user request, you must provide a dummy click event like Event("click") instead of passing null or omitting the parameter.
-
-16. Surface targeting: Output `surface(surfaceId)` to specify or target a user interface surface:
+15. Surface targeting: Output `surface(surfaceId)` to specify or target a user interface surface:
     surface("dashboard-surface-1")
     root = Label(...)
 
@@ -74,7 +72,7 @@ These functions are defined by the A2UI protocol, not by a catalog. Call them by
 ## Component Signatures
 
 Instantiate components with these signatures, naming every argument (`Button(label="Save", variant="outline")`, `Stack(children=[a, b])`). Do not name any other key.
-Notation: `name?` is optional; `name~` also takes a data binding ($/path) or a function call, any other property takes a literal only (this replaces the `(static)` annotation); `:n` marks a number (write 1.5, not "1.5"), `:b` a boolean. Under a signature, `- prop: type` gives a property's values: `a|b|c` is one of these strings (write "a"), `{key, key: type}` is a map with those keys (`{a|b: type}`: keys a and b, both of that type), `[type]` a list, `Action` an Event(...) or function call, and a capitalized name a type from Shared Types.
+Notation: `name?` is optional; `name~` also takes a data binding ($/path) or a function call, any other property takes a literal only; `:n` marks a number (write 1.5, not "1.5"), `:b` a boolean. Under a signature, `- prop: type` gives a property's values: `a|b|c` is one of these strings (write "a"), `{key, key: type}` is a map with those keys (`{a|b: type}`: keys a and b, both of that type), `[type]` a list, `Action` an Event(...) or function call, and a capitalized name a type from Shared Types.
 Actions go in a component's `on` map, keyed by event: on={change: Event("save")}. No component takes an `action` argument.
 
 ### Shared Types

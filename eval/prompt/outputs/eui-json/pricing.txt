@@ -1,0 +1,43 @@
+[
+{"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+{"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{"billing":"monthly"}}},
+{"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+{"id":"root","component":"Page","title":"Pricing","subtitle":"Pick the plan that fits your team","children":["body"]},
+{"id":"body","component":"Stack","gap":"lg","align":"center","children":["billing","plans"]},
+{"id":"billing","component":"Segmented","items":[{"label":"Monthly","value":"monthly"},{"label":"Yearly","value":"yearly"}],"value":{"path":"/billing"},"on":{"change":{"functionCall":{"call":"set","args":{"path":"/billing","value":{"path":"/billing"}}}}}},
+{"id":"plans","component":"Grid","columns":{"base":1,"md":3},"gap":"lg","children":["free","pro","team"]},
+
+{"id":"free","component":"Card","title":"Free","description":"For trying things out","children":["free-body"]},
+{"id":"free-body","component":"Stack","gap":"md","children":["free-price","free-feats","free-btn"]},
+{"id":"free-price","component":"Heading","level":"h2","text":"$0"},
+{"id":"free-feats","component":"List","divided":true,"children":["free-f1","free-f2","free-f3","free-f4"]},
+{"id":"free-f1","component":"Row","icon":"check","title":"1 project"},
+{"id":"free-f2","component":"Row","icon":"check","title":"Up to 3 members"},
+{"id":"free-f3","component":"Row","icon":"check","title":"Community support"},
+{"id":"free-f4","component":"Row","icon":"check","title":"1 GB storage"},
+{"id":"free-btn","component":"Button","label":"Choose plan","variant":"outline","on":{"press":{"event":{"name":"choosePlan","context":{"plan":"free","billing":{"path":"/billing"}}}}}},
+
+{"id":"pro","component":"Card","title":"Pro","description":"For growing teams that ship fast","style":{"borderColor":"$color.primary","borderWidth":2},"children":["pro-body"]},
+{"id":"pro-body","component":"Stack","gap":"md","children":["pro-badge","pro-price","pro-note","pro-feats","pro-btn"]},
+{"id":"pro-badge","component":"Badge","text":"Recommended","variant":"default","icon":"star"},
+{"id":"pro-price","component":"Heading","level":"h2","text":{"call":"cond","args":{"if":{"call":"eq","args":{"a":{"path":"/billing"},"b":"yearly"}},"then":"$10","else":"$12"}}},
+{"id":"pro-note","component":"Text","variant":"muted","text":{"call":"cond","args":{"if":{"call":"eq","args":{"a":{"path":"/billing"},"b":"yearly"}},"then":"per month, billed yearly","else":"per month"}}},
+{"id":"pro-feats","component":"List","divided":true,"children":["pro-f1","pro-f2","pro-f3","pro-f4"]},
+{"id":"pro-f1","component":"Row","icon":"check","title":"Unlimited projects"},
+{"id":"pro-f2","component":"Row","icon":"check","title":"Up to 20 members"},
+{"id":"pro-f3","component":"Row","icon":"check","title":"Priority support"},
+{"id":"pro-f4","component":"Row","icon":"check","title":"100 GB storage"},
+{"id":"pro-btn","component":"Button","label":"Choose plan","on":{"press":{"event":{"name":"choosePlan","context":{"plan":"pro","billing":{"path":"/billing"}}}}}},
+
+{"id":"team","component":"Card","title":"Team","description":"For organizations that need control","children":["team-body"]},
+{"id":"team-body","component":"Stack","gap":"md","children":["team-price","team-note","team-feats","team-btn"]},
+{"id":"team-price","component":"Heading","level":"h2","text":{"call":"cond","args":{"if":{"call":"eq","args":{"a":{"path":"/billing"},"b":"yearly"}},"then":"$25","else":"$30"}}},
+{"id":"team-note","component":"Text","variant":"muted","text":{"call":"cond","args":{"if":{"call":"eq","args":{"a":{"path":"/billing"},"b":"yearly"}},"then":"per user / month, billed yearly","else":"per user / month"}}},
+{"id":"team-feats","component":"List","divided":true,"children":["team-f1","team-f2","team-f3","team-f4"]},
+{"id":"team-f1","component":"Row","icon":"check","title":"Unlimited members"},
+{"id":"team-f2","component":"Row","icon":"check","title":"SSO and audit log"},
+{"id":"team-f3","component":"Row","icon":"check","title":"Dedicated support"},
+{"id":"team-f4","component":"Row","icon":"check","title":"1 TB storage"},
+{"id":"team-btn","component":"Button","label":"Choose plan","variant":"outline","on":{"press":{"event":{"name":"choosePlan","context":{"plan":"team","billing":{"path":"/billing"}}}}}}
+]}}
+]

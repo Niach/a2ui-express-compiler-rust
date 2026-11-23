@@ -1,0 +1,10 @@
+<a2ui>
+surface("main")
+email = Input(label="Email", name="email", type="email", placeholder="you@example.com", checks=[?required("Email is required"), ?email("Enter a valid email address")])
+password = Input(label="Password", name="password", type="password", checks=[?required("Password is required")])
+remember = Checkbox(label="Remember me", name="remember")
+forgot = Link(label="Forgot password?", on={press: Event("forgot_password")})
+submit = Button(label="Sign in", variant="default", submit=true, on={press: Event("sign_in")})
+form = Form(name="signin", children=[email, password, remember, forgot, submit], on={submit: Event("sign_in")})
+root = Page(title="Sign in", children=[form])
+</a2ui>

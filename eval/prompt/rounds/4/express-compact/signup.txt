@@ -1,0 +1,16 @@
+<a2ui>
+surface("main")
+$/form/name = ""
+$/form/email = ""
+$/form/password = ""
+$/form/confirm = ""
+$/form/terms = false
+nameField = Input(label="Full name", name="name", value=$/form/name, checks=[?required])
+emailField = Input(label="Email", name="email", type="email", value=$/form/email, checks=[?required, ?email])
+passwordField = Input(label="Password", name="password", type="password", value=$/form/password, checks=[?required, ?length(min=8)])
+confirmField = Input(label="Confirm password", name="confirm", type="password", value=$/form/confirm, checks=[?required, ?length(min=8)])
+terms = Checkbox(label="I agree to the terms", name="terms", checked=$/form/terms, checks=[?required($/form/terms, "You must agree to the terms")])
+actions = FormActions(submit="Create account")
+form = Form(name="signup", children=[nameField, emailField, passwordField, confirmField, terms, actions], on={submit: Event("create_account", {name: $/form/name, email: $/form/email, password: $/form/password, confirm: $/form/confirm, terms: $/form/terms})})
+root = Page(title="Create account", children=[form])
+</a2ui>

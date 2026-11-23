@@ -21,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json::{Map, Value};
 
 use super::signatures::{Structured, enum_value, schema_enum, str_field, structured_property};
-use crate::schema::{Catalog, Component, common_def_name};
+use crate::schema::{Catalog, Component, Function, SlotKind, common_def_name};
 
 /// How deep nested map keys are spelled out inline.
 const MAX_INLINE_DEPTH: usize = 6;
@@ -46,7 +46,7 @@ const UNIVERSAL_MIN_COMPONENTS: usize = 8;
 pub(super) const COMPONENTS_HEADING: &str = "## Component Signatures\n\nInstantiate components with these signatures, naming every argument (`Button(label=\"Save\", variant=\"outline\")`, `Stack(children=[a, b])`). Do not name any other key.";
 
 /// The legend printed before the compact signatures.
-const LEGEND: &str = "Notation: `name?` is optional; `name~` also takes a data binding ($/path) or a function call, any other property takes a literal only (this replaces the `(static)` annotation); `:n` marks a number (write 1.5, not \"1.5\"), `:b` a boolean. Under a signature, `- prop: type` gives a property's values: `a|b|c` is one of these strings (write \"a\"), `{key, key: type}` is a map with those keys (`{a|b: type}`: keys a and b, both of that type), `[type]` a list, `Action` an Event(...) or function call, and a capitalized name a type from Shared Types.";
+const LEGEND: &str = "Notation: `name?` is optional; `name~` also takes a data binding ($/path) or a function call, any other property takes a literal only; `:n` marks a number (write 1.5, not \"1.5\"), `:b` a boolean. Under a signature, `- prop: type` gives a property's values: `a|b|c` is one of these strings (write \"a\"), `{key, key: type}` is a map with those keys (`{a|b: type}`: keys a and b, both of that type), `[type]` a list, `Action` an Event(...) or function call, and a capitalized name a type from Shared Types.";
 
 /// A shape the model has to be told: the allowed values of an enum, the
 /// keys of a map (a list of maps is its item map), or an action.
@@ -543,6 +543,180 @@ pub(super) fn components(catalog: &Catalog) -> String {
     }
     out.push(format!("\n### Components\n{signatures}"));
     out.join("\n")
+}
+
+/// Rules of upstream's text the compact signatures make moot: `(static)`
+/// is never written (the legend's `~` replaces it), and the action rule
+/// is about an `action` argument no component takes when actions go in a
+/// map.
+const STATIC_RULE: &str = "Static properties:";
+const ACTION_RULE: &str = "Required actions:";
+
+/// Where the check sentence goes: the end of rule 7.
+const CHECK_RULE_END: &str = r#"?regex("^[0-9]{5}$", "Postal code must be 5 digits")."#;
+
+/// Where the data rule goes: after rule 11 (templates).
+const TEMPLATE_RULE_END: &str = "    itemTemplate = Image($url)";
+
+/// Removes the rule paragraph (`\n\n<n>. <head>…`) whose text opens with
+/// `head`.
+fn remove_rule(text: &str, head: &str) -> String {
+    let mut from = 0;
+    while let Some(i) = text[from..].find("\n\n").map(|i| i + from) {
+        let rest = &text[i + 2..];
+        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+        if digits > 0 && rest[digits..].starts_with(". ") && rest[digits + 2..].starts_with(head) {
+            let end = text[i + 2..].find("\n\n").map_or(text.len(), |e| i + 2 + e);
+            return format!("{}{}", &text[..i], &text[end..]);
+        }
+        from = i + 2;
+    }
+    text.to_owned()
+}
+
+/// What a compact data/check hint names, read from the catalogs: the
+/// property a check reads (`value`), the list that takes a template, and a
+/// component to show one item's field.
+struct BindingNames<'c> {
+    /// The check function and the component property its first argument
+    /// reads when the component binds it.
+    check: Option<(&'c str, &'c str)>,
+    /// A check function whose second argument is a number (`length`), for
+    /// the example of positional check arguments.
+    numeric_check: Option<&'c str>,
+    /// A component and its child-list property that takes a template.
+    list: Option<(&'c str, &'c str)>,
+    /// A component and a required property that takes a binding.
+    item: Option<(&'c str, &'c str)>,
+}
+
+impl<'c> BindingNames<'c> {
+    fn of(catalogs: &'c [Catalog]) -> BindingNames<'c> {
+        let components = || {
+            catalogs
+                .iter()
+                .flat_map(|c| c.components().iter().map(move |x| (c, x)))
+        };
+        let bindable = |c: &Catalog, x: &Component, p: &str| {
+            x.property_schema(p)
+                .is_some_and(|s| c.admits_path(s) && c.slot_kind(s).is_none())
+        };
+        // A check function (one returning a check result or a boolean)
+        // whose first argument a checkable component binds; `required`
+        // first, as the commonest check.
+        let mut check = None;
+        let mut numeric_check = None;
+        for catalog in catalogs {
+            let mut functions: Vec<&Function> = catalog
+                .functions()
+                .iter()
+                .filter(|f| matches!(f.return_type(), Some("validationResult" | "boolean")))
+                .collect();
+            functions.sort_by_key(|f| f.name() != "required");
+            numeric_check = numeric_check.or_else(|| {
+                functions.iter().find_map(|f| {
+                    let second = f.arguments().get(1)?;
+                    let schema = f.argument_schema(second)?;
+                    catalog.accepts_number(schema).then(|| f.name())
+                })
+            });
+            check = functions.iter().find_map(|f| {
+                let first = f.arguments().first()?;
+                components()
+                    .any(|(c, x)| x.is_checkable() && bindable(c, x, first))
+                    .then(|| (f.name(), first.as_str()))
+            });
+            if check.is_some() {
+                break;
+            }
+        }
+        let prefer = |name: &str| {
+            let name = name.to_owned();
+            move |(_, x): &(&Catalog, &Component)| x.name() != name
+        };
+        let mut lists: Vec<(&Catalog, &Component)> = components()
+            .filter(|(c, x)| {
+                x.property_schema("children")
+                    .is_some_and(|s| c.slot_kind(s) == Some(SlotKind::ChildList))
+            })
+            .collect();
+        lists.sort_by_key(prefer("List"));
+        let list = lists.first().map(|(_, x)| (x.name(), "children"));
+        let mut items: Vec<(&Catalog, &Component, &str)> = components()
+            .filter_map(|(c, x)| {
+                let p = x.required().iter().find(|p| {
+                    p.as_str() != "component"
+                        && bindable(c, x, p)
+                        && x.property_schema(p).is_some_and(|s| !c.accepts_number(s))
+                })?;
+                Some((c, x, p.as_str()))
+            })
+            .collect();
+        items.sort_by_key(|(_, x, _)| x.name() != "Text");
+        let item = items.first().map(|(_, x, p)| (x.name(), *p));
+        BindingNames {
+            check,
+            numeric_check,
+            list,
+            item,
+        }
+    }
+}
+
+/// Upstream's rules, adapted to the compact signatures: the rules about
+/// `(static)` and the `action` argument go when they do not apply, rule 7
+/// says what a check reads, and a rule after the templates says to keep
+/// data in the data model and bind to it. Not renumbered.
+pub(super) fn adapt_rules(rules: &str, catalogs: &[Catalog], writes_data: bool) -> String {
+    let mut rules = remove_rule(rules, STATIC_RULE);
+    let takes_action = catalogs
+        .iter()
+        .flat_map(Catalog::components)
+        .any(|c| c.properties().iter().any(|p| p == "action"));
+    if !takes_action {
+        rules = remove_rule(&rules, ACTION_RULE);
+    }
+    let names = BindingNames::of(catalogs);
+    if let Some((function, prop)) = names.check {
+        let sentence = format!(
+            " A check reads the value its component binds to `{prop}` (`{prop}=$/form/email`), so bind it; on a component that binds none, name the value first: ?{function}($/form/terms, \"Required\")."
+        );
+        let positional = match names.numeric_check {
+            Some(f) => {
+                format!(" Check arguments are positional, never named: ?{f}(8, \"Too short\").")
+            }
+            None => " Check arguments are positional, never named.".to_owned(),
+        };
+        rules = rules.replacen(
+            CHECK_RULE_END,
+            &format!("{CHECK_RULE_END}{sentence}{positional}"),
+            1,
+        );
+    }
+    let mut data = vec!["Keep data in the data model and bind to it.".to_owned()];
+    if let Some((_, prop)) = names.check {
+        data.push(format!(
+            "Bind every input's `{prop}` to a path (`{prop}=$/form/name`) and send it in events: Event(\"save\", {{name: $/form/name}})."
+        ));
+    }
+    if let (Some((list, slot)), Some((item, prop))) = (names.list, names.item) {
+        let fill = if writes_data {
+            "$/items = [{title: \"A\"}, {title: \"B\"}], "
+        } else {
+            ""
+        };
+        data.push(format!(
+            "Repeated content (cards, rows, messages, events) is one template over a list, not copies: {fill}{list}({slot}=_template($/items, item)), item = {item}({prop}=$title) or any tree reading the item ($title). Only `~` properties take a binding, in a template too; give the others a literal."
+        ));
+    }
+    if data.len() > 1 && rules.contains(TEMPLATE_RULE_END) {
+        rules = rules.replacen(
+            TEMPLATE_RULE_END,
+            &format!("{TEMPLATE_RULE_END}\n\n99. Data: {}", data.join(" ")),
+            1,
+        );
+    }
+    rules
 }
 
 /// The compact signatures of the named functions, in the order given: the

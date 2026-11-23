@@ -170,3 +170,53 @@ fn update_scope_and_delete() {
         ]
     );
 }
+
+fn eui() -> Compiler {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../vendor/eui/catalog/core.schema.json"
+    );
+    let catalog = Catalog::from_json_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    Compiler::new(vec![catalog], None).unwrap()
+}
+
+/// A check on a component that binds no value would read its own message
+/// (`required(value: "Email is required")`), so it is an error; a bound
+/// field, or a check that names its value, compiles.
+#[test]
+fn a_check_with_nothing_to_read_is_an_error() {
+    let err = eui()
+        .compile(
+            r#"root = Input(label="Email", name="email", checks=[?required("Email is required")])"#,
+            "main",
+        )
+        .unwrap_err();
+    assert_eq!(err.category(), Category::Validation, "{err:?}");
+    assert!(err.to_string().contains("no value to check"), "{err}");
+
+    let out = eui()
+        .compile(
+            r#"root = Input(label="Email", name="email", value=$/email, checks=[?required("Email is required"), ?email("Invalid")])"#,
+            "main",
+        )
+        .unwrap();
+    let checks = &out[0]["createSurface"]["components"][0]["@checks"];
+    assert_eq!(
+        checks[0]["condition"]["args"]["value"],
+        json!({"@path": "/email"})
+    );
+    assert_eq!(checks[0]["message"], "Email is required");
+
+    let out = eui()
+        .compile(
+            r#"root = Checkbox(label="Terms", name="terms", checks=[?required($/terms, "Accept the terms")])"#,
+            "main",
+        )
+        .unwrap();
+    let checks = &out[0]["createSurface"]["components"][0]["@checks"];
+    assert_eq!(
+        checks[0]["condition"]["args"]["value"],
+        json!({"@path": "/terms"})
+    );
+    assert_eq!(checks[0]["message"], "Accept the terms");
+}

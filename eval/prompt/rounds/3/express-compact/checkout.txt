@@ -1,0 +1,27 @@
+<a2ui>
+surface("main")
+$/order/subtotal = 48
+$/form/delivery = "standard"
+$/form/country = "us"
+
+fullName = Input(label="Full name", name="fullName", placeholder="Jane Doe", checks=[?required("Full name is required")])
+street = Input(label="Street address", name="street", placeholder="123 Main St", checks=[?required("Street is required")])
+city = Input(label="City", name="city", checks=[?required("City is required")])
+postal = Input(label="Postal code", name="postalCode", checks=[?required("Postal code is required")])
+cityRow = FieldGroup(columns=2, children=[city, postal])
+country = Select(label="Country", name="country", value=$/form/country, placeholder="Select a country", options=[{label: "United States", value: "us"}, {label: "Canada", value: "ca"}, {label: "United Kingdom", value: "uk"}, {label: "Germany", value: "de"}, {label: "France", value: "fr"}], checks=[?required("Country is required")])
+shippingHeading = Heading(text="Shipping address", level="h3")
+
+deliveryHeading = Heading(text="Delivery option", level="h3")
+delivery = Radio(name="delivery", value=$/form/delivery, options=[{label: "Standard", value: "standard", description: "Free", trailing: "Free"}, {label: "Express", value: "express", description: "Faster delivery", trailing: "$9.90"}], on={change: Event("delivery_changed")})
+
+summaryHeading = Heading(text="Order summary", level="h3")
+subtotalRow = Row(title="Subtotal", value=formatCurrency($/order/subtotal, "USD", 2))
+shippingRow = Row(title="Shipping", value=cond(eq($/form/delivery, "express"), "$9.90", "Free"))
+totalRow = Row(title="Total", value=formatCurrency(add($/order/subtotal, cond(eq($/form/delivery, "express"), 9.9, 0)), "USD", 2))
+summary = Card(children=[summaryHeading, subtotalRow, shippingRow, totalRow])
+
+actions = FormActions(submit="Place order")
+form = Form(name="checkout", on={submit: Event("place_order")}, children=[shippingHeading, fullName, street, cityRow, country, Separator(), deliveryHeading, delivery, Separator(), summary, actions])
+root = Page(title="Checkout", children=[form])
+</a2ui>

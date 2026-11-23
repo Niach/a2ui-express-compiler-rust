@@ -217,7 +217,10 @@ picks the format:
   line several components share is listed once under *Common Properties*;
   bindable properties are marked `~`, numbers `:n`, booleans `:b`; component
   descriptions are cut to their first sentence and property and function
-  descriptions are left out. The rules section is upstream's.
+  descriptions are left out. The rules are upstream's, less the two the
+  notation makes moot (`(static)`, the `action` argument), plus a sentence
+  on what a check reads and a rule on binding data and templating repeated
+  content, generated from the catalog (#AXC-21).
 
 ```rust
 use a2ui_express::prompt::{generate_prompt, PromptOptions, PromptStyle};

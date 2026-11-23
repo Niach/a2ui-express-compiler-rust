@@ -1,0 +1,17 @@
+<a2ui>
+surface("main")
+$/form/name = "Ada Lovelace"
+$/form/email = "ada@example.com"
+$/form/bio = "Analyst of engines"
+$/form/timezone = "Europe/London"
+root = Page(title="Edit profile", children=[profileForm])
+profileForm = Form(name="profile", children=[photoRow, nameField, emailField, bioField, tzField, actions], on={submit: Event("save_profile", {name: $/form/name, email: $/form/email, bio: $/form/bio, timezone: $/form/timezone})})
+photoRow = Stack(direction="horizontal", gap="md", align="center", children=[avatar, changePhoto])
+avatar = Avatar(name=$/form/name, size="xl")
+changePhoto = Button(label="Change photo", variant="outline", on={press: Event("change_photo")})
+nameField = Input(label="Display name", name="name", value=$/form/name, checks=[?required])
+emailField = Input(label="Email", name="email", type="email", value=$/form/email, checks=[?required, ?email])
+bioField = Textarea(label="Bio", name="bio", rows=4, value=$/form/bio)
+tzField = Select(label="Timezone", name="timezone", value=$/form/timezone, searchable=true, options=[{label: "Europe/London", value: "Europe/London"}, {label: "Europe/Paris", value: "Europe/Paris"}, {label: "Europe/Berlin", value: "Europe/Berlin"}, {label: "America/New_York", value: "America/New_York"}, {label: "America/Los_Angeles", value: "America/Los_Angeles"}, {label: "Asia/Tokyo", value: "Asia/Tokyo"}, {label: "UTC", value: "UTC"}])
+actions = FormActions(submit="Save", cancel=true, on={cancel: Event("cancel_edit")})
+</a2ui>

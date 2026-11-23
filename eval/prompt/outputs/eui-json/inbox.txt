@@ -1,0 +1,18 @@
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/notifications","value":[
+    {"id":"n1","sender":"Ada Lovelace","message":"Ada commented on your pull request","time":"2026-11-23T09:55:00Z","unread":true},
+    {"id":"n2","sender":"Grace Hopper","message":"Grace assigned you to EXP-42","time":"2026-11-23T09:20:00Z","unread":true},
+    {"id":"n3","sender":"Alan Turing","message":"Alan merged the release branch","time":"2026-11-23T07:30:00Z","unread":false},
+    {"id":"n4","sender":"Linus Torvalds","message":"Linus mentioned you in a review","time":"2026-11-22T16:00:00Z","unread":false},
+    {"id":"n5","sender":"Margaret Hamilton","message":"Margaret shared a document with you","time":"2026-11-21T11:00:00Z","unread":false}
+  ]}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Notifications","children":["markAll","list"]},
+    {"id":"markAll","component":"Button","label":"Mark all as read","variant":"outline","on":{"press":{"event":{"name":"markAllRead"}}}},
+    {"id":"list","component":"List","divided":true,"children":{"componentId":"item","path":"/notifications","key":"id"}},
+    {"id":"item","component":"Row","title":{"path":"message"},"meta":{"call":"formatRelativeTime","args":{"value":{"path":"time"}}},"slots":{"leading":"avatar","trailing":"dot"}},
+    {"id":"avatar","component":"Avatar","name":{"path":"sender"}},
+    {"id":"dot","component":"Badge","text":"New","variant":"default","visible":{"path":"unread"}}
+  ]}}
+]

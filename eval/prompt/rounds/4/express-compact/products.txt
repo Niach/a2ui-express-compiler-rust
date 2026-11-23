@@ -1,0 +1,20 @@
+<a2ui>
+surface("main")
+$/query = ""
+$/products = [
+  {name: "Trail Backpack", price: "$89.00", image: "https://example.com/img/backpack.jpg", rating: 4.5},
+  {name: "Insulated Bottle", price: "$24.00", image: "https://example.com/img/bottle.jpg", rating: 4},
+  {name: "Merino Beanie", price: "$32.00", image: "https://example.com/img/beanie.jpg", rating: 5},
+  {name: "Camp Stove", price: "$59.00", image: "https://example.com/img/stove.jpg", rating: 3.5}
+]
+search = Input(label="Search products", name="query", type="search", placeholder="Search products", value=$/query)
+cardImage = Image(src=$image, alt=$name, fit="cover", aspectRatio=1.33)
+cardName = Heading(text=$name, level="h3")
+cardPrice = Text(text=$price, variant="lead")
+cardRating = Rating(value=$rating, max=5, readOnly=true, size="sm")
+cardButton = Button(label="Add to cart", icon="shopping-cart", on={press: Event("add_to_cart", {name: $name})})
+cardBody = Stack(direction="vertical", gap="sm", children=[cardImage, cardName, cardPrice, cardRating, cardButton])
+productCard = Card(padded=true, children=[cardBody])
+grid = Grid(columns={base: 1, sm: 2, lg: 4}, gap="md", children=_template($/products, productCard))
+root = Page(title="Products", children=[Stack(direction="vertical", gap="md", children=[search, grid])])
+</a2ui>

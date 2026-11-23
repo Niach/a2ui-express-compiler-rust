@@ -192,6 +192,41 @@ fn eui_compact_prompt_fits_the_budget() {
     assert_eq!(rules(&text), rules(&upstream));
 }
 
+/// The compact rules drop the two that the compact signatures make moot
+/// (`(static)`, the `action` argument), say what a check reads, and add a
+/// data rule naming the catalog's template list, input binding and an item
+/// component.
+#[test]
+fn compact_rules_teach_binding_and_checks() {
+    let text = prompt(
+        vec![load("../../vendor/eui/catalog/core.schema.json")],
+        &compact(),
+    );
+    let rules = &text[..text.find("\n\n## System Functions").unwrap()];
+    assert!(!rules.contains("Static properties"));
+    assert!(!rules.contains("Required actions"));
+    assert!(!text.contains("(static)"));
+    assert!(rules.contains(
+        "A check reads the value its component binds to `value` (`value=$/form/email`), so bind it; on a component that binds none, name the value first: ?required($/form/terms, \"Required\")."
+    ));
+    assert!(
+        rules.contains("Check arguments are positional, never named: ?length(8, \"Too short\").")
+    );
+    assert!(rules.contains("Only `~` properties take a binding, in a template too"));
+    assert!(rules.contains("\n\n12. Data: Keep data in the data model and bind to it. Bind every input's `value` to a path"));
+    assert!(rules.contains("List(children=_template($/items, item)), item = Text(text=$title)"));
+    assert!(rules.contains("\n\n15. Surface targeting:"));
+    assert!(!rules.contains("\n\n16. "));
+
+    // The default style keeps upstream's rules.
+    let upstream = prompt(
+        vec![load("../../vendor/eui/catalog/core.schema.json")],
+        &PromptOptions::default(),
+    );
+    assert!(upstream.contains("Static properties"));
+    assert!(!upstream.contains("Data: Keep data"));
+}
+
 #[test]
 fn compact_names_shared_shapes_and_keeps_the_rest_inline() {
     let catalog = Catalog::from_json(json!({

@@ -20,11 +20,10 @@ Page title="Q3 overview"
 
 ```
 Page title="Q3 overview"
-  Stack
-    Grid
-      StatTile label="Revenue" value="$1.2M"
-      StatTile label="Orders" value="3,420"
-      StatTile label="Refunds" value="41"
-    Table columns[4]
-[data model] {"orders":[{"id":"#10542","customer":"Acme Corp","amount":1280,"status":"Paid"},{"id":"#10541","customer":"Globex","amount":460.5,"status":"Shipped"},{"id":"#10540","customer":"Initech","amount":2150,"status":"Pending"},{"id":"#10539","customer":"Umbrella Ltd","amount":89.99,"status":"Refunded"},{"id":"#10538","customer":"Hooli","amount":735,"status":"Paid"}]}
+  Grid
+    StatTile label="Revenue" value="$1.2M"
+    StatTile label="Orders" value="3,420"
+    StatTile label="Refunds" value="41"
+  Table columns[4]
+[data model] {"orders":[{"id":"#10482","customer":"Ava Thompson","amount":128.5,"status":"Paid"},{"id":"#10481","customer":"Liam Carter","amount":342,"status":"Paid"},{"id":"#10480","customer":"Noah Patel","amount":59.9,"status":"Pending"},{"id":"#10479","customer":"Mia Rossi","amount":214.25,"status":"Refunded"},{"id":"#10478","customer":"Ethan Kim","amount":87,"status":"Paid"}]}
 ```

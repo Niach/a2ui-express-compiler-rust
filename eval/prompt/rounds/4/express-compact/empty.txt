@@ -1,0 +1,5 @@
+<a2ui>
+surface("main")
+root = Page(title="Projects", children=[empty])
+empty = EmptyState(icon="folder", title="No projects yet", description="Projects you create will show up here so you can keep your work organized.", actionLabel="Create project", size="page", on={press: Event("create_project")})
+</a2ui>

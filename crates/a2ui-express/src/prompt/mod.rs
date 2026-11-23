@@ -97,8 +97,15 @@ pub enum PromptStyle {
     /// `:b`, action slots read `Action`. Component descriptions are cut to
     /// their first sentence; property, argument and function descriptions
     /// are left out. A legend explains the notation, and the model is told
-    /// to name every argument. The rules, catalog instructions and examples
-    /// are the same as upstream's.
+    /// to name every argument. The catalog instructions and examples are
+    /// the same as upstream's; the rules are upstream's with these
+    /// changes: the `(static)` rule goes (the `~` mark replaces it), the
+    /// required-`action` rule goes when no component takes an `action`
+    /// argument, rule 7 says a check reads the value its component binds
+    /// (the compiler refuses a check with nothing to read), and a rule after
+    /// the templates says to keep data in the data model, bind inputs, and
+    /// write repeated content as a template, naming the catalog's own list
+    /// and item components.
     ///
     /// On eui's core catalog (104 components, 57 functions) the prompt goes
     /// from 457,928 characters (~114k tokens at chars / 4) to about 39.5k
@@ -164,6 +171,7 @@ impl Generator<'_> {
         let mut rules = rules::rules(at_least_v1);
         let mut wants_components_or_data = true;
         let mut wants_components = true;
+        let mut writes_data = true;
         let callable = if at_least_v1 {
             agent_callable_functions(self.catalogs)
         } else {
@@ -176,7 +184,7 @@ impl Generator<'_> {
             if !self.allows(&["deleteSurface", "DeleteSurfaceMessage"]) {
                 rules = rules.replacen(rules::DELETE_RULE, "", 1);
             }
-            let writes_data = self.allows(&["updateDataModel", "UpdateDataModelMessage"]);
+            writes_data = self.allows(&["updateDataModel", "UpdateDataModelMessage"]);
             if !writes_data {
                 rules = rules.replacen(rules::DATA_RULE, "", 1);
             }
@@ -226,6 +234,11 @@ impl Generator<'_> {
             rules = rules.replacen(rules::ROOT_EXAMPLE_LINE, &format!("root = {root}(...)"), 1);
         }
 
+        let compact = self.options.style == PromptStyle::Compact && wants_components;
+        if compact {
+            rules = compact::adapt_rules(&rules, self.catalogs.catalogs(), writes_data);
+        }
+
         let has_multi_catalog_rules =
             self.catalogs.catalogs().len() > 1 && wants_components_or_data;
         let mut combined = rules;
@@ -233,7 +246,11 @@ impl Generator<'_> {
             combined.push('\n');
             combined.push_str(&self.multi_catalog_rules());
         }
-        if self.options.allowed_messages.is_some() || has_callable_rule || has_multi_catalog_rules {
+        if self.options.allowed_messages.is_some()
+            || has_callable_rule
+            || has_multi_catalog_rules
+            || compact
+        {
             combined = rules::renumber(&combined);
         }
         if wants_components {

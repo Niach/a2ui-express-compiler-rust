@@ -1,0 +1,9 @@
+<a2ui>
+surface("main")
+$/draft = ""
+$/messages = [{text: "Hi! Can you help me plan a trip to Lisbon?", side: "out", author: "You"}, {text: "Of course! How many days are you planning to stay?", side: "in", author: "Assistant"}, {text: "About four days, mostly sightseeing and food.", side: "out", author: "You"}]
+bubble = MessageBubble(text=$text, side=$side, author=$author)
+messageList = List(gap="sm", children=_template($/messages, bubble), style={flexGrow: 1, overflowY: "auto", padding: 16})
+composer = Composer(placeholder="Type a message", value=$/draft, submitLabel="Send", on={change: Event("draft_changed", {text: $/draft}), submit: Event("send_message", {text: $/draft}, userMessage=$/draft)})
+root = Stack(direction="vertical", gap="none", children=[messageList, composer], style={height: "100%"})
+</a2ui>

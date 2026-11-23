@@ -1,0 +1,16 @@
+<a2ui>
+surface("main")
+$/issue = {title: "Login fails on Safari", status: "In progress", priority: "High", description: "Users on Safari 17 are redirected back to the login page after submitting valid credentials. The session cookie is not being persisted.", assignee: "Dana Lee"}
+$/events = [{title: "Issue created", detail: "Reported by Sam Ortiz", time: "2 days ago"}, {title: "Assigned to Dana Lee", detail: "Status changed to In progress", time: "1 day ago"}, {title: "Comment added", detail: "Reproduced on Safari 17.2", time: "3 hours ago"}]
+closeBtn = Button(label="Close issue", on={press: Event("close_issue", {title: $/issue/title})})
+statusBadge = Badge(text=$/issue/status, variant="secondary", icon="status-in-progress")
+priorityBadge = Badge(text=$/issue/priority, variant="outline", icon="priority-high")
+badges = Stack(direction="horizontal", gap="sm", align="center", children=[statusBadge, priorityBadge])
+description = Markdown(text=$/issue/description)
+assignee = Row(title=$/issue/assignee, subtitle="Assignee", slots={leading: Avatar(name=$/issue/assignee)})
+detailsPanel = Stack(direction="vertical", gap="md", children=[description, assignee])
+eventRow = Row(title=$title, subtitle=$detail, meta=$time, icon="activity")
+activityPanel = List(divided=true, children=_template($/events, eventRow))
+tabs = Tabs(tabs=[{label: "Details", value: "details"}, {label: "Activity", value: "activity"}], value="details", children=[detailsPanel, activityPanel])
+root = Page(title=$/issue/title, slots={trailing: closeBtn}, children=[badges, tabs])
+</a2ui>

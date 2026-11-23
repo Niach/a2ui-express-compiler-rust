@@ -456,7 +456,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             let mut compiled = Vec::new();
             for rc in raw_checks {
                 if let ExprKind::Check { name, args } = &rc.kind {
-                    let (condition, message) = self.check_call(name, args, false)?;
+                    let (condition, message) = self.check_call(name, args, false, true)?;
                     compiled.push(json!({"condition": condition, "message": message}));
                 }
             }
@@ -609,7 +609,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                     "'_' can only stand in for an argument.",
                 ));
             }
-            ExprKind::Check { name, args } => self.check_call(name, args, at.action)?.0,
+            ExprKind::Check { name, args } => self.check_call(name, args, at.action, false)?.0,
             ExprKind::Call(call) => return self.call_value(call, at.action, at.inline),
         })
     }
@@ -911,11 +911,18 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
     /// implicitly, a string where a non-string parameter is expected (or
     /// after the parameters) is the message, and a `{catalogId: …}` map names
     /// the function's catalog.
+    ///
+    /// In a component's checks (`in_component`), a string literal as the
+    /// value checked is an error: the component binds no value for the
+    /// check to read, so the check would test its own message
+    /// (`?required("Email is required")` on an unbound field compiles to
+    /// `required(value: "Email is required")`, which always passes).
     fn check_call(
         &mut self,
         name: &str,
         raw_args: &[Expr],
         action: bool,
+        in_component: bool,
     ) -> Result<(Value, String), CompileError> {
         let mut remaining: Vec<&Expr> = Vec::new();
         let mut check_catalog: Option<&Expr> = None;
@@ -997,6 +1004,16 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                     if let (Some(s), true) = (string_literal(arg), expects_non_string) {
                         message = s.to_owned();
                         break;
+                    }
+                    if in_component && i + start == 0 {
+                        if let Some(s) = string_literal(arg) {
+                            return Err(CompileError::validation(format!(
+                                "Check '?{name}' has no value to check: its component binds no '{param}', so it would check the string \"{s}\"."
+                            ))
+                            .with_help(format!(
+                                "Bind the component's '{param}' to a data path ({param}=$/form/field), or name the value first: ?{name}($/form/field, \"{s}\")."
+                            )));
+                        }
                     }
                     call_args.push(arg);
                 }

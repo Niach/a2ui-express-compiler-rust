@@ -2,41 +2,103 @@
   {
     "id": "login",
     "title": "Login form",
-    "request": "A sign-in screen: email and password fields (both required, the email validated as an email), a 'Remember me' checkbox, a primary 'Sign in' button, and a 'Forgot password?' link."
+    "request": "A sign-in screen: email and password fields (both required, the email validated as an email), a 'Remember me' checkbox, a primary 'Sign in' button, and a 'Forgot password?' link.",
+    "set": "axc20"
   },
   {
     "id": "dashboard",
     "title": "Dashboard",
-    "request": "A sales dashboard: a page header 'Q3 overview', three stat tiles (Revenue $1.2M up 8%, Orders 3,420 up 3%, Refunds 41 down 12%), and below them a table of the five most recent orders (order id, customer, amount, status) bound to the data model."
+    "request": "A sales dashboard: a page header 'Q3 overview', three stat tiles (Revenue $1.2M up 8%, Orders 3,420 up 3%, Refunds 41 down 12%), and below them a table of the five most recent orders (order id, customer, amount, status) bound to the data model.",
+    "set": "axc20"
   },
   {
     "id": "settings",
     "title": "Settings page",
-    "request": "A notification settings page: a section 'Email' with switches for 'Product updates' and 'Weekly digest', a section 'Appearance' with a theme select (Light, Dark, System) and a font-size slider (12 to 20), and a Save / Cancel row at the bottom."
+    "request": "A notification settings page: a section 'Email' with switches for 'Product updates' and 'Weekly digest', a section 'Appearance' with a theme select (Light, Dark, System) and a font-size slider (12 to 20), and a Save / Cancel row at the bottom.",
+    "set": "axc20"
   },
   {
     "id": "chat",
     "title": "Chat composer",
-    "request": "A chat view: a scrollable list of three messages between the user and an assistant (bubbles, newest at the bottom) and a message composer pinned below with a send action."
+    "request": "A chat view: a scrollable list of three messages between the user and an assistant (bubbles, newest at the bottom) and a message composer pinned below with a send action.",
+    "set": "axc20"
   },
   {
     "id": "products",
     "title": "Product card grid",
-    "request": "A product catalogue: a responsive grid of four product cards, each with an image, name, price, a rating, and an 'Add to cart' button; a search field above the grid."
+    "request": "A product catalogue: a responsive grid of four product cards, each with an image, name, price, a rating, and an 'Add to cart' button; a search field above the grid.",
+    "set": "axc20"
   },
   {
     "id": "empty",
     "title": "Empty state",
-    "request": "The projects page of an app with no projects yet: an empty state with a folder icon, the title 'No projects yet', a one-sentence explanation, and a 'Create project' action."
+    "request": "The projects page of an app with no projects yet: an empty state with a folder icon, the title 'No projects yet', a one-sentence explanation, and a 'Create project' action.",
+    "set": "axc20"
   },
   {
     "id": "checkout",
-    "title": "Checkout form (held out)",
-    "request": "A checkout step: a shipping address form (full name, street, city, postal code, country select), a delivery option choice between Standard (free) and Express ($9.90), an order summary with subtotal, shipping and total, and a 'Place order' button."
+    "title": "Checkout form",
+    "request": "A checkout step: a shipping address form (full name, street, city, postal code, country select), a delivery option choice between Standard (free) and Express ($9.90), an order summary with subtotal, shipping and total, and a 'Place order' button.",
+    "set": "axc20"
   },
   {
     "id": "issue",
-    "title": "Issue detail (held out)",
-    "request": "An issue detail view: the title 'Login fails on Safari' with a status badge 'In progress' and a priority, tabs for 'Details' and 'Activity'; Details shows the description text and assignee avatar, Activity lists three timeline events; a 'Close issue' button in the header."
+    "title": "Issue detail",
+    "request": "An issue detail view: the title 'Login fails on Safari' with a status badge 'In progress' and a priority, tabs for 'Details' and 'Activity'; Details shows the description text and assignee avatar, Activity lists three timeline events; a 'Close issue' button in the header.",
+    "set": "axc20"
+  },
+  {
+    "id": "signup",
+    "title": "Sign-up form",
+    "request": "A create-account screen: full name, email (validated as an email), password and confirm password (both required, at least 8 characters), an 'I agree to the terms' checkbox that must be checked, and a 'Create account' button.",
+    "set": "axc21"
+  },
+  {
+    "id": "inbox",
+    "title": "Notification inbox",
+    "request": "A notifications inbox: a header 'Notifications' with a 'Mark all as read' action, and a list of five notifications, each with the sender's avatar, a one-line message, a relative time, and an unread marker on the first two.",
+    "set": "axc21"
+  },
+  {
+    "id": "pricing",
+    "title": "Pricing plans",
+    "request": "A pricing page: a monthly / yearly billing toggle, then three plan cards (Free $0, Pro $12, Team $30 per user), each with a short tagline, a list of four features, and a 'Choose plan' button; the Pro card is highlighted as recommended.",
+    "set": "axc21"
+  },
+  {
+    "id": "profile",
+    "title": "Edit profile",
+    "request": "An edit-profile form prefilled with the current user (Ada Lovelace, ada@example.com, bio 'Analyst of engines', timezone Europe/London): avatar with a 'Change photo' action, display name, email, a bio textarea, a timezone select, and Save / Cancel.",
+    "set": "axc21"
+  },
+  {
+    "id": "todo",
+    "title": "To-do list",
+    "request": "A to-do list: an input to add a task with an 'Add' button, a list of four tasks each with a checkbox (one already done), the task text and a delete action, and a footer showing how many tasks are left.",
+    "set": "axc21"
+  },
+  {
+    "id": "kanban",
+    "title": "Kanban board",
+    "set": "heldout",
+    "request": "A small kanban board: three columns (To do, Doing, Done), each with a header showing its card count and two or three task cards with a title and an assignee avatar."
+  },
+  {
+    "id": "contact",
+    "title": "Contact form",
+    "set": "heldout",
+    "request": "A contact form: name, email (validated as an email), a subject select (Sales, Support, Other), a message textarea (required, at most 500 characters), and a 'Send message' button."
+  },
+  {
+    "id": "files",
+    "title": "File browser",
+    "set": "heldout",
+    "request": "A file browser: a breadcrumb path (Home / Projects / Website), a search field, and a table of six files with name, size, modified date and a row action menu (Rename, Delete)."
+  },
+  {
+    "id": "music",
+    "title": "Music player",
+    "set": "heldout",
+    "request": "A music player: the current track's cover art, title and artist, a progress bar, play/pause, previous and next controls, and a queue of the next four tracks below."
   }
 ]

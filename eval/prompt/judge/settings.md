@@ -6,6 +6,21 @@ Request: A notification settings page: a section 'Email' with switches for 'Prod
 
 ```
 Page title="Notification settings"
+  Form name="notifications"
+    Section title="Email"
+      Switch label="Product updates" name="productUpdates"
+      Switch label="Weekly digest" name="weeklyDigest"
+    Section title="Appearance"
+      Select label="Theme" value={"@path":"/form/theme"} name="theme" options[3]
+      Slider label="Font size" value={"@path":"/form/fontSize"}
+    FormActions
+[data model] {"form":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":16}}
+```
+
+## Sample B
+
+```
+Page title="Notification settings"
   Form name="notificationSettings"
     Section title="Email"
       Switch label="Product updates" name="productUpdates"
@@ -15,19 +30,4 @@ Page title="Notification settings"
       Slider label="Font size" value={"@path":"/settings/fontSize"}
     FormActions
 [data model] / = {"settings":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":14}}
-```
-
-## Sample B
-
-```
-Page title="Notification settings"
-  Form name="notification_settings"
-    Section title="Email"
-      Switch label="Product updates" name="productUpdates"
-      Switch label="Weekly digest" name="weeklyDigest"
-    Section title="Appearance"
-      Select label="Theme" value={"@path":"/settings/theme"} name="theme" options[3]
-      Slider label="Font size" value={"@path":"/settings/fontSize"}
-    FormActions
-[data model] {"settings":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":14}}
 ```
