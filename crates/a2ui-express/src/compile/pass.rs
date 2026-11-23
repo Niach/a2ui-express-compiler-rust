@@ -337,6 +337,21 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             }
         }
 
+        // The standard check mixin is written under its envelope key
+        // (`@checks` from v1.0) however it is spelled: as `?check(…)` or as a
+        // long-form `checks=[{condition, message}]`. Upstream writes the
+        // long form under the bare legacy key, which its own decompiler then
+        // reads back as `?check(…)` shorthand and recompiles to `@checks`, so
+        // the round trip moves the rules to another key (#AXC-17).
+        let standard_checks = check_prop == Some("checks") && !custom.iter().any(|c| c == "checks");
+        let wire_key = |prop: &str| -> String {
+            if standard_checks && prop == "checks" {
+                envelope_key("checks", v1)
+            } else {
+                prop.to_owned()
+            }
+        };
+
         let mut seen: HashSet<&str> = HashSet::new();
         let mut bound = HashMap::new();
         for (prop, arg) in pairs {
@@ -347,7 +362,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                 return Err(CompileError::duplicate_property(name, prop));
             }
             if matches!(arg.kind, ExprKind::Skipped) {
-                dict.insert(prop.into(), Value::Null);
+                dict.insert(wire_key(prop), Value::Null);
                 continue;
             }
 
@@ -405,7 +420,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             if self.resolves_to_path(arg) {
                 bound.insert(prop.to_owned(), mapped.clone());
             }
-            dict.insert(prop.into(), mapped);
+            dict.insert(wire_key(prop), mapped);
         }
 
         for req in required {
@@ -441,7 +456,13 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                 } else {
                     check_prop.to_owned()
                 };
-                dict.insert(key, compiled.into());
+                // Shorthand checks join long-form ones given for the same key.
+                match dict.get_mut(&key) {
+                    Some(Value::Array(rules)) => rules.extend(compiled),
+                    _ => {
+                        dict.insert(key, compiled.into());
+                    }
+                }
             }
         }
         self.ctx.bound_paths.clear();

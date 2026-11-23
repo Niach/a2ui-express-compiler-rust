@@ -679,7 +679,7 @@
           "value": {
             "@path": "/invite/email"
           },
-          "checks": [
+          "@checks": [
             {
               "condition": {
                 "@call": "email",
