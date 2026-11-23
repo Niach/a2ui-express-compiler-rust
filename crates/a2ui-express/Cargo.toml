@@ -6,6 +6,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+readme = "../../README.md"
+documentation = "https://docs.rs/a2ui-express"
+keywords = ["a2ui", "genui", "llm", "compiler", "ui"]
+categories = ["compilers", "parser-implementations", "wasm"]
+include = ["src/**/*", "schemas/**/*", "Cargo.toml", "LICENSE", "NOTICE"]
 
 # Runtime dependencies stay limited to serde, serde_json and thiserror so the
 # crate embeds cleanly in eui-core and builds for wasm32-unknown-unknown.

@@ -274,6 +274,16 @@ scripts/build-npm.sh && (cd packages/npm && npm ci && npm test)   # wasm binding
 (cd crates/a2ui-express-py && maturin develop --release && pytest tests)   # Python binding
 ```
 
+## Releasing
+
+`a2ui-express` publishes to crates.io from the `publish-crate` workflow when
+a tag `a2ui-express-v<version>` is pushed (the version must match
+`Cargo.toml`). It needs the `CARGO_REGISTRY_TOKEN` repository secret. CI runs
+`cargo publish --dry-run -p a2ui-express` on every change. The crate carries
+its own copy of the common types (`crates/a2ui-express/schemas/`), written by
+`scripts/sync-upstream.sh` and covered by the vendor drift check. The
+bindings (`a2ui-express-ffi`, `-wasm`, `-py`) are not published to crates.io.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

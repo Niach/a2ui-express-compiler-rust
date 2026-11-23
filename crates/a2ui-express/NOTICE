@@ -1,0 +1,27 @@
+a2ui-express-compiler-rust
+Copyright 2026 The a2ui-express-compiler-rust Authors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+================================================================================
+A2UI (Google LLC)
+================================================================================
+
+This crate is a Rust port of the A2UI Express inference format from the A2UI
+agent SDK (https://github.com/a2ui-project/a2ui), Copyright Google LLC,
+licensed under the Apache License, Version 2.0. Its design follows the
+TypeScript implementation in typescript/agents/a2ui_agent.
+
+vendor/a2ui/ holds unmodified files from that repository (the Express
+conformance suite, test catalogs, protocol schemas, the basic catalog and the
+Express grammar). They keep their original copyright headers; the upstream
+license is at vendor/a2ui/LICENSE and the pinned commit at vendor/a2ui/UPSTREAM.
+
+================================================================================
+eui (@exponential_app/eui)
+================================================================================
+
+vendor/eui/ holds unmodified files from the npm package @exponential_app/eui,
+licensed under the Apache License, Version 2.0. Its LICENSE and NOTICE are at
+vendor/eui/LICENSE and vendor/eui/NOTICE; the pinned version is recorded in
+vendor/eui/UPSTREAM.
