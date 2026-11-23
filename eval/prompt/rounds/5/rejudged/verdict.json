@@ -30,8 +30,8 @@
     "winner": "A"
   },
   "inbox": {
-    "A": {"fidelity": 4, "components": 4, "notes": "Hand-built header row and list with avatars and times, but the 'New' badge shows on all five items, not just the unread ones."},
-    "B": {"fidelity": 4, "components": 5, "notes": "Uses the Page header slot for the action, but likewise shows the unread badge on every item."},
+    "A": {"fidelity": 5, "components": 4, "notes": "Covers every requirement: the header with a 'Mark all as read' action, five bound rows each with an avatar, message, relative time and a New badge on the first two; the header is a hand-built horizontal Stack rather than a page-level component."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Covers every requirement as well, and uses Page's title and trailing slot for the header and action, which is more idiomatic; the cond() for badge visibility is redundant but harmless."},
     "winner": "B"
   },
   "issue": {

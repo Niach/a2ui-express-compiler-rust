@@ -45,7 +45,8 @@ eui's core catalog write UIs as well as one given eui's own hand-written
    scores fidelity and component use 1–5 and picks a winner. The outline
    shows every prop (bindings as `$/path`, calls as `name(arg=…)`, values
    cut at 240 characters), checks whole, actions (`on=[press→event …]`),
-   style keys and which list a template repeats over.
+   style keys, a node's `visible` condition (#AXC-27) and which list a
+   template repeats over.
 5. **Held out.** Requests in the `fresh` set are written after the prompt
    is final and run once; the report lists them apart. `--keep-key` adds
    them without re-shuffling the labels of requests already judged.

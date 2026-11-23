@@ -11,15 +11,16 @@ run per sample. Judge: Claude Opus, blind ([judge-brief.md](judge-brief.md)).
 validity ≥ eui's, the compact prompt within eui's budget (≤ 10,000 at
 chars / 4). **Met:** 4–4 (9 ties) overall, 2–1 (1 tie) on the 4 held out,
 17/17 valid vs 14/17, 9,471 at chars / 4. On 4 fresh requests written after
-the prompt was final: 1–1 (2 ties), 4/4 valid vs 3/4.
+the prompt was final: 0–2 (2 ties), 4/4 valid vs 3/4 (1–1 before #AXC-27's
+re-judging, see below).
 
 | Set | Express valid | eui valid | Express F / C | eui F / C | Judge Express–eui–tie |
 |---|---|---|---|---|---|
 | AXC-20 (8) | 8/8 | 6/8 | 4.88 / 4.75 | 4.63 / 4.50 | 2–1–5 |
-| AXC-21 (5) | 5/5 | 4/5 | 4.00 / 4.60 | 4.40 / 4.40 | 0–2–3 |
+| AXC-21 (5) | 5/5 | 4/5 | 4.40 / 4.60 | 4.80 / 4.40 | 0–2–3 |
 | AXC-21 held out (4) | 4/4 | 4/4 | 5.00 / 4.75 | 4.75 / 4.50 | 2–1–1 |
-| **All 17** | **17/17** | **14/17** | **4.65 / 4.71** | **4.59 / 4.47** | **4–4–9** |
-| Fresh held out (4) | 4/4 | 3/4 | 5.00 / 4.75 | 4.75 / 5.00 | 1–1–2 |
+| **All 17** | **17/17** | **14/17** | **4.76 / 4.71** | **4.71 / 4.47** | **4–4–9** |
+| Fresh held out (4) | 4/4 | 3/4 | 4.75 / 4.75 | 5.00 / 5.00 | 0–2–2 |
 
 | Prompt | Characters | chars / 4 | o200k_base | cl100k_base |
 |---|---:|---:|---:|---:|
@@ -78,6 +79,33 @@ fixed in `score.ts`, and both arms were re-run on all 17 requests afterwards:
 `--keep-key` keeps the A/B labels of requests already judged, so the fresh
 requests could be added without re-shuffling the 17.
 
+### AXC-27: `visible` in the outline
+
+The outline did not print a node's `visible` condition (eui keeps it on the
+node, not in its props), so a branch shown only when `$unread` is true read
+as always rendered. `score.ts` now prints `visible=…`. Of the judged
+replies, three use `visible`, in two requests; only those samples' outlines
+changed, so only those requests were judged again (one fresh blind Opus
+judge per request, same brief, same A/B labels; every other verdict is kept):
+
+| Run | Request | Before | After |
+|---|---|---|---|
+| AXC-22, 17 requests | Notification inbox | Express F3 C4 · eui F3 C4 · tie | Express F5 C4 · eui F5 C4 · tie |
+| AXC-22, fresh | Order history | Express F5 C5 · eui F4 C5 · Express | Express F4 C5 · eui F5 C5 · eui JSON |
+| AXC-21 (`rounds/5/`) | Notification inbox | Express F4 C4 · eui F4 C5 · eui JSON | Express F5 C4 · eui F5 C4 · tie |
+| AXC-21 replies vs AXC-22 eui (`rounds/5/rejudged/`) | Notification inbox | Express F4 C4 · eui F4 C5 · eui JSON | Express F5 C4 · eui F5 C5 · eui JSON |
+
+Both inbox replies had been marked down for "the 'New' badge on every row";
+with the condition shown, both are F5. In Order history it is eui's reply
+that filters the list on the client with `visible=or(eq($/filter, "all"),
+eq($/filter, $status))`; Express's only sends an event. So the fix did not
+favour Express: the 17 stay 4–4–9 (means up for both arms), the fresh 4 go
+from 1–1–2 to 0–2–2, AXC-21's own run from 2–11–4 to 2–10–5, and the
+re-judged AXC-21 replies stay 3–9–5. The AXC-20 rounds (`rounds/1`–`3`) have
+no reply that uses `visible`, and `rounds/4` was not judged. The tables
+below carry the new figures. A request judged alone by a new judge is not
+the same run as its neighbours; read the per-set tallies with that in mind.
+
 ### Prompt effect vs eval fix
 
 To separate the two, the AXC-21 Express replies (`rounds/5/`) were judged
@@ -123,11 +151,11 @@ frames 17 (AXC-21: 14), a Card appears in 15 (5), Row in 6 (4).
 | Request | Express (compact prompt) | eui JSON (catalogPrompt) | Judge |
 |---|---|---|---|
 | Sign-up form | ✅ · 6 types · 317 tok · F4 C5 | ✅ · 6 types · 583 tok · F5 C4 | eui JSON |
-| Notification inbox | ✅ · 7 types · 253 tok · F3 C4 | ✅ · 6 types · 403 tok · F3 C4 | tie |
+| Notification inbox | ✅ · 7 types · 253 tok · F5 C4 | ✅ · 6 types · 403 tok · F5 C4 | tie |
 | Pricing plans | ✅ · 11 types · 551 tok · F4 C5 | ✅ · 10 types · 988 tok · F5 C5 | eui JSON |
 | Edit profile | ✅ · 10 types · 430 tok · F5 C5 | ✅ · 9 types · 626 tok · F5 C4 | tie |
 | To-do list | ✅ · 9 types · 299 tok · F4 C4 | ❌ newInput: style.flex: not in the Box style whitelist · 8 types · 496 tok · F4 C5 | tie |
-| **Total** | 5/5 validate · 8.60 types · 370 tok/reply · F4.00 C4.60 | 4/5 validate · 7.80 types · 619 tok/reply · F4.40 C4.40 | Express 0, eui 2, tie 3 |
+| **Total** | 5/5 validate · 8.60 types · 370 tok/reply · F4.40 C4.60 | 4/5 validate · 7.80 types · 619 tok/reply · F4.80 C4.40 | Express 0, eui 2, tie 3 |
 
 #### AXC-21 held out (run once on the AXC-21 prompt, then seen)
 
@@ -144,16 +172,16 @@ frames 17 (AXC-21: 14), a Card appears in 15 (5), Row in 6 (4).
 | Request | Express (compact prompt) | eui JSON (catalogPrompt) | Judge |
 |---|---|---|---|
 | Table booking | ✅ · 9 types · 310 tok · F5 C5 | ❌ date: props.checks: unknown prop · 10 types · 613 tok · F5 C5 | tie |
-| Order history | ✅ · 5 types · 343 tok · F5 C5 | ✅ · 6 types · 575 tok · F4 C5 | Express |
+| Order history | ✅ · 5 types · 343 tok · F4 C5 | ✅ · 6 types · 575 tok · F5 C5 | eui JSON |
 | Team directory | ✅ · 8 types · 272 tok · F5 C4 | ✅ · 10 types · 504 tok · F5 C5 | eui JSON |
 | Onboarding step | ✅ · 9 types · 282 tok · F5 C5 | ✅ · 9 types · 544 tok · F5 C5 | tie |
-| **Total** | 4/4 validate · 7.75 types · 301 tok/reply · F5.00 C4.75 | 3/4 validate · 8.75 types · 559 tok/reply · F4.75 C5.00 | Express 1, eui 1, tie 2 |
+| **Total** | 4/4 validate · 7.75 types · 301 tok/reply · F4.75 C4.75 | 3/4 validate · 8.75 types · 559 tok/reply · F5.00 C5.00 | Express 0, eui 2, tie 2 |
 
 #### All 17 (AXC-20 + AXC-21 + AXC-21 held out)
 
 | Request | Express (compact prompt) | eui JSON (catalogPrompt) | Judge |
 |---|---|---|---|
-| **Total** | 17/17 validate · 7.76 types · 332 tok/reply · F4.65 C4.71 | 14/17 validate · 7.47 types · 562 tok/reply · F4.59 C4.47 | Express 4, eui 4, tie 9 |
+| **Total** | 17/17 validate · 7.76 types · 332 tok/reply · F4.76 C4.71 | 14/17 validate · 7.47 types · 562 tok/reply · F4.71 C4.47 | Express 4, eui 4, tie 9 |
 
 ### Caveats
 
@@ -228,11 +256,11 @@ The eui JSON replies of the first 13 requests are the ones from earlier runs
 | Request | Express (compact prompt) | eui JSON (catalogPrompt) | Judge |
 |---|---|---|---|
 | Sign-up form | ✅ · 5 types · 266 tok · F4 C5 | ✅ · 6 types · 548 tok · F5 C5 | eui JSON |
-| Notification inbox | ✅ · 7 types · 276 tok · F4 C4 | ✅ · 6 types · 413 tok · F4 C5 | eui JSON |
+| Notification inbox | ✅ · 7 types · 276 tok · F5 C4 | ✅ · 6 types · 413 tok · F5 C4 | tie |
 | Pricing plans | ✅ · 9 types · 616 tok · F5 C4 | ✅ · 11 types · 1086 tok · F5 C5 | eui JSON |
 | Edit profile | ✅ · 9 types · 355 tok · F4 C4 | ✅ · 9 types · 673 tok · F5 C5 | eui JSON |
 | To-do list | ✅ · 8 types · 292 tok · F4 C4 | ✅ · 9 types · 455 tok · F4 C5 | eui JSON |
-| **Total** | 5/5 validate · 7.60 types · 361 tok/reply · F4.20 C4.20 | 5/5 validate · 8.20 types · 635 tok/reply · F4.60 C5.00 | Express 0, eui 5, tie 0 |
+| **Total** | 5/5 validate · 7.60 types · 361 tok/reply · F4.40 C4.20 | 5/5 validate · 8.20 types · 635 tok/reply · F4.80 C4.80 | Express 0, eui 4, tie 1 |
 
 #### Held out (run once, on the final prompt)
 
@@ -249,10 +277,10 @@ The eui JSON replies of the first 13 requests are the ones from earlier runs
 | | Express (compact) | eui JSON |
 |---|---|---|
 | Validate in eui | 16/17 | 16/17 |
-| Fidelity (mean) | 4.29 (4.50 without the reply that did not compile) | 4.82 |
-| Component use (mean) | 4.29 | 4.82 |
+| Fidelity (mean) | 4.35 (4.56 without the reply that did not compile) | 4.88 |
+| Component use (mean) | 4.29 | 4.76 |
 | Reply size | 325 tok | 556 tok |
-| Judge wins | 2 | 11 (4 ties) |
+| Judge wins | 2 | 10 (5 ties) |
 
 ### Before / after on the AXC-20 requests
 

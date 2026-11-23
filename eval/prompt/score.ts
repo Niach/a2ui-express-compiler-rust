@@ -110,10 +110,12 @@ interface Node {
   /** eui keeps a component's actions here, beside its props. */
   on?: Record<string, unknown>
   style?: Record<string, unknown>
+  /** eui keeps a component's `visible` condition here too. */
+  visible?: unknown
 }
 
 /** Props the outline leaves out: the tree, events and checks are drawn apart. */
-const SKIP_PROPS = new Set([`id`, `component`, `children`, `slots`, `on`, `checks`, `@checks`, `style`, `accessibility`])
+const SKIP_PROPS = new Set([`id`, `component`, `children`, `slots`, `on`, `checks`, `@checks`, `style`, `accessibility`, `visible`])
 /** Long values are cut here (#AXC-22: was 60, and 80 for a check, which hid
  *  a check's later arguments). */
 const MAX_VALUE = 240
@@ -177,7 +179,11 @@ function outline(node: Node, depth = 0, lines: string[] = []): string[] {
     : []
   const styleMap = node.style ?? props.style
   const style = styleMap && typeof styleMap === `object` ? Object.keys(styleMap as object) : []
+  // #AXC-27: `visible` is on the node as well. Without it, two branches
+  // swapped by `visible=$/loading` read as both rendered at once.
+  const visible = node.visible ?? props.visible
   const extra = [
+    visible !== undefined ? `visible=${cut(value(visible))}` : ``,
     node.template ? `children=[template ${node.template.component}, once per item of $${node.template.path}]` : ``,
     events.length ? `on=[${events.join(`, `)}]` : ``,
     checks.length ? `checks=[${checks.join(`, `)}]` : ``,

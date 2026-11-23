@@ -10,7 +10,7 @@ Page title="Order history"
     Segmented variant="segmented" value=$/filter items[4: "All" | "Shipped" | "Delivered" | "Cancelled"]
     List divided=true children=[template order, once per item of $/orders]
 [template order: repeated once per item of its list]
-  Row title=$number subtitle=concat(values=[$date, " · ", $items]) value=$total chevron="right" pressable=true on=[press→event openOrder {id: $id}]
+  Row title=$number subtitle=concat(values=[$date, " · ", $items]) value=$total chevron="right" pressable=true visible=or(values=[eq(a=$/filter, b="all"), eq(a=$/filter, b=$status)]) on=[press→event openOrder {id: $id}]
     [slot trailing]
       Badge text=$statusLabel variant=$badge
 [data model] / = {"filter":"all","orders":[{"id":"1042","number":"#1042","date":"Nov 18, 2026","items":"3 items","total":"$128.40","status":"shipped","statusLabel":"Shipped","badge":"secondary"},{"id":"1038","number":"#1038","date":"Nov 11, 2026","items":"1 item","total":"$24.99","status":"delivered","statusLabel":"Delivered","badge":"default"},{"id":"1031","number":"#1031","date":"Oct 29, 2026","items":"5 items","total":"$212.75","status":"delivered","statusLabel":"Delivered","badge":"default"},{"id":"1027","number":"#1027","date":"Oct 15, 2026","items":"2 items","total":"$59.00","status":"cancelled","statusLabel":"Cancelled","badge":"destructive"},{"id":"1019","number":"#1019","date":"Sep 30, 2026","items":"4 items","total":"$87.20","status":"shipped","statusLabel":"Shipped","badge":"secondary"}]}
