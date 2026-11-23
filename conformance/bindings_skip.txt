@@ -7,8 +7,3 @@
 
 # `expect_present`: a pointer the harness checks and deletes before comparing.
 test_compile_express_check_without_a_message_still_carries_one
-# The harness's `compile_checked` validates the emitted messages against
-# the catalog's functions (`validate_payload`), beyond `compile`.
-test_compile_express_map_with_call_like_keys_still_rejects_bindings
-test_compile_express_standalone_call_renderer_only_function_is_validation_error
-test_compile_express_standalone_call_user_activation_function_is_validation_error
