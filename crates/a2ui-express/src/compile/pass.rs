@@ -648,7 +648,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
     ) -> Result<Value, CompileError> {
         let args = CallArgs::of(call);
         match call.name.as_str() {
-            "_template" => return self.template(&args.pos, action),
+            "_template" => return self.template(&args.pos, args.get("key"), action),
             "Event" => return self.event(&args),
             _ => {}
         }
@@ -663,7 +663,16 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
         })
     }
 
-    fn template(&mut self, args: &[&Expr], action: bool) -> Result<Value, CompileError> {
+    /// `_template($/items, item)`, and `key="id"`: a pointer relative to each
+    /// item that identifies it, for catalogs whose `ChildList` template
+    /// declares one (eui's does). Upstream's Express has no `key`; without
+    /// it the output is upstream's.
+    fn template(
+        &mut self,
+        args: &[&Expr],
+        key: Option<&Expr>,
+        action: bool,
+    ) -> Result<Value, CompileError> {
         if args.len() < 2 {
             return Err(CompileError::parse(
                 "_template helper requires exactly 2 arguments: path and templateComponent.",
@@ -683,7 +692,17 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                 ..At::action(action)
             },
         )?;
-        Ok(json!({"path": path, "componentId": component}))
+        let mut template = json!({"path": path, "componentId": component});
+        if let Some(key) = key {
+            let Some(key) = string_literal(key) else {
+                return Err(CompileError::validation(format!(
+                    "The key argument to _template must be a string (a pointer relative to each item, such as \"id\"), got: {}",
+                    format_value(key)
+                )));
+            };
+            template["key"] = key.into();
+        }
+        Ok(template)
     }
 
     fn inline_component(

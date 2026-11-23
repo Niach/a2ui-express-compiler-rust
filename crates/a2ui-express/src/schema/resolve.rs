@@ -389,7 +389,10 @@ impl<'a> Schemas<'a> {
         let Some(s) = self.view(schema) else {
             return false;
         };
-        if s.ref_str().and_then(common_def_name) == Some("Action") || is_flattened_action(&s) {
+        if s.ref_str().and_then(common_def_name) == Some("Action")
+            || is_flattened_action(&s)
+            || is_combined_action(&s)
+        {
             return true;
         }
         COMBINATORS.iter().any(|k| {
@@ -574,11 +577,42 @@ fn is_flattened_action(s: &View<'_>) -> bool {
     else {
         return false;
     };
-    if props.len() != 1 {
+    if props.len() == 1 {
+        let (key, value) = props.iter().next().expect("one property");
+        return (key == "event" || key == "functionCall")
+            && reqs.iter().any(|r| r == key.as_str())
+            && is_object_or_ref_schema(value);
+    }
+    false
+}
+
+/// An action written as one object with both branches as optional
+/// properties (`{event?, functionCall?}`, at least one required through
+/// `anyOf`/`oneOf`), as eui's `EuiAction` is: either or both may be given.
+fn is_combined_action(s: &View<'_>) -> bool {
+    if s.get("type").is_some_and(|t| t != "object") {
         return false;
     }
-    let (key, value) = props.iter().next().expect("one property");
-    (key == "event" || key == "functionCall")
-        && reqs.iter().any(|r| r == key.as_str())
-        && is_object_or_ref_schema(value)
+    let Some(Value::Object(props)) = s.get("properties") else {
+        return false;
+    };
+    if props.len() != 2 {
+        return false;
+    }
+    let (Some(event), Some(call)) = (props.get("event"), props.get("functionCall")) else {
+        return false;
+    };
+    let requires = |key: &str| {
+        ["anyOf", "oneOf"].iter().any(|k| {
+            members(s.get(k)).iter().any(|m| {
+                m.get("required")
+                    .and_then(Value::as_array)
+                    .is_some_and(|r| r.iter().any(|x| x == key))
+            })
+        })
+    };
+    is_object_or_ref_schema(event)
+        && is_object_or_ref_schema(call)
+        && requires("event")
+        && requires("functionCall")
 }

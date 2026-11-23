@@ -170,3 +170,44 @@ fn long_form_checks_use_the_envelope_key() {
         .collect();
     assert_eq!(messages, ["a", "b"], "{both}");
 }
+
+/// Two eui shapes upstream's Express has no example of: a template's row
+/// `key` (eui's ChildList extension), and a handler in an `on` map, whose
+/// schema (`EuiAction`) has both `event` and `functionCall` as optional
+/// properties. Both compile to eui's shape and survive the round trip.
+#[test]
+fn template_keys_and_on_handler_calls_round_trip() {
+    let compiler = compiler();
+    let source = r#"root = Box(children=_template($/rows, row, key="id"))
+row = Button(label=$label, on={press: openUrl(url="https://example.com"), hover: Event("hovered")})
+$/rows = [{id: "a", label: "A"}]
+"#;
+    let first = compiler
+        .compile(source, "main")
+        .unwrap_or_else(|e| panic!("{} ({:?})", e.message, e.kind));
+    let components = first[0]["createSurface"]["components"].as_array().unwrap();
+    let find = |id: &str| components.iter().find(|c| c["id"] == id).unwrap();
+    assert_eq!(
+        find("root")["children"],
+        serde_json::json!({"path": "/rows", "componentId": "row", "key": "id"})
+    );
+    let on = &find("row")["on"];
+    assert_eq!(on["press"]["functionCall"]["@call"], "openUrl", "{on}");
+    assert_eq!(on["hover"]["event"]["name"], "hovered", "{on}");
+
+    for order in [Order::Upstream, Order::TopDown] {
+        let options = DecompileOptions {
+            keyword_args: true,
+            order,
+        };
+        let express = decompile(compiler.catalogs(), &first, &options).unwrap();
+        assert!(express.contains("key=\"id\""), "{express}");
+        let second = compiler
+            .compile(&express, "main")
+            .unwrap_or_else(|e| panic!("{} ({:?})\n{express}", e.message, e.kind));
+        assert!(
+            json_eq(&Value::Array(second.clone()), &Value::Array(first.clone())),
+            "{order:?}:\n{express}\n{second:#?}"
+        );
+    }
+}

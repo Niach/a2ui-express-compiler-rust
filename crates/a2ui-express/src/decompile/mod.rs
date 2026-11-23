@@ -948,8 +948,15 @@ impl<'c> Decompiler<'c> {
                 catalog,
                 surface_catalog_id,
             )?;
+            let key = match obj.get("key") {
+                Some(key @ Value::String(_)) => format!(
+                    ", key={}",
+                    self.value(key, var_names, false, catalog, surface_catalog_id)?
+                ),
+                _ => String::new(),
+            };
             return Ok(format!(
-                "_template({path}, {})",
+                "_template({path}, {}{key})",
                 reference(component_id, var_names)
             ));
         }
