@@ -54,6 +54,7 @@ def generate_prompt(
     surface_id: Optional[str] = None,
     examples: Optional[Sequence[Sequence[Mapping[str, Json]]]] = None,
     allowed_messages: Optional[Sequence[str]] = None,
+    style: Optional[Literal["upstream", "compact"]] = None,
 ) -> str: ...
 def agent_callable_functions(catalogs: CatalogInput) -> list[str]: ...
 
@@ -113,5 +114,6 @@ class Catalogs:
         surface_id: Optional[str] = None,
         examples: Optional[Sequence[Sequence[Mapping[str, Json]]]] = None,
         allowed_messages: Optional[Sequence[str]] = None,
+        style: Optional[Literal["upstream", "compact"]] = None,
     ) -> str: ...
     def agent_callable_functions(self) -> list[str]: ...

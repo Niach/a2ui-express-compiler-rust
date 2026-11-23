@@ -251,17 +251,20 @@ fn has_format_content(text: &str, complete: bool) -> bool {
 }
 
 /// Generates the system-prompt section that teaches a model Express for the
-/// catalogs. `examples` is a list of turns, each a list of A2UI messages.
+/// catalogs. `examples` is a list of turns, each a list of A2UI messages;
+/// `style` is `"upstream"` (the default, upstream's format byte for byte)
+/// or `"compact"` (far shorter on large catalogs).
 #[pyfunction]
-#[pyo3(signature = (catalogs, *, surface_id=None, examples=None, allowed_messages=None))]
+#[pyo3(signature = (catalogs, *, surface_id=None, examples=None, allowed_messages=None, style=None))]
 fn generate_prompt(
     py: Python<'_>,
     catalogs: &Bound<'_, PyAny>,
     surface_id: Option<String>,
     examples: Option<&Bound<'_, PyAny>>,
     allowed_messages: Option<Vec<String>>,
+    style: Option<String>,
 ) -> PyResult<String> {
-    let options = prompt_options(py, surface_id, examples, allowed_messages)?;
+    let options = prompt_options(py, surface_id, examples, allowed_messages, style)?;
     ok(py, ffi::generate_prompt(from_py(catalogs)?, &options))
 }
 
@@ -270,7 +273,9 @@ fn prompt_options(
     surface_id: Option<String>,
     examples: Option<&Bound<'_, PyAny>>,
     allowed_messages: Option<Vec<String>>,
+    style: Option<String>,
 ) -> PyResult<ffi::PromptOptions> {
+    let style = ok(py, ffi::prompt_style(style.as_deref()))?;
     let examples = match examples {
         Some(e) => ok(py, ffi::prompt_examples(from_py(e)?))?,
         None => Vec::new(),
@@ -279,6 +284,7 @@ fn prompt_options(
         surface_id,
         examples,
         allowed_messages,
+        style,
     })
 }
 
@@ -398,15 +404,16 @@ impl Catalogs {
         })
     }
 
-    #[pyo3(signature = (*, surface_id=None, examples=None, allowed_messages=None))]
+    #[pyo3(signature = (*, surface_id=None, examples=None, allowed_messages=None, style=None))]
     fn generate_prompt(
         &self,
         py: Python<'_>,
         surface_id: Option<String>,
         examples: Option<&Bound<'_, PyAny>>,
         allowed_messages: Option<Vec<String>>,
+        style: Option<String>,
     ) -> PyResult<String> {
-        let options = prompt_options(py, surface_id, examples, allowed_messages)?;
+        let options = prompt_options(py, surface_id, examples, allowed_messages, style)?;
         ok(py, self.inner.generate_prompt(&options))
     }
 

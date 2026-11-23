@@ -229,6 +229,19 @@ pub struct PromptOptions {
     pub examples: Vec<Vec<Value>>,
     /// The message types the agent may write; `None` allows all.
     pub allowed_messages: Option<Vec<String>>,
+    /// How the signatures are written (default upstream's format).
+    pub style: prompt::PromptStyle,
+}
+
+/// Reads a prompt style: `"upstream"` (the default) or `"compact"`.
+pub fn prompt_style(style: Option<&str>) -> Result<prompt::PromptStyle> {
+    match style {
+        None | Some("upstream") => Ok(prompt::PromptStyle::Upstream),
+        Some("compact") => Ok(prompt::PromptStyle::Compact),
+        Some(other) => Err(FfiError::argument(format!(
+            "unknown prompt style {other:?}; expected \"upstream\" or \"compact\""
+        ))),
+    }
 }
 
 fn string_list(value: &Value, what: &str) -> Result<Vec<String>> {
@@ -258,9 +271,9 @@ pub fn prompt_examples(value: Value) -> Result<Vec<Vec<Value>>> {
 }
 
 impl PromptOptions {
-    /// Reads `{surfaceId?, examples?, allowedMessages?}`.
+    /// Reads `{surfaceId?, examples?, allowedMessages?, style?}`.
     pub fn from_json(options: &Value) -> Result<Self> {
-        let known = ["surfaceId", "examples", "allowedMessages"];
+        let known = ["surfaceId", "examples", "allowedMessages", "style"];
         let Some(map) = options_map(options, &known, "prompt")? else {
             return Ok(PromptOptions::default());
         };
@@ -271,6 +284,7 @@ impl PromptOptions {
                 None | Some(Value::Null) => None,
                 Some(v) => Some(string_list(v, "allowedMessages")?),
             },
+            style: prompt_style(string_option(map, "style")?)?,
         })
     }
 }
@@ -290,6 +304,7 @@ fn generate_prompt_with(set: &CatalogSet, options: &PromptOptions) -> Result<Str
             .unwrap_or_else(|| DEFAULT_SURFACE_ID.to_owned()),
         examples: options.examples.clone(),
         allowed_messages: options.allowed_messages.clone(),
+        style: options.style,
     };
     Ok(prompt::generate_prompt(set, &options)?)
 }

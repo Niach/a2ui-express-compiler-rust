@@ -36,7 +36,7 @@ the failure, to show as well).
 | `unwrap(text)`, `wrap(rawParts)`, `hasFormatContent(text, complete?)` | raw parts `{text}` / `{a2ui_raw, is_final?}` |
 | `new Catalogs(catalogs, {version?, surfaceId?})` | the above as methods, catalogs loaded once (`stream(opts)` opens a `StreamCompiler`) |
 | `decompile(catalogs, messages, {keywordArgs?, order?})` | full build only; `order: "top-down"` writes `root` first |
-| `generatePrompt(catalogs, {examples?, allowedMessages?})`, `agentCallableFunctions(catalogs)` | full build only |
+| `generatePrompt(catalogs, {examples?, allowedMessages?, style?: "upstream" | "compact"})`, `agentCallableFunctions(catalogs)` | full build only |
 
 `catalogs` is a catalog document or a list of them.
 

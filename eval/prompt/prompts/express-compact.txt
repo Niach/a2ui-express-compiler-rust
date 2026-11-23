@@ -1,0 +1,406 @@
+# A2UI Express DSL Output Contract
+
+You must output the user interface using A2UI Express.
+
+IMPORTANT: You MUST always surround the entire A2UI Express block with the literal sentinel tags `<a2ui>` and `</a2ui>` (always include both the opening and closing tags; do NOT wrap the tags in backticks or replace the opening tag with a markdown code fence such as ```a2ui).
+
+The host compiler will compile your A2UI Express output into the correct JSON envelopes automatically.
+
+## Grammar Rules
+
+1. Component constructors can be assigned to variables or nested inline inside parent component arguments:
+   header = ComponentA(prop1="val1")
+   root = ComponentB([header, ComponentC("Click", action=Event("submit"))])
+
+   Keyword arguments (`param=value`) and positional arguments with `_` placeholders are supported.
+
+   Variable names MUST start with a letter or underscore, and only contain letters, digits, and underscores.
+
+2. The interface tree must have a single entry point assigned to the reserved variable 'root'.
+
+3. Primitives:
+   - Strings: Quoted with `"` or `"""`. Support for `\n`, `\t`, `\\`, and `\"` escapes.
+     Raw Strings: Prefaced by `r` (e.g., `r"..."` or `r"""..."""`), with no escape processing.
+   - Numbers: write as integers or decimals, e.g., 42
+   - Booleans: write true or false
+   - Null values: write null
+   - Dates & Times: Values for date-time inputs (e.g. in DateTimeInput) must strictly use RFC 3339 format with a timezone offset (e.g. "2026-03-14T00:00:00Z").
+
+4. Lists: represent as arrays, e.g., [child1, child2].
+
+5. Maps: represent as key-value blocks, e.g., {title: "Overview", child: contentCol}. Map keys are always literal strings (dynamic variable resolution is not supported for keys).
+
+6. Data bindings: prefix absolute paths in the data model with '$', e.g., $/user/firstName.
+   Prefix relative list scopes with '$', e.g., $firstName.
+   A lone '$' represents an empty relative path which resolves to the root of the current context (e.g. inside a template, representing the entire item itself).
+
+7. Logic and validation: prefix client check rules with '?', e.g., ?required or ?regex("^[0-9]{5}$"). To specify a custom error message for validation failures, append it as an extra string argument, e.g. ?regex("^[0-9]{5}$", "Postal code must be 5 digits").
+
+8. Action events: represent server-side actions using the Event helper, `Event(name, context?, userMessage=...)`:
+   Event("save_deal", {rep: $/form/rep})
+   Event("reply", userMessage="Replying now")
+   Event("save_deal", {rep: $/form/rep}, userMessage=$/form/summary)
+   The context map is optional. Pass `userMessage=` as a keyword argument (a string, `$path` binding, or function call) to set the message shown on the user's behalf when the event fires.
+
+9. Nested functions: call client functions directly using catalog signatures, for example myFunction("value").
+
+10. Data model population: Assign a value directly to an absolute data path (e.g. $/path/to/key = "value") to populate or initialize values inside the shared dataModel. The value can be a primitive, array, or map.
+
+11. Dynamic list templates: If a component expects a template child list, represent it using the _template helper:
+    _template($/path/to/list, itemTemplate)
+    And define the template component variable on another line, utilizing relative path references prefixed with $:
+    itemTemplate = Image($url)
+
+12. To delete a user interface surface, output the standalone `deleteSurface(surfaceId)` command (no variable assignment):
+    deleteSurface("dashboard-surface-1")
+
+13. To have the renderer run a function right away, output the call as a standalone command (no variable assignment):
+    required(...)
+    Only these functions can be called this way: `required`, `regex`, `length`, `numeric`, `email`, `formatString`, `formatNumber`, `formatCurrency`, `formatDate`, `pluralize`, `and`, `or`, `not`, `percent`, `add`, `sub`, `eq`, `lt`, `clamp`, `cond`, `fallback`, `concat`, `coalesce`, `text`, `map`, `len`, `fill`, `formatPercent`, `formatRelativeTime`, `filter`, `mul`, `div`, `mod`, `round`, `floor`, `ceil`, `abs`, `min`, `max`, `today`, `now`, `dateTime`, `dateAdd`, `dateDiff`, `startOf`, `endOf`, `weekday`, `isoWeek`, `hours`, `formatDuration`, `orElse`, `expr`.
+
+14. Static properties: Arguments annotated with '(static)' in the signatures below MUST be defined as literal values or arrays inline. You CANNOT use a dynamic data binding path (prefixed by $) for these arguments.
+
+15. Required actions: Parameters named 'action' (or annotated in component signatures) are strictly required. You must pass a valid Event (e.g. Event("click")) or function call. If no specific action is described in the user request, you must provide a dummy click event like Event("click") instead of passing null or omitting the parameter.
+
+16. Surface targeting: Output `surface(surfaceId)` to specify or target a user interface surface:
+    surface("dashboard-surface-1")
+    root = Label(...)
+
+## System Functions
+
+These functions are defined by the A2UI protocol, not by a catalog. Call them by their `@` name, like any function, and never add a `catalogId` to them:
+• @index(offset?)
+
+## Component Signatures
+
+Instantiate components with these signatures, naming every argument (`Button(label="Save", variant="outline")`, `Stack(children=[a, b])`). Do not name any other key.
+Notation: `name?` is optional; `name~` also takes a data binding ($/path) or a function call, any other property takes a literal only (this replaces the `(static)` annotation); `:n` marks a number (write 1.5, not "1.5"), `:b` a boolean. Under a signature, `- prop: type` gives a property's values: `a|b|c` is one of these strings (write "a"), `{key, key: type}` is a map with those keys (`{a|b: type}`: keys a and b, both of that type), `[type]` a list, `Action` an Event(...) or function call, and a capitalized name a type from Shared Types.
+Actions go in a component's `on` map, keyed by event: on={change: Event("save")}. No component takes an `action` argument.
+
+### Shared Types
+- Style: {display: flex|grid|block|none, flexDirection: row|column|row-reverse|column-reverse, flexWrap: nowrap|wrap|wrap-reverse, justifyContent: JustifyContent, alignItems: AlignItems, alignContent: JustifyContent, alignSelf: AlignItems, justifySelf: AlignItems, flexGrow, flexShrink, flexBasis, gap, rowGap, columnGap, direction: ltr|rtl, overflow: visible|hidden|clip|scroll|auto, overflowX: visible|hidden|clip|scroll|auto, overflowY: visible|hidden|clip|scroll|auto, width, height, minWidth, minHeight, maxWidth, maxHeight, aspectRatio, position: relative|absolute|sticky, top, right, bottom, left, inset, insetInlineStart, insetInlineEnd, insetBlockStart, insetBlockEnd, padding, paddingTop, paddingRight, paddingBottom, paddingLeft, paddingHorizontal, paddingVertical, paddingInlineStart, paddingInlineEnd, margin, marginTop, marginRight, marginBottom, marginLeft, marginHorizontal, marginVertical, marginInlineStart, marginInlineEnd, gridTemplateColumns, gridTemplateRows, gridTemplateAreas, gridArea, gridColumn, gridRow, backgroundColor, backgroundGradient: {angle, stops: [{color, offset}]}, color, borderWidth, borderTopWidth, borderRightWidth, borderBottomWidth, borderLeftWidth, borderColor, borderStyle: solid|dashed|dotted, borderRadius, borderTopLeftRadius, borderTopRightRadius, borderBottomRightRadius, borderBottomLeftRadius, opacity, boxShadow, fontSize, fontWeight: 300|400|500|600|700|800, lineHeight, letterSpacing, textAlign: left|right|center|start|end|justify, textDecoration: none|underline|line-through, textTransform: none|uppercase|lowercase|capitalize, fontStyle: normal|italic, fontFamily, transition, transitionEasing, transform, visibility: visible|hidden, pointerEvents: auto|none, userSelect: auto|none|text, cursor: Cursor, backdropBlur, animation: Animation, animationDuration, :hover: Hover, :focus-visible: Hover, :pressed: Hover}
+- JustifyContent: one of flex-start|flex-end|start|end|center|stretch|space-between|space-around|space-evenly
+- AlignItems: one of flex-start|flex-end|start|end|center|stretch|baseline
+- Cursor: one of auto|default|pointer|text|not-allowed|grab|grabbing|move|col-resize|row-resize
+- Animation: one of pulse|spin|fade-in|slide-in-up|slide-in-down|slide-in-left|slide-in-right|shimmer
+- Hover: Style without :hover, :focus-visible, :pressed
+- Variant: one of default|secondary|outline|ghost|destructive|link
+- Icon: one of a-large-small|action-chat|action-create|action-default|action-repository|action-run|action-suggestion|activity|anchor|app-editor-chat|archive|archive-restore|arrow-down|arrow-down-left|arrow-left|arrow-left-right|arrow-right|arrow-up-right|at-sign|atom|audio-lines|auth-passkey|award|ban|battery-charging|battery-medium|bell|bell-off|bluetooth|bold|book-open|bookmark|bot|boxes|braces|brain|brand-exponential|briefcase|brush-cleaning|bug|building|building-2|calculator|calendar|calendar-days|call-end|call-incoming|call-mute|call-speaker|call-speaker-off|call-unmute|camera|car|chart-line|chat-results|check|check-check|chevron-down|chevron-left|chevron-right|chevron-up|chevrons-up-down|ci-failed|ci-passed|ci-queued|ci-running|ci-skipped|circle|circle-arrow-up|circle-check|circle-dashed|circle-dot|circle-pause|circle-play|circle-question-mark|circle-slash|circle-stop|circle-user|circle-x|clipboard-list|clock|cloud|code|coding-assistant|coding-command|coding-compact|coding-diff|coding-ended|coding-in-review|coding-needs-input|coding-plan|coding-running|coding-stop|coding-subagent|coding-tool|coffee|compass|computer|copy|corner-down-right|cpu|credit-card|crown|database|download|droplet|dumbbell|ear|ede-battery|ede-battery-charging|ede-bluetooth|ede-brightness|ede-lock|ede-power|ede-suspend|ede-wifi|ede-window|ede-wired|ede-workspaces|editor-bold|editor-clear-formatting|editor-code|editor-emoji|editor-heading-1|editor-heading-2|editor-heading-3|editor-image|editor-issue-ref|editor-italic|editor-link|editor-list|editor-list-ordered|editor-list-todo|editor-mention|editor-quote|editor-strikethrough|editor-text|editor-text-format|editor-unlink|ellipsis|ellipsis-vertical|ethernet-port|event-assignee-changed|event-board-moved|event-estimate-changed|event-label-added|event-label-removed|event-priority-changed|event-relation-added|event-relation-removed|event-status-changed|event-title-changed|external-link|eye|eye-off|fast-forward|file|file-diff|file-pen-line|file-text|fingerprint|flag|flame|flask-conical|fold-vertical|folder|folder-kanban|folder-open|gamepad-2|gauge|gem|gift|git-branch|git-compare-arrows|git-merge|git-pull-request|github|globe|graduation-cap|guide-changes|hammer|hand|hard-drive|hash|heading-1|heading-2|heading-3|headphones|heart|heart-off|history|hourglass|house|image|images|inbox|info|italic|key|landmark|laptop|layers|layers-2|layout-grid|leaf|lightbulb|link|link-2|list|list-checks|list-end|list-ordered|list-todo|list-tree|loader-circle|lock|lock-open|log-in|log-out|mail|mail-open|map|map-pin|maximize-2|media-fast-forward|media-rewind|media-skip-next|media-skip-previous|media-volume-down|media-volume-mute|media-volume-off|media-volume-up|megaphone|menu|message-circle|message-square|message-square-plus|message-square-reply|mic|mic-off|microscope|minimize-2|minus|monitor|monitor-off|moon|mountain|move|music|nav-account|nav-actions|nav-admin|nav-apps|nav-boards|nav-changelog|nav-chats|nav-computer|nav-create-issue|nav-devices|nav-drafts|nav-files|nav-getting-started|nav-inbox|nav-issues|nav-my-issues|nav-needs-you|nav-notifications|nav-rail-collapse|nav-rail-expand|nav-report-bug|nav-search|nav-settings|nav-sign-out|nav-source-control|nav-team-switcher|nav-terminal|nav-threads|newspaper|notification-agent-message|notification-agent-signed-out|notification-issue-assigned|notification-issue-comment|notification-issue-created|notification-issue-mention|notification-issue-status-changed|notification-mark-read|notification-mute|notification-pr-merged|notification-pr-opened|notification-reporter-reply|notification-session-blocked|os-apple|os-linux|os-windows|package|paintbrush|palette|panel-left-close|panel-left-open|paperclip|pause|pen-tool|pencil|phone|phone-incoming|phone-off|pin|pin-off|plane|play|plug|plus|power|pr-batch|pr-closed|pr-conflict|pr-draft|pr-hold|pr-merged|pr-open|pr-resume|pr-stack|printer|priority-high|priority-low|priority-medium|priority-none|priority-urgent|progress-1-4|progress-1-5|progress-2-4|progress-2-5|progress-3-4|progress-3-5|progress-4-5|puzzle|qr-code|quote|refresh-cw|relation-blocked-by|relation-blocks|relation-duplicate|relation-parent|relation-related|relation-section|relation-sub-issue|remove-formatting|repeat|rewind|rocket|rotate-ccw|run-pause|run-resume|sc-push|scale|scan-line|search|search-x|send|server|session-shell|session-tree|settings|settings-about|settings-account|settings-agents|settings-api|settings-billing|settings-boards|settings-general|settings-import|settings-issues|settings-labels|settings-licenses|settings-local-repos|settings-mcp|settings-members|settings-notifications|settings-rate|settings-repositories|settings-servers|settings-sessions|settings-statuses|settings-storage|settings-sync|settings-tools|settings-voice|settings-widget|share-2|shield|shield-check|shield-question-mark|shopping-bag|shopping-cart|signal-high|signal-low|signal-medium|skip-back|skip-forward|sliders-horizontal|smartphone|smile|sparkles|square|square-check|square-kanban|square-minus|square-pen|square-slash|square-terminal|star|star-half|star-off|status-backlog|status-cancelled|status-done|status-duplicate|status-in-progress|status-in-review|status-todo|stethoscope|store|strikethrough|sun|support-open|support-resolved|tag|target|terminal|thread-results|tool-script|trace-background|trace-chevron|trace-completed|trace-edit|trace-failed|trace-fetch|trace-read|trace-reasoning|trace-search|trace-subagent|trace-task-done|trace-task-pending|trace-task-running|trace-terminal|trace-todo|trace-tool|trash-2|tree-pine|triangle-alert|trigger-event|trigger-schedule|trophy|truck|type|ui-add|ui-agent-source|ui-archive|ui-arrow-down|ui-arrow-right|ui-assignee|ui-attach|ui-avatar-placeholder|ui-back|ui-branch|ui-camera|ui-check|ui-checklist|ui-chevron-down|ui-chevron-left|ui-chevron-right|ui-chevron-up|ui-clean|ui-clear|ui-clock|ui-close|ui-cloud|ui-copy|ui-delete|ui-delete-account|ui-device|ui-device-default|ui-device-offline|ui-dock-side|ui-docs|ui-download|ui-due-date|ui-edit|ui-empty-search|ui-error|ui-estimate|ui-external-link|ui-favorite-off|ui-file|ui-float|ui-folder|ui-folder-open|ui-fullscreen|ui-fullscreen-exit|ui-github|ui-help|ui-hide|ui-history|ui-hold|ui-icon-placeholder|ui-indeterminate|ui-info|ui-invite|ui-issue|ui-link|ui-loading|ui-mail|ui-mark-read|ui-mark-unread|ui-mcp|ui-member|ui-menu|ui-minus|ui-more|ui-more-vertical|ui-offline|ui-organization|ui-owner|ui-permission|ui-photos|ui-pin|ui-print|ui-private|ui-properties|ui-qr-code|ui-queued|ui-read|ui-redock|ui-refresh|ui-remove-member|ui-repeat|ui-repository|ui-scan|ui-selected|ui-selector|ui-send|ui-server|ui-share|ui-sign-in|ui-sign-out|ui-staging|ui-star-half|ui-star-off|ui-stop|ui-submit|ui-subscribe|ui-success|ui-swap|ui-team|ui-unarchive|ui-unassigned|ui-undo|ui-undock|ui-unlock|ui-unpin|ui-unselected|ui-unsubscribe|ui-update|ui-usage|ui-warning|ui-watch|ui-widget|undo-2|unlink|upload|user|user-minus|user-plus|user-x|users|video|voice-call|voice-level|volume-1|volume-2|volume-off|volume-x|wallet|wifi|wifi-off|work-faces|work-results|workflow|wrench|x|zap
+- Option: {label, value, icon: Icon, disabled, description, trailing, mono, image, count}
+- Tone: one of neutral|primary|success|warning|danger|info
+- MenuItem: {label, value, kind: item|checkbox|separator|label|submenu, icon: Icon, shortcut, checked, destructive, disabled, items: [MenuItem], searchable, placeholder}
+- Column: {key, label, type: text|number|date|boolean|badge|slot|currency|percent|relativeTime|dateTime, slot, width, align: start|center|end, sortable, currency, decimals, truncate, format}
+- TreeItem: {id, title, icon: Icon, meta, children: [TreeItem], hasChildren}
+
+### Common Properties
+Every component also takes style? (Style), visible?~:b: pass them by name.
+A property with one of these names has this type unless its component says otherwise:
+- type: single|multiple
+- slots: {leading, trailing}
+- icon: Icon
+- tone: Tone
+- options: [Option]
+- side: top|right|bottom|left
+- gap: none|xs|sm|md|lg|xl
+- validateOn: change|blur|submit
+- align: start|center|end
+- orientation: horizontal|vertical
+
+### Components
+• Accordion(items, type?, value?~, children?~, on?) — Collapsible sections; child i is the body of item i.
+  - items: [{title, value, count}]
+  - on: {change: Action}
+• Alert(title, message?~, type?) — Inline banner: icon, title, message.
+  - type: info|success|warning|error
+• AlertDialog(title, description?, confirmLabel?, cancelLabel?, destructive?:b, open?~:b, children?~, slots?, on?) — Confirmation modal; ignores outside clicks.
+  - slots: {trigger}
+  - on: {confirm|cancel|change: Action}
+• AppBar(title~, subtitle?~, back?:b, slots?, on?) — Top bar: title, optional subtitle and back button.
+  - on: {back: Action}
+• AudioPlayer(src~, title?, durationMs?:n) — Audio player: title and play control.
+• Avatar(name~, src?~, size?, seed?~) — Round user picture; falls back to initials on a stable hue.
+  - size: sm|default|lg|xl
+• Badge(text~, variant?~, icon?) — Small count or status label.
+  - variant: Variant
+• Box(pressable?:b, children?~, on?) — Container laid out by its whitelisted style; every macro expands into it.
+  - on: {press|toggle|hover: Action}
+• Breadcrumb(items, on?) — Path to the current page; all but the last are links firing `select`.
+  - items: [Option]
+  - on: {select: Action}
+• Button(label?~, icon?~, href?, variant?, size?, disabled?~:b, loading?:b, pendingLabel?, submit?:b, hold?:b, holdingLabel?, children?~, on?, checks?) — Press target: label and optional icon (or one custom child).
+  - variant: Variant
+  - size: sm|default|lg|icon
+  - on: {press|holdStart|holdEnd|holdCancel: Action}
+• Calendar(source?, view?, labelField?, detailField?, metaField?, on?) — Month or week of records as coloured bars in lanes; phones: dots and the day's agenda.
+  - view: month|week
+  - on: {select|open: Action}
+• CallSurface(name~, avatar?~, seed?~, state?~, activity?~, level?~:n, bands?~, status?~, caption?~, muted?~:b, speaker?~:b, on?) — Voice call screen: wave, avatar, name, status, call buttons.
+  - state: ringing|connecting|talking|ended
+  - activity: idle|listening|thinking|speaking|muted
+  - on: {mute|speaker|hangUp: Action}
+• Canvas(size, shapes~, fit?, label?, pointer?:b, on?) — Static drawing of shapes and text (charts, diagrams); Motion animates.
+  - fit: contain|cover|fill
+  - on: {press|move|leave: Action}
+• Card(title?, description?, padded?:b, pressable?:b, children?~, on?) — Bordered card for grouped content, not page headers.
+  - on: {press: Action}
+• Carousel(page?~:n, loop?:b, indicators?:b, counter?:b, thumbnails?, children?~, on?) — Horizontal pager; each child is one page.
+  - on: {change: Action}
+• Chart(kind, categories?~, series~, rows?~, categoryField?, title?, height?:n, xLabel?, yLabel?, min?:n, max?:n, valueFormat?, showAxes?:b, showGrid?:b, showLegend?:b, showValues?:b) — Chart of any `kind`, with axes, legend and tooltip.
+  - kind: bar|stackedBar|line|area|pie|donut|sparkline
+  - series: [{name, values, field, tone: Tone}]
+  - valueFormat: {type: number|currency|percent|compact, currency, decimals}
+• Checkbox(label~, name, checked?~:b, indeterminate?~:b, disabled?:b, on?, checks?) — Labelled checkbox.
+  - on: {change: Action}
+• Chip(label~, shape?, selected?:b, tone?~, dot?, icon?, image?, detail?~, removable?:b, pressable?:b, slots?, on?) — Small token: a pill (filter, label, state) or a rect naming an entity; removable.
+  - shape: pill|rect
+  - slots: {leading}
+  - on: {press|remove: Action}
+• ChipInput(label?, name, values?~, suggestions?~, placeholder?, max?:n, disabled?:b, on?, checks?) — Removable chips (Enter or comma adds).
+  - suggestions: [Option]
+  - on: {change|add|remove: Action}
+• ChoiceTiles(name, options, type?, value?~, columns?:n, disabled?:b, on?, checks?) — Picture tiles picking one or many values (options' `image`, `description`).
+  - on: {change: Action}
+• CodeBlock(code~, language?, title?, lineNumbers?:b, wrap?:b, copyable?:b, highlight?, maxLines?:n, variant?~, size?) — Mono source code: syntax colouring, line numbers, copy button.
+  - language: plain|json|js|ts|tsx|rust|swift|kotlin|python|bash|html|css|sql|yaml|markdown|ansi
+  - variant: default|destructive
+  - size: default|sm
+• Collapsible(title, open?~:b, count?:n, children?~, on?) — One disclosure section: a title row shows or hides its children.
+  - on: {change: Action}
+• Composer(placeholder?, value?~, submitLabel?, attachments?:b, busy?:b, menuKeys?~:b, slots?, on?) — Chat input: growing text field, submit button, optional attachments; slots sit in its controls row.
+  - on: {submit|change|stop|key|attach: Action}
+• DatePicker(label?, name, value?~, min?, max?, placeholder?, firstDayOfWeek?:n, inline?:b, marks?, today?, on?) — Calendar date field (ISO yyyy-mm-dd).
+  - marks: [{date, tone: Tone}]
+  - on: {change|month: Action}
+• DateRangePicker(label?, name, start?~, end?~, min?, max?, placeholder?, firstDayOfWeek?:n, on?) — Two-date range field with one calendar (ISO dates).
+  - on: {change: Action}
+• Dialog(title?, description?~, open?~:b, dismissible?:b, children?~, slots?, on?) — Centred modal, opened by its trigger slot or by binding `open`.
+  - slots: {trigger, footer}
+  - on: {change: Action}
+• DockCard(label~, title~, caption?~, meta?~, icon?, tone?, open?~:b, children?~, slots?, on?) — Floating one-row card; children open in a bottom sheet, footer pinned.
+  - slots: {footer}
+  - on: {press|change: Action}
+• Drawer(title?, description?, open?~:b, side?, dismissible?:b, dragToDismiss?:b, children?~, slots?, on?) — Panel sliding in from an edge (a bottom sheet on phones).
+  - slots: {trigger, footer}
+  - on: {change: Action}
+• Embed(surface~, on?) — Nested surface drawn in place, sandboxed (own data and ids); its `event` actions fire `action` {name, context}; a bad one shows an error box.
+  - on: {action: Action}
+• EmptyState(icon, title, description?, actionLabel?, size?, on?) — Empty screen or list: `page` = icon disc, title, sentence, action; `list` = one muted line.
+  - size: page|list
+  - on: {press: Action}
+• FieldGroup(columns?:n, children?~) — Fields side by side (Starts / Ends) that stack on phones.
+• FileUpload(label?, name, accept?, multiple?:b, maxSize?:n, files?~, hint?, disabled?:b, on?) — Drop zone + browse button; files go to the host via `upload`, listed back in `files`.
+  - files: [{name, size, type, url}]
+  - on: {upload|remove: Action}
+• Form(name, disabled?~:b, busy?~:b, summary?:b, children?~, on?) — Collects fields by `name`; fires `submit` with their values once every check passes.
+  - on: {submit|invalid|change: Action}
+• FormActions(submit~, cancel?:b, destructive?:b, children?~, on?) — End-aligned button row: children, Cancel, then THE submit (the one primary).
+  - on: {cancel: Action}
+• Grid(columns?, gap?, children?~) — Equal-column grid for cards and tiles.
+  - columns: {base, sm, md, lg, xl}
+• Group(title?, footer?, children?~) — Rounded group of form rows, optional title and footnote.
+• Heading(text~, level?) — Section or page heading, four levels.
+  - level: h1|h2|h3|h4
+• Icon(name~, size?, tone?~, label?) — One icon from the shared Lucide registry.
+  - name: Icon
+  - size: sm|default|lg|xl
+• Image(src?~, alt~, fit?, width?:n, height?:n, aspectRatio?:n, fallback?, loading?, focalX?:n, focalY?:n) — Picture from a URL, else a placeholder box.
+  - fit: contain|cover|fill|none|scaleDown
+  - fallback: Icon
+  - loading: lazy|eager
+• Input(label, name, type?, placeholder?, value?~, variant?, size?, disabled?:b, validateOn?, on?, checks?) — Single-line text field.
+  - type: text|email|password|number|search|url|tel
+  - variant: field|row|bare|code|box
+  - size: default|sm
+  - on: {change|submit|focus|blur: Action}
+• Kbd(keys) — Keyboard shortcut drawn as a key cap.
+• KbdGroup(keys~) — Key chord: one Kbd cap per key.
+• KeyRecorder(label, value?~, recording?~:b, pending?~, placeholder?, error?, on?) — Shortcut field: press records (`start`), blur stops (`stop`); while recording each key fires `key` {type: down|up|modifiers|mouse, key, button, ctrl, alt, shift, meta}; the host sets `value`.
+  - on: {start|stop|key: Action}
+• Label(text~, for? (component ID), required?:b) — Caption for an unlabelled control, optional required mark.
+• Link(label~, href?, external?:b, on?) — Inline link opening a URL or firing `press`.
+  - on: {press: Action}
+• List(direction?, gap?, divided?:b, sectionBy?, stickyHeaders?:b, children?~, slots?) — Windowed list for anything past a screen; children may come from a data template.
+  - direction: vertical|horizontal
+  - slots: {section}
+• Markdown(text~, profile?, variant?, lines?:n) — GitHub-flavoured markdown, for prose.
+  - profile: document|inline
+  - variant: body|caption
+• Menu(label?, icon?, items, side?, align?, anchor? (component ID), openOn?, children?~, on?) — Actions, checkboxes, groups, submenus; opened by pressing its child or right-click/long-press.
+  - items: [MenuItem]
+  - openOn: press|contextmenu
+  - on: {select: Action}
+• MessageBubble(text~, side?, time?~, status?~, author?~, pressable?:b, href?~, slots?, on?) — Chat bubble, in (left, after an avatar) or out (right).
+  - side: in|out
+  - status: sending|sent|read
+  - slots: {attachment, avatar}
+  - on: {press: Action}
+• Meter(segments~, max?:n, label?, value?) — Usage bar: coloured segments against a maximum, label and value.
+  - segments: [{value, tone: Tone, label}]
+• Mosaic(pictures, label?, on?) — Pictures: halves, or one large + two small with `+N`; press fires `select {index}`.
+  - pictures: [{src, alt}]
+  - on: {select: Action}
+• Motion(layers?, size?, duration?:n, fps?:n, assets?, markers?, lottie?, src?, autoplay?:b, loop?:b, plays?:n, direction?, speed?:n, segment?, marker?, progress?~:n, play?~:b, poster?:n, fit?, slots?, stateMachine?, inputs?~, label?, on?) — Lottie-compatible vector animation, identical everywhere (loaders, states, explainers).
+  - direction: forward|reverse|alternate
+  - fit: contain|cover|fill
+  - on: {press|hover|visible|complete|state: Action}
+• NumberField(label, name, value?~:n, min?:n, max?:n, step?:n, precision?:n, unit?, placeholder?, disabled?:b, validateOn?, on?, checks?) — Numeric field: steppers, min/max/step clamping, locale formatting.
+  - on: {change|submit|focus|blur: Action}
+• Outline(items, value?~, caption?, on?) — Anchor rows under a caption, one active; press fires `select {id}`.
+  - items: [{id, title, count}]
+  - on: {select: Action}
+• Page(title~, subtitle?~, back?:b, padded?:b, children?~, slots?, on?) — Screen: an AppBar row over a padded scrolling body.
+  - on: {back: Action}
+• Pagination(totalPages:n, page?~:n, on?) — Previous, next, and current page of a total.
+  - on: {change: Action}
+• Plan(title~, description?~, steps?, state?~, progress?~:n, approveLabel?, declineLabel?, stopLabel?, on?) — Plan card: steps to approve, then progress and Stop.
+  - steps: [{title, detail, icon: Icon, status: running|error|pending|done|skipped}]
+  - state: proposed|running|done|declined
+  - on: {approve|decline|stop: Action}
+• Popover(open?~:b, side?, align?, anchor? (component ID), openOn?, children?~, slots?, on?) — Small panel anchored to its trigger.
+  - openOn: press|hover
+  - slots: {trigger}
+  - on: {change: Action}
+• Progress(value~:n, max?:n, label?, valueText?~, detail?~, tone?) — Horizontal progress bar.
+• QrCode(value~, size?:n, level?, label?) — QR code of a value, dark on a light plate.
+  - level: L|M|Q|H
+• QrScanner(hint?~, formats?, label?, disabled?:b, on?) — QR viewfinder; the host camera fires `scanned {value}`.
+  - on: {scanned: Action}
+• Radio(label?, name, options, value?~, orientation?, on?, checks?) — Labelled radio group choosing one value.
+  - on: {change: Action}
+• Rating(value?~:n, max?:n, readOnly?:b, size?, on?) — Row of stars scoring out of `max`.
+  - size: sm|default|lg
+  - on: {change: Action}
+• RecordForm(kind, recordId?~, submitLabel?, readOnly?:b, cancel?:b, path?, fields?, missing?:b, error?~, author?~, authorOptions?~, on?) — Form for one record kind: a field per schema field, with checks; submit saves.
+  - authorOptions: [Option]
+  - on: {submit|cancel: Action}
+• RecordTable(kind, query?, columns?, search?:b, filter?, totals?:b, add?:b, editable?:b, title?, cols?, rows?~, count?~, loading?~:b, fields?, path?, editorOpen?~:b, editorId?~, deleteOpen?~:b, missing?:b, error?~, author?~, authorOptions?~, searchValue?~, filterValue?~, filterLabel?, filterOptions?) — One kind's records: count + Add, sortable table (phones: a list), drawer edit, confirmed delete.
+  - cols: [Column]
+  - authorOptions: [Option]
+  - filterOptions: [Option]
+• Resizable(direction?, sizes?~, panels?, handle?:b, children?~, on?) — Panels split by drag handles; each child is a panel.
+  - direction: horizontal|vertical
+  - panels: [{min, max, collapsible}]
+  - on: {change: Action}
+• Ring(value~:n, size?, tone?, label?) — Progress ring for a fraction, icon-sized.
+  - size: sm|default|lg
+• Row(title~, identifier?~, subtitle?~, meta?~, value?~, placeholder?, icon?~, chevron?~, selected?~:b, density?, surface?, pressable?:b, href?, depth?:n, open?~:b, children?~, slots?, on?) — THE list row: lead glyph or slot, identifier, title, subtitle, trailing meta/value/slot, chevron; nestable; with children it folds.
+  - chevron: none|right|selector
+  - density: default|compact
+  - surface: flat|card
+  - on: {press|change: Action}
+• ScrollArea(direction?, maxHeight?:n, children?~) — Scrolling region of bounded height or width.
+  - direction: vertical|horizontal|both
+• SearchList(items~, query?~, placeholder?, value?~, emptyText?, maxRows?:n, showCount?:b, on?) — Search field over rows: typing filters, arrows move, Enter picks.
+  - items: [{label, value, icon: Icon, identifier, disabled}]
+  - on: {search|select: Action}
+• Section(title?~, caption?~, count?~:n, icon?, collapsible?:b, open?~:b, tint?, tree?:b, loading?~:b, children?~, slots?, on?) — Band header (foldable, tinted) over hairline-divided rows; no title = rows only.
+  - tint: Tone
+  - on: {change: Action}
+• Segmented(items, type?, value?~, variant?, size?, fill?:b, orientation?, on?) — ONE row or column of segments (also a bottom bar or rail).
+  - items: [Option]
+  - variant: segmented|toggles|outline|bar
+  - size: sm|default|lg
+  - on: {change: Action}
+• Select(label?, description?, name, options?~, source?, placeholder?, value?~, multiple?:b, searchable?:b, emptyText?, searchPlaceholder?, triggerVariant?, align?, popupWidth?:n, loading?~:b, disabled?:b, validateOn?, on?, checks?) — Picks one or many options.
+  - triggerVariant: field|row|pill
+  - on: {change|search|open: Action}
+• Separator(orientation?) — Hairline that divides content.
+• SettingsRow(label~, description?~, stackBelow?, children?~) — Settings line: label (+ description), then the control (children); stacks on phones.
+  - stackBelow: never|sm|md|lg|xl
+• Sidebar(side?, width?:n, collapseBelow?, collapsed?~:b, rail?:b, children?~, slots?) — Shell: nav column (`sidebar` slot) beside the children, hidden narrow or collapsed.
+  - side: left|right
+  - collapseBelow: never|sm|md|lg|xl
+  - slots: {sidebar}
+• Skeleton(width?, height?, rounded?:b, rows?:n, rowHeight?:n, dot?:b) — Pulsing placeholder: a block or `rows` rows.
+• Slider(label?, min?~:n, max~:n, step?:n, value?~:n, icon?, endLabel?~, showValue?:b, on?) — Slider from min to max.
+  - on: {change: Action}
+• Sparkline(values~, tone?, height?:n) — Tiny inline trend line, no axes or legend.
+• Spinner(size?, label?) — Indeterminate activity indicator.
+  - size: xs|sm|default|lg
+• SplitView(open?~:b, width?:n, children?~, slots?, on?) — List (`list` slot) + detail (children); phones show one, detail with a back button.
+  - slots: {list}
+  - on: {back: Action}
+• Stack(direction?~, gap?, align?~, justify?~, wrap?, children?~) — Flex container: children in one direction with a gap.
+  - direction: horizontal|vertical
+  - align: start|center|end|stretch
+  - justify: start|center|end|between|around|evenly
+  - wrap: {base, sm, md, lg, xl}
+• StatTile(label~, value~, delta?~, tone?~, trend?~, pressable?:b, on?) — Dashboard tile: label, big value, toned change, trend sparkline.
+  - on: {press: Action}
+• Stepper(steps, current?~:n, orientation?, collapse?) — Wizard progress: numbered steps, done ones ticked.
+  - steps: [{label, description}]
+  - collapse: never|auto|always
+• Switch(label~, name, checked?~:b, description?, disabled?:b, size?, on?) — Labelled on/off switch.
+  - size: default|compact
+  - on: {change: Action}
+• Table(columns, rows~, rowKey?, sort?~, selectable?, selected?~, caption?, emptyText?, striped?:b, density?, stickyHeader?:b, totals?:b, slots?, on?) — Typed columns: sorting, selection, widths, alignment, windowed; `slot` columns hold components.
+  - columns: [Column]
+  - sort: {key, direction: asc|desc}
+  - selectable: none|single|multiple
+  - density: default|compact
+  - on: {sort|select|rowPress: Action}
+• Tabs(tabs, value?~, variant?, fill?:b, closable?, addable?:b, swipeable?:b, children?~, on?) — Tab navigation; child i is the panel of tab i.
+  - tabs: [{label, value, icon: Icon, count}]
+  - variant: pill|strip
+  - closable: none|hover|always
+  - on: {change|close|new|reorder|more: Action}
+• Text(text~, variant?, align?, lines?:n, tone?, shimmer?:b, live?) — Text in one type style; prefer components over inline markdown.
+  - variant: body|caption|muted|lead|code|label|title
+  - live: off|polite|assertive
+• Textarea(label, name, placeholder?, rows?:n, autosize?:b, maxRows?:n, value?~, variant?, disabled?:b, validateOn?, on?, checks?) — Multi-line text field.
+  - variant: field|row|code
+  - on: {change|focus|blur: Action}
+• TimePicker(label?, name, value?~, min?, max?, step?:n, placeholder?, disabled?:b, on?) — Time field (`HH:mm`): a list every `step` minutes, or typed.
+  - on: {change: Action}
+• Timeline(source?, labelField?, rowTitle?, showCount?:b, on?) — Records over time: coloured bars across week, month or quarter columns.
+  - on: {open: Action}
+• Toast(title~, description?~, type?, open?~:b, duration?:n, actionLabel?, dismissible?:b, on?) — Transient notice; one per notice with `open` bound.
+  - type: info|success|warning|error
+  - on: {dismiss|action|change: Action}
+• Toggle(label, icon?, pressed?~:b, variant?, size?, on?) — Two-state button that stays pressed.
+  - variant: default|outline
+  - size: sm|default|lg
+  - on: {change: Action}
+• Toolbar(gap?, children?~, slots?) — Controls in one row, bottom-aligned, wrapping on phones; `trailing` = end action.
+  - slots: {trailing}
+• Tooltip(content~, side?, children?~) — Short hint on hover or long-press over its children.
+• Trace(size?, children?~) — Column of TraceItem lines (an agent's steps).
+  - size: default|sm
+• TraceItem(title~, icon?, description?, status?, size?, collapsible?:b, open?~:b, children?~, on?) — One step: icon, title, muted detail; may expand to its children.
+  - status: running|error|pending|done|skipped
+  - size: default|sm
+  - on: {change: Action}
+• Tree(items, expanded?~, value?~, label?, on?) — File-style tree: branches fold, leaves select, lazy branches load; WAI-ARIA keys.
+  - items: [TreeItem]
+  - on: {select|toggle|load: Action}
+• TreeGuides(depth:n, elbowAt?:n, tee?:b, passThrough?) — Tree gutter a nested Row draws (filled by the core); never authored directly.
+• Unknown() — Renderer's placeholder for an undefined component; never authored directly.
+• Video(src~, poster?, durationMs?:n, autoplay?:b, aspectRatio?:n) — Poster until play, then the platform player with controls.
+• VoiceWave(activity?~, variant?, level?~:n, bands?~, size?, label?, children?~) — Live voice level: three waves around an optional decorative child.
+  - activity: idle|listening|thinking|speaking|muted
+  - variant: ring|bars
+  - size: sm|md|lg|xl
+• Window(title?, children?~) — Window frame: three-dot chrome bar (optional caption) over one child filling the body.
+• ZoomableImage(src~, alt~, naturalWidth?:n, naturalHeight?:n, initial?, maxScale?:n, controls?, scale?~:n, on?) — Picture that zooms (pinch, ⌘-wheel, double-tap) and pans.
+  - initial: auto|fit|fitWidth|actual
+  - controls: auto|always|none
+  - on: {zoom|tap: Action}
+
+## Function Signatures
+
+Call these functions for checks, actions and computed values:
+• abs(value?), add(a?, b?), and(values), bind(path?, source?, params?), ceil(value?), clamp(value?, min?, max?), coalesce(values?), concat(values?), cond(if?, then?, else?), dateAdd(date?, n?, unit?), dateDiff(a?, b?, unit?), dateTime(date?, time?), div(a?, b?), email(value), endOf(date?, unit?), eq(a?, b?), expr(expr?, vars?, default?), fallback(value?, default?), fill(template?, params?), filter(items?, query?, fields?, where?), floor(value?), formatCurrency(value, currency, decimals?, grouping?), formatDate(value, format), formatDuration(hours?, format?), formatNumber(value, decimals?, grouping?), formatPercent(value?, decimals?), formatRelativeTime(value?, now?), formatString(value), hours(minutes?), isoWeek(date?), len(value?), length(value, min?, max?), lt(a?, b?), map(value?, cases?, default?), max(values?), min(values?), mod(a?, b?), mul(a?, b?), not(value), now(), numeric(value, min?, max?), openUrl(url), or(values), orElse(value?, default?), percent(value?, max?), pluralize(value, zero?, one?, two?, few?, many?, other), regex(value, pattern), required(value), round(value?, digits?), set(path?, value?), startOf(date?, unit?), sub(a?, b?), text(value?), today(), weekday(date?)
+
+## Catalog Instructions
+
+Exponential UI core: shadcn-named components for app-shaped surfaces.
+
+## Catalog rules
+
+1. Components are flat: `{id, component, ...props}`. Exactly one has the id `root`. Ids are identifiers (letters, digits, `_`). `children` are ids (`["a", "b"]`), never inline components, or `{componentId, path, key?}`: one `componentId` per item of the array at `path` (`key` = the item field naming it). `slots` = `{name: id}`.
+2. A dynamic prop takes a literal, a binding `{"@path": "/json/pointer"}` or a call `{"@call": "name", "args": {…}}`. Keep data in the data model and bind to it; a path without a leading `/` reads the current item.
+3. `on: {<event>: action}`: an action is `{event: {name, context?, userMessage?}}` (sent to the agent) and/or `{functionCall: {"@call", args}}` (runs on the renderer: a catalog function, `set`, or a host function such as `app_toast`).
+4. `visible: false` (or a binding) removes a component and its space. Inputs take `checks: [{condition, message?}]`; a condition is a binding or a call (`required`, `regex`, `length`, `numeric`, `email`).
+5. Lay out with Page, Stack, Grid, Card, SplitView, Sidebar and List. A row of controls is a Toolbar, fields side by side a FieldGroup, the Cancel/submit row FormActions; Box + `style` only for the rest. Wrap fields in Form.
+6. Prefer catalog components over Markdown, labels and tones over colours. A colour is a `$color.*` token, never `#hex`. Leave built-in copy (Cancel, Search…) unset: it is localized.
+7. One default Button per screen (the submit or main action); the rest outline, secondary or ghost.

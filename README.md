@@ -81,7 +81,7 @@ stream.finish().forEach(render);
 `parseResponse(catalogs, text, {surfaceId?, wrapped?, progressiveKeys?})`,
 `new StreamCompiler(catalogs, {surfaceId?, wrapped?, progressiveKeys?, afterRejectedBlock?: "end" | "continue"})`
 with `push`/`finish`/`inBlock`, `unwrap`/`wrap`/`hasFormatContent`,
-`generatePrompt(catalogs, {examples?, allowedMessages?})`,
+`generatePrompt(catalogs, {examples?, allowedMessages?, style?: "upstream" | "compact"})`,
 `agentCallableFunctions(catalogs)`. TypeScript types included.
 
 Each free function loads its catalogs anew. For a large catalog load them
@@ -127,6 +127,42 @@ loop), raising `ParseError` / `ValidationError` /
 cd crates/a2ui-express-py && maturin develop --release && pytest tests
 ```
 
+## Streaming
+
+`response::ExpressParser` reads model output: prose with Express blocks
+between `<a2ui>` tags (or a bare Express body).
+
+```rust
+let parser = ExpressParser::new(compiler, "main");
+let mut stream = parser.open_stream();
+for chunk in model_output {
+    for part in stream.push(chunk)? {   // Part::Text | Part::A2ui(messages) | Part::Error
+        render(part);
+    }
+}
+render_all(stream.finish()?);
+```
+
+Each statement compiles as soon as it is complete: a new surface's
+`createSurface` once `root` is there, then `updateComponents` /
+`updateDataModel` deltas. A component may name a child that comes later (it
+renders once the child arrives), and an open string of a `text` property heals,
+so a sentence types in live. Every message is checked against a
+`state::RendererState` mirror of what the renderer holds before it is
+returned. Streamed in any chunk size, a response leaves the renderer with the
+same surfaces as `parse_response` on the whole text
+([`tests/streaming.rs`](crates/a2ui-express/tests/streaming.rs) checks every
+conformance input one character at a time). A step costs about what its
+statement costs: eui's kitchen-sink surface (251 components, 30 KB) streams
+character by character in ~0.2 s in release builds
+(`cargo run --release -p a2ui-express --example stream_bench`).
+
+`response::{unwrap, wrap, has_format_content}` split a whole response into
+text and raw blocks and back.
+
+Samples meant for streaming should be written top-down (`root` first):
+`decompile` with `Order::TopDown`.
+
 ## Conformance suite
 
 The test oracle is the upstream, language-neutral conformance suite, vendored
@@ -166,6 +202,39 @@ components: `scripts/gen-eui-express.mjs <unpacked-eui-package>`.
 The lexer's identifier tables (`crates/a2ui-express/src/syntax/xid.rs`) are
 generated too, from upstream's ANTLR lexer at the same pin, so identifiers
 lex exactly as upstream lexes them: `scripts/gen-xid-tables.py <a2ui-checkout>`.
+
+## Prompt generator
+
+`a2ui_express::prompt::generate_prompt` writes the system-prompt section
+that teaches a model Express for the active catalogs. `PromptOptions::style`
+picks the format:
+
+- `PromptStyle::Upstream` (the default) is upstream's format byte for byte;
+  the conformance suite (`prompt_generator.yaml`) checks it.
+- `PromptStyle::Compact` is opt-in, for large catalogs. Each enum or map
+  shape several properties share (a style map, an icon enum) is listed once
+  under *Shared Types* and referred to by name (`- icon: Icon`); a property
+  line several components share is listed once under *Common Properties*;
+  bindable properties are marked `~`, numbers `:n`, booleans `:b`; component
+  descriptions are cut to their first sentence and property and function
+  descriptions are left out. The rules section is upstream's.
+
+```rust
+use a2ui_express::prompt::{generate_prompt, PromptOptions, PromptStyle};
+
+let options = PromptOptions { style: PromptStyle::Compact, ..Default::default() };
+let prompt = generate_prompt(&catalogs, &options)?;
+```
+
+On eui's core catalog (`vendor/eui/catalog/core.schema.json`, 104
+components) the upstream format is 457,928 characters (~114k tokens at
+chars / 4); the compact one is about 39.5k characters (~9.9k tokens, inside
+eui's 10k budget). [`eval/prompt/`](eval/prompt/) compares it with eui's
+hand-written `catalogPrompt` on sample UIs.
+
+```sh
+cargo run -q -p a2ui-express --example express -- prompt vendor/eui/catalog/core.schema.json --compact
+```
 
 ## Running the suite
 

@@ -158,6 +158,11 @@ export interface PromptOptions {
   examples?: A2uiMessage[][];
   /** The message types the agent may write (`createSurface`, `updateComponents`, …); default all. */
   allowedMessages?: string[];
+  /**
+   * How the signatures are written: `"upstream"` (default, upstream's format byte for byte)
+   * or `"compact"` (shared types and common properties listed once; far shorter on large catalogs).
+   */
+  style?: "upstream" | "compact";
 }
 /** Generates the system-prompt section that teaches a model Express for the catalogs. */
 export function generatePrompt(catalogs: CatalogDocuments, options?: PromptOptions): string;

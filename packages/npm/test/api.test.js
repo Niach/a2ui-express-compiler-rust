@@ -1,7 +1,10 @@
 // The JS surface of the binding: shapes, options, errors, and what the
 // renderer build leaves out.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { loadFlavours } from "./load.js";
 
@@ -102,6 +105,19 @@ test("Catalogs: load once, compile many times", () => {
   const messages = catalogs.compile('root = Text("x")');
   assert.deepEqual(catalogs.compile(catalogs.decompile(messages)), messages);
   assert.ok(catalogs.generatePrompt().includes("Text("));
+  assert.ok(catalogs.generatePrompt({ style: "compact" }).includes("Text("));
   assert.deepEqual(catalogs.agentCallableFunctions(), []);
   assert.equal(new renderer.Catalogs(CATALOG).decompile, undefined);
+});
+
+test("compact prompt on eui's catalog fits 40,000 chars", () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const catalog = JSON.parse(readFileSync(join(root, "vendor/eui/catalog/core.schema.json"), "utf8"));
+  const compact = ax.generatePrompt(catalog, { style: "compact" });
+  const upstream = ax.generatePrompt(catalog, { style: "upstream" });
+  assert.equal(upstream, ax.generatePrompt(catalog));
+  const chars = [...compact].length;
+  assert.ok(chars <= 40_000, `${chars} chars`);
+  assert.ok(chars < [...upstream].length);
+  assert.throws(() => ax.generatePrompt(catalog, { style: "tiny" }), { category: "ArgumentError" });
 });

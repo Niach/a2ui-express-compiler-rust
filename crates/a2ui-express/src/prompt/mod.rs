@@ -7,12 +7,15 @@
 //! catalog's own instructions, and the examples, rewritten from A2UI JSON
 //! into Express through the [decompiler](crate::decompile).
 //!
+//! [`PromptStyle`] picks the signature format: upstream's (the default), or
+//! a compact one for large catalogs.
+//!
 //! Ported from upstream's TypeScript `prompt-generator.ts` (pinned in
 //! `vendor/a2ui/UPSTREAM`, after a2ui-project/a2ui#4184); the behaviour is
 //! fixed by `vendor/a2ui/conformance/agent/express/prompt_generator.yaml`.
 //!
 //! ```
-//! use a2ui_express::prompt::{generate_prompt, PromptOptions};
+//! use a2ui_express::prompt::{generate_prompt, PromptOptions, PromptStyle};
 //! use a2ui_express::schema::{Catalog, CatalogSet};
 //! use serde_json::json;
 //!
@@ -32,8 +35,13 @@
 //! let prompt = generate_prompt(&catalogs, &PromptOptions::default()).unwrap();
 //! assert!(prompt.contains("• Badge(text, variant? (static))"));
 //! assert!(prompt.contains("  - variant: Must be one of: 'info', 'warn'"));
+//!
+//! let compact = PromptOptions { style: PromptStyle::Compact, ..Default::default() };
+//! let prompt = generate_prompt(&catalogs, &compact).unwrap();
+//! assert!(prompt.contains("• Badge(text~, variant?)\n  - variant: info|warn"));
 //! ```
 
+mod compact;
 mod examples;
 mod rules;
 mod signatures;
@@ -61,6 +69,41 @@ pub struct PromptOptions {
     /// `callRendererFunction`, or their `…Message` class names). The rules
     /// for the others are left out. `None` allows all of them.
     pub allowed_messages: Option<Vec<String>>,
+    /// How the signatures are written. The default,
+    /// [`PromptStyle::Upstream`], is upstream's format byte for byte.
+    pub style: PromptStyle,
+}
+
+/// How a prompt writes the component and function signatures.
+///
+/// Everything else (the rules, the catalog instructions, the examples) is
+/// the same in both styles.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum PromptStyle {
+    /// Upstream's format, byte for byte (what the conformance suite checks):
+    /// every property's description, enum values and map keys under each
+    /// component.
+    #[default]
+    Upstream,
+    /// A compact format for large catalogs, opt-in. Every enum or map
+    /// shape that several properties use and that is long to spell out is
+    /// listed once, under `### Shared Types`, and referred to by name
+    /// (`- style: Style`, `- icon: Icon`): the name of its `$defs` entry
+    /// when it has one, else the property's name, capitalized. A property
+    /// line that reads the same in at least three components is listed once,
+    /// under `### Common Properties`, and properties nearly every component
+    /// takes leave the signatures. Bindable properties are marked `~`
+    /// (instead of marking the others `(static)`), numbers `:n`, booleans
+    /// `:b`, action slots read `Action`. Component descriptions are cut to
+    /// their first sentence; property, argument and function descriptions
+    /// are left out. A legend explains the notation, and the model is told
+    /// to name every argument. The rules, catalog instructions and examples
+    /// are the same as upstream's.
+    ///
+    /// On eui's core catalog (104 components, 57 functions) the prompt goes
+    /// from 457,928 characters (~114k tokens at chars / 4) to about 39.5k
+    /// (~9.9k tokens).
+    Compact,
 }
 
 /// Generates the Express prompt section for the active catalogs.
@@ -298,7 +341,10 @@ impl Generator<'_> {
         names.sort_unstable();
         format!(
             "## System Functions\n\nThese functions are defined by the A2UI protocol, not by a catalog. Call them by their `@` name, like any function, and never add a `catalogId` to them:\n{}",
-            signatures::functions(first, names)
+            match self.options.style {
+                PromptStyle::Upstream => signatures::functions(first, names),
+                PromptStyle::Compact => compact::functions(first, names),
+            }
         )
     }
 
@@ -318,11 +364,19 @@ impl Generator<'_> {
         } else {
             String::new()
         };
-        format!(
-            "{header}## Positional Component Signatures\n\nUse these exact positional signatures to instantiate components. Do not output property keys:\n{}\n\n## Positional Function Signatures\n\nUse these exact positional signatures to instantiate check rules or logic functions:\n{}{instructions}",
-            signatures::components(catalog),
-            signatures::catalog_functions(catalog),
-        )
+        match self.options.style {
+            PromptStyle::Upstream => format!(
+                "{header}## Positional Component Signatures\n\nUse these exact positional signatures to instantiate components. Do not output property keys:\n{}\n\n## Positional Function Signatures\n\nUse these exact positional signatures to instantiate check rules or logic functions:\n{}{instructions}",
+                signatures::components(catalog),
+                signatures::catalog_functions(catalog),
+            ),
+            PromptStyle::Compact => format!(
+                "{header}{}\n{}\n\n## Function Signatures\n\nCall these functions for checks, actions and computed values:\n{}{instructions}",
+                compact::COMPONENTS_HEADING,
+                compact::components(catalog),
+                compact::catalog_functions(catalog),
+            ),
+        }
     }
 
     /// The examples, one sentinel-wrapped block per turn.

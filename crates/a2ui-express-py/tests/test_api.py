@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 import a2ui_express as ax
@@ -95,6 +98,22 @@ def test_loaded_catalogs() -> None:
         assert parts == [{"a2ui": messages}]
     assert catalogs.parse_response('<a2ui>root = Text("x")</a2ui>', surface_id="main") == [{"a2ui": messages}]
     assert "Text(" in catalogs.generate_prompt()
+    assert "Text(" in catalogs.generate_prompt(style="compact")
     assert catalogs.agent_callable_functions() == []
     with pytest.raises(ax.CatalogError):
         ax.Catalogs([])
+
+
+EUI_CATALOG = Path(__file__).resolve().parents[3] / "vendor/eui/catalog/core.schema.json"
+
+
+def test_compact_prompt_on_eui_catalog() -> None:
+    catalog = json.loads(EUI_CATALOG.read_text())
+    compact = ax.generate_prompt(catalog, style="compact")
+    upstream = ax.generate_prompt(catalog, style="upstream")
+    assert upstream == ax.generate_prompt(catalog)
+    assert len(compact) <= 40_000, len(compact)
+    assert len(compact) < len(upstream)
+    assert compact == ax.Catalogs([catalog]).generate_prompt(style="compact")
+    with pytest.raises(ValueError, match="prompt style"):
+        ax.generate_prompt(catalog, style="tiny")

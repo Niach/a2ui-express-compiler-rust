@@ -1,0 +1,42 @@
+[
+  {
+    "id": "login",
+    "title": "Login form",
+    "request": "A sign-in screen: email and password fields (both required, the email validated as an email), a 'Remember me' checkbox, a primary 'Sign in' button, and a 'Forgot password?' link."
+  },
+  {
+    "id": "dashboard",
+    "title": "Dashboard",
+    "request": "A sales dashboard: a page header 'Q3 overview', three stat tiles (Revenue $1.2M up 8%, Orders 3,420 up 3%, Refunds 41 down 12%), and below them a table of the five most recent orders (order id, customer, amount, status) bound to the data model."
+  },
+  {
+    "id": "settings",
+    "title": "Settings page",
+    "request": "A notification settings page: a section 'Email' with switches for 'Product updates' and 'Weekly digest', a section 'Appearance' with a theme select (Light, Dark, System) and a font-size slider (12 to 20), and a Save / Cancel row at the bottom."
+  },
+  {
+    "id": "chat",
+    "title": "Chat composer",
+    "request": "A chat view: a scrollable list of three messages between the user and an assistant (bubbles, newest at the bottom) and a message composer pinned below with a send action."
+  },
+  {
+    "id": "products",
+    "title": "Product card grid",
+    "request": "A product catalogue: a responsive grid of four product cards, each with an image, name, price, a rating, and an 'Add to cart' button; a search field above the grid."
+  },
+  {
+    "id": "empty",
+    "title": "Empty state",
+    "request": "The projects page of an app with no projects yet: an empty state with a folder icon, the title 'No projects yet', a one-sentence explanation, and a 'Create project' action."
+  },
+  {
+    "id": "checkout",
+    "title": "Checkout form (held out)",
+    "request": "A checkout step: a shipping address form (full name, street, city, postal code, country select), a delivery option choice between Standard (free) and Express ($9.90), an order summary with subtotal, shipping and total, and a 'Place order' button."
+  },
+  {
+    "id": "issue",
+    "title": "Issue detail (held out)",
+    "request": "An issue detail view: the title 'Login fails on Safari' with a status badge 'In progress' and a priority, tabs for 'Details' and 'Activity'; Details shows the description text and assignee avatar, Activity lists three timeline events; a 'Close issue' button in the header."
+  }
+]

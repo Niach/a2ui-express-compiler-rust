@@ -36,7 +36,7 @@ for sample in dataset:
 | `parse_response(catalogs, text, *, surface_id=None, wrapped=True, progressive_keys=None, version=None)` | a whole response |
 | `StreamCompiler(catalogs, *, surface_id=None, wrapped=True, progressive_keys=None, after_rejected_block="end", version=None)` | `.push(chunk)`, `.finish()`, `.in_block` |
 | `unwrap(text)`, `wrap(parts)`, `has_format_content(text, complete=False)` | raw parts `{"text"}` / `{"a2ui_raw", "is_final"?}` |
-| `generate_prompt(catalogs, *, surface_id=None, examples=None, allowed_messages=None)`, `agent_callable_functions(catalogs)` | prompt generator |
+| `generate_prompt(catalogs, *, surface_id=None, examples=None, allowed_messages=None, style=None)` (`style="compact"` for large catalogs), `agent_callable_functions(catalogs)` | prompt generator |
 | `Catalogs(catalogs, *, version=None, surface_id=None)` | loaded once; `.compile`, `.decompile`, `.parse_response`, `.stream`, `.generate_prompt`, `.agent_callable_functions`, `.version`, `.ids`; thread-safe |
 
 Errors are `ParseError`, `ValidationError` and `CatalogError`, subclasses of
