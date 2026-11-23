@@ -64,6 +64,7 @@ pub use version::CatalogVersion;
 /// A catalog document that cannot be loaded, or catalogs that cannot be
 /// used together.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CatalogError {
     /// The text is not JSON.
     #[error("catalog is not valid JSON: {0}")]
@@ -96,6 +97,27 @@ pub enum CatalogError {
         function: String,
         /// Its declared callers.
         callers: String,
+    },
+    /// A v1.0 component, property, function or argument name that is not a
+    /// UAX #31 identifier.
+    #[error("Invalid UAX #31 {kind} identifier: '{name}'{}", in_owner(.owner))]
+    InvalidIdentifier {
+        /// What is named: `component`, `property`, `function` or `argument`.
+        kind: &'static str,
+        /// The name.
+        name: String,
+        /// The component of a property or the function of an argument, as
+        /// `component 'Name'` or `function 'name'`.
+        owner: Option<String>,
+    },
+    /// A v1.0 `metadata` that is not `{"extensions": {<identifier>: …}}`.
+    #[error("{reason}")]
+    InvalidMetadata {
+        /// Whose metadata it is: `catalog`, `component 'Name'` or
+        /// `function 'name'`.
+        owner: String,
+        /// What is wrong.
+        reason: String,
     },
     /// A function definition with an invalid field.
     #[error("Function '{function}': {reason}")]
@@ -138,4 +160,10 @@ pub enum CatalogError {
         /// The catalogs' version.
         catalogs: String,
     },
+}
+
+fn in_owner(owner: &Option<String>) -> String {
+    owner
+        .as_ref()
+        .map_or_else(String::new, |owner| format!(" in {owner}"))
 }
