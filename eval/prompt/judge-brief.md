@@ -4,7 +4,8 @@ You judge generated user interfaces. Each file `judge/<request>.md` holds one
 UI request and two samples, A and B: each an outline of the rendered component
 tree a model wrote for that request (component, its props, `$/path` data
 bindings, `name(...)` function calls, `on=[event→action]`, `checks=[...]`,
-`style{keys}`, data templates and the data model). The components come from
+`style{keys}`, `visible=<condition>` on a component shown only when it
+holds, data templates and the data model). The components come from
 one design system (shadcn-like names: Page, Card, List, Row, Form, ...); both
 samples use the same one. Long values are cut with `…`.
 

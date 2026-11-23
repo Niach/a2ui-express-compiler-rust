@@ -30,8 +30,8 @@
     "winner": "A"
   },
   "inbox": {
-    "A": {"fidelity": 3, "components": 4, "notes": "Header action, avatars, messages and times, but the 'New' badge is shown on every row rather than only the two unread ones."},
-    "B": {"fidelity": 3, "components": 4, "notes": "Same structure inside a card with sender subtitles, and the same unconditional 'New' badge on all rows."},
+    "A": {"fidelity": 5, "components": 4, "notes": "Covers everything asked (header action, five rows with avatar, message, time, New badge on the first two), though the visibility uses a roundabout cond(if/then/else) where a direct binding would do."},
+    "B": {"fidelity": 5, "components": 4, "notes": "Covers everything asked with a direct visible=$unread binding and a Card wrapper, but the sender subtitle repeats the name already in each message."},
     "winner": "tie"
   },
   "issue": {

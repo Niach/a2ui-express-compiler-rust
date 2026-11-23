@@ -45,9 +45,9 @@
     "winner": "A"
   },
   "inbox": {
-    "A": {"fidelity": 4, "components": 5, "notes": "Page header, mark-all action, templated rows with avatar and New badge; time is not displayed and is stored as ISO rather than relative."},
-    "B": {"fidelity": 4, "components": 4, "notes": "Same templated list with relative times in the data but not shown, and a hand-built Heading stack instead of a Page."},
-    "winner": "A"
+    "A": {"fidelity": 5, "components": 4, "notes": "Covers everything: the Page title is the header, there is a Mark all as read button, and five Rows each have an Avatar, message, a relative time made by formatRelativeTime and a New badge on the first two, though the visible cond(...) wrapper adds nothing over binding $unread directly."},
+    "B": {"fidelity": 5, "components": 4, "notes": "Covers everything, with a cleanly aligned header row and a badge bound straight to $unread, but it builds the header from Stack and Heading instead of a Page and hard-codes the relative times as strings."},
+    "winner": "tie"
   },
   "pricing": {
     "A": {"fidelity": 5, "components": 5, "notes": "Segmented toggle drives the prices, three titled cards with taglines, check-icon feature Lists, a Recommended badge on Pro, and Choose plan buttons."},

@@ -5,9 +5,9 @@
     "winner": "tie"
   },
   "orders": {
-    "A": {"fidelity": 4, "components": 5, "notes": "Rows are pressable with a status badge, number, date, item count and total, but the filter is only bound to data and fires no change behaviour."},
-    "B": {"fidelity": 5, "components": 5, "notes": "Same idiomatic Segmented plus List of Rows with badges, and the filter also emits a change event, so filtering actually works."},
-    "winner": "B"
+    "A": {"fidelity": 5, "components": 5, "notes": "Segmented filter really filters the five order rows through a visible condition, each row shows number, date, item count, total and a status badge, and pressing a row opens the order; the only risk is that the lowercase filter values must match the segment item values."},
+    "B": {"fidelity": 4, "components": 5, "notes": "The layout and rows are clean and complete with a working open action, but the filter only sends an event and nothing in the UI filters the list, so it depends on the server."},
+    "winner": "A"
   },
   "team": {
     "A": {"fidelity": 5, "components": 5, "notes": "A Toolbar holds the search field and the member count, a responsive grid shows person cards with Avatar, Heading and role, and Message sends a stable id."},
