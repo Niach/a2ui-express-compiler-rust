@@ -1,10 +1,14 @@
 <a2ui>
 surface("main")
-$/items = [{sender: "Ava Chen", message: "Ava Chen commented on your pull request", time: "2 min ago", unread: true}, {sender: "Marcus Lee", message: "Marcus Lee mentioned you in Q3 planning", time: "18 min ago", unread: true}, {sender: "Priya Nair", message: "Priya Nair approved your design review", time: "1 hour ago", unread: false}, {sender: "Tom Becker", message: "Tom Becker assigned you an issue", time: "3 hours ago", unread: false}, {sender: "Sofia Rossi", message: "Sofia Rossi shared a file with you", time: "Yesterday", unread: false}]
-title = Heading(text="Notifications", level="h2")
-markAll = Button(label="Mark all as read", variant="outline", on={press: Event("mark_all_read")})
-header = Stack(direction="horizontal", justify="between", align="center", children=[title, markAll])
-item = Row(title=$message, meta=$time, slots={leading: Avatar(name=$sender), trailing: Badge(text="New", visible=$unread)})
-notifications = List(divided=true, children=_template($/items, item))
-root = Stack(direction="vertical", gap="md", children=[header, notifications])
+$/notifications = [
+  {sender: "Maya Chen", message: "Maya Chen commented on your pull request", time: "2m ago", unread: true},
+  {sender: "Luis Ortega", message: "Luis Ortega assigned you to Billing refactor", time: "18m ago", unread: true},
+  {sender: "Priya Nair", message: "Priya Nair mentioned you in #design-review", time: "1h ago", unread: false},
+  {sender: "Tom Becker", message: "Tom Becker approved your deploy request", time: "3h ago", unread: false},
+  {sender: "Ana Souza", message: "Ana Souza shared the Q3 roadmap with you", time: "Yesterday", unread: false}
+]
+root = Page(title="Notifications", slots={trailing: Button(label="Mark all as read", variant="outline", on={press: Event("mark_all_read")})}, children=[inbox])
+inbox = Card(children=[list])
+list = List(divided=true, children=_template($/notifications, item))
+item = Row(title=$message, subtitle=$sender, meta=$time, slots={leading: Avatar(name=$sender), trailing: Badge(text="New", visible=$unread)})
 </a2ui>

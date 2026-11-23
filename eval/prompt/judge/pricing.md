@@ -5,88 +5,75 @@ Request: A pricing page: a monthly / yearly billing toggle, then three plan card
 ## Sample A
 
 ```
-Page title="Pricing" subtitle="Pick the plan that fits your team"
-  Stack
-    Segmented value={"@path":"/billing"} items[2]
-    Grid
-      Card title="Free" description="For trying things out"
-        Stack
-          Heading text="$0"
-          List
-            Row title="1 project" icon="check"
-            Row title="Up to 3 members" icon="check"
-            Row title="Community support" icon="check"
-            Row title="1 GB storage" icon="check"
-          Button label="Choose plan" variant="outline"
-      Card title="Pro" description="For growing teams that ship fast"
-        Stack
-          Badge text="Recommended" variant="default" icon="star"
-          Heading text={"@call":"cond","args":{"if":{"@call":"eq","args":{"a":{"@pa
-          Text text={"@call":"cond","args":{"if":{"@call":"eq","args":{"a":{"@pa variant="muted"
-          List
-            Row title="Unlimited projects" icon="check"
-            Row title="Up to 20 members" icon="check"
-            Row title="Priority support" icon="check"
-            Row title="100 GB storage" icon="check"
-          Button label="Choose plan"
-      Card title="Team" description="For organizations that need control"
-        Stack
-          Heading text={"@call":"cond","args":{"if":{"@call":"eq","args":{"a":{"@pa
-          Text text={"@call":"cond","args":{"if":{"@call":"eq","args":{"a":{"@pa variant="muted"
-          List
-            Row title="Unlimited members" icon="check"
-            Row title="SSO and audit log" icon="check"
-            Row title="Dedicated support" icon="check"
-            Row title="1 TB storage" icon="check"
-          Button label="Choose plan" variant="outline"
-[data model] / = {"billing":"monthly"}
+Page title="Pricing" subtitle="Simple plans that scale with you"
+  Stack direction="vertical" gap="lg" align="center"
+    Segmented items[2: "Monthly" | "Yearly"] type="single" value=$/billing on=[change→event set_billing {billing: $/billing}]
+    Grid columns={base: 1, md: 3} gap="md"
+      Card title="Free" description="For trying things out."
+        Heading text="$0" level="h2"
+        Text text="per user / month" variant="caption"
+        List
+          Row title="1 project" icon="check"
+          Row title="Community support" icon="check"
+          Row title="1 GB storage" icon="check"
+          Row title="Basic analytics" icon="check"
+        Button label="Choose plan" variant="outline" on=[press→event choose_plan {plan: "free", billing: $/billing}]
+      Card title="Pro" description="For growing professionals." style{borderWidth, borderColor}
+        Badge text="Recommended" variant="default" icon="star"
+        Heading text="$12" level="h2"
+        Text text="per user / month" variant="caption"
+        List
+          Row title="Unlimited projects" icon="check"
+          Row title="Priority email support" icon="check"
+          Row title="100 GB storage" icon="check"
+          Row title="Advanced analytics" icon="check"
+        Button label="Choose plan" variant="default" on=[press→event choose_plan {plan: "pro", billing: $/billing}]
+      Card title="Team" description="For teams that work together."
+        Heading text="$30" level="h2"
+        Text text="per user / month" variant="caption"
+        List
+          Row title="Everything in Pro" icon="check"
+          Row title="Shared workspaces" icon="check"
+          Row title="Roles and permissions" icon="check"
+          Row title="Single sign-on" icon="check"
+        Button label="Choose plan" variant="outline" on=[press→event choose_plan {plan: "team", billing: $/billing}]
+[data model] {"billing":"monthly"}
 ```
 
 ## Sample B
 
 ```
-Page title="Pricing" subtitle="Pick the plan that fits"
-  Stack
-    Segmented value={"@path":"/billing"} type="single" items[2]
-    Grid
-      Card
-        Stack
-          Stack
-            Heading text="Free"
-            Text text="For trying things out" variant="muted"
-            Heading text="$0"
-          Stack
-            Text text="1 project"
-            Text text="Community support"
-            Text text="Basic analytics"
-            Text text="1 GB storage"
-          Button label="Choose plan" variant="outline"
-      Card
-        Stack
-          Stack
-            Badge text="Recommended" variant="default"
-            Heading text="Pro"
-            Text text="For growing professionals" variant="muted"
-            Heading text={"@call":"cond","args":{"if":{"@call":"eq","args":{"a":{"@pa
-            Text text="per user / month" variant="caption"
-          Stack
-            Text text="Unlimited projects"
-            Text text="Priority email support"
-            Text text="Advanced analytics"
-            Text text="50 GB storage"
-          Button label="Choose plan" variant="default"
-      Card
-        Stack
-          Stack
-            Heading text="Team"
-            Text text="For collaborating teams" variant="muted"
-            Heading text={"@call":"cond","args":{"if":{"@call":"eq","args":{"a":{"@pa
-            Text text="per user / month" variant="caption"
-          Stack
-            Text text="Everything in Pro"
-            Text text="Shared workspaces"
-            Text text="Roles and permissions"
-            Text text="Dedicated support"
-          Button label="Choose plan" variant="outline"
-[data model] {"billing":"monthly"}
+Page title="Pricing" subtitle="Simple plans that grow with you"
+  Stack gap="lg"
+    Segmented items[2: "Monthly" | "Yearly"] value=$/billing style{alignSelf}
+    Grid columns={base: 1, md: 3} gap="md"
+      Card title="Free" description="For trying things out"
+        Stack gap="md"
+          Heading level="h2" text="$0"
+          List divided=true
+            Row icon="check" title="1 project"
+            Row icon="check" title="Community support"
+            Row icon="check" title="1 GB storage"
+            Row icon="check" title="Basic analytics"
+          Button label="Choose plan" variant="outline" on=[press→event choosePlan {plan: "free", billing: $/billing}]
+      Card title="Pro" description="For growing professionals" style{borderColor, borderWidth}
+        Stack gap="md"
+          Badge text="Recommended" icon="star"
+          Heading level="h2" text=cond(if=eq(a=$/billing, b="yearly"), then="$10 / month", else="$12 / month")
+          List divided=true
+            Row icon="check" title="Unlimited projects"
+            Row icon="check" title="Priority support"
+            Row icon="check" title="100 GB storage"
+            Row icon="check" title="Advanced analytics"
+          Button label="Choose plan" on=[press→event choosePlan {plan: "pro", billing: $/billing}]
+      Card title="Team" description="For collaborating teams"
+        Stack gap="md"
+          Heading level="h2" text=cond(if=eq(a=$/billing, b="yearly"), then="$25 / user / month", else="$30 / user / month")
+          List divided=true
+            Row icon="check" title="Everything in Pro"
+            Row icon="check" title="Shared workspaces"
+            Row icon="check" title="Roles and permissions"
+            Row icon="check" title="SSO and audit log"
+          Button label="Choose plan" variant="outline" on=[press→event choosePlan {plan: "team", billing: $/billing}]
+[data model] / = {"billing":"monthly"}
 ```

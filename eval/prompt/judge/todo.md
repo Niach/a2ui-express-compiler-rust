@@ -6,35 +6,34 @@ Request: A to-do list: an input to add a task with an 'Add' button, a list of fo
 
 ```
 Page title="To-do"
-  Stack
-    Toolbar
-      Input label="New task" placeholder="What needs doing?" value={"@path":"/newTask"} name="newTask"
-      Button label="Add"
-    List
-    Text text={"@call":"formatString","args":{"value":"${/remaining} tasks variant="muted"
-[template taskRow: repeated once per item of its list]
-  Stack
-    Checkbox label="" name="done"
-    Text text={"@path":"title"}
-    Button variant="ghost" icon="trash-2"
-[data model] {"newTask":"","remaining":3,"tasks":[{"id":"t1","title":"Buy groceries","done":false},{"id":"t2","title":"Write project report","done":true},{"id":"t3","title":"Call the dentist","done":false},{"id":"t4","title":"Water the plants","done":false}]}
+  Card
+    Stack gap="md"
+      Stack direction="horizontal" gap="sm" align="end"
+        Input name="newTask" label="New task" placeholder="What needs doing?" value=$/newTask on=[submit→event addTask {text: $/newTask}] style{flex}
+        Button label="Add" on=[press→event addTask {text: $/newTask}]
+      List divided=true children=[template taskItem, once per item of $/tasks]
+      Text variant="muted" text=concat(values=[$/left, " tasks left"])
+[template taskItem: repeated once per item of its list]
+  Stack direction="horizontal" gap="sm" justify="between"
+    Checkbox name="done" label=$text checked=$done on=[change→event toggleTask {id: $id, done: $done}]
+    Button label="Delete" icon="trash-2" variant="ghost" size="sm" on=[press→event deleteTask {id: $id}]
+[data model] / = {"newTask":"","tasks":[{"id":"t1","text":"Buy groceries","done":false},{"id":"t2","text":"Write project report","done":true},{"id":"t3","text":"Call the dentist","done":false},{"id":"t4","text":"Book flights","done":false}],"left":3}
 ```
 
 ## Sample B
 
 ```
 Page title="To-do"
-  Card
-    Stack
-      Toolbar
-        [slot trailing]
-          Button label="Add"
-        Input label="New task" placeholder="What needs doing?" value={"@path":"/newTask"} name="newTask"
-      List
-      Text text={"@call":"concat","args":{"values":[{"@path":"/left"}," task variant="muted"
+  Card title="My tasks"
+    Stack direction="horizontal" gap="sm" align="end"
+      Input label="New task" name="task" placeholder="What needs doing?" value=$/form/task on=[submit→event add_task {task: $/form/task}]
+      Button label="Add" on=[press→event add_task {task: $/form/task}]
+    List divided=true children=[template item, once per item of $/tasks]
+    Separator
+    Text text=$/footer variant="muted"
 [template item: repeated once per item of its list]
-  Stack
-    Checkbox label={"@path":"text"} name="done"
-    Button label="Delete" variant="ghost" icon="trash-2"
-[data model] / = {"newTask":"","left":3,"tasks":[{"id":"t1","text":"Buy groceries","done":true},{"id":"t2","text":"Write report","done":false},{"id":"t3","text":"Call the dentist","done":false},{"id":"t4","text":"Water the plants","done":false}]}
+  Stack direction="horizontal" gap="sm" align="center" justify="between"
+    Checkbox label=$title name="done" checked=$done on=[change→event toggle_task {id: $id}]
+    Button label="Delete" variant="ghost" icon="trash-2" on=[press→event delete_task {id: $id}]
+[data model] {"form":{"task":""},"footer":"3 tasks left","tasks":[{"id":"t1","title":"Buy groceries","done":false},{"id":"t2","title":"Write project report","done":true},{"id":"t3","title":"Call the dentist","done":false},{"id":"t4","title":"Book flights","done":false}]}
 ```

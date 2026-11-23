@@ -100,5 +100,29 @@
     "title": "Music player",
     "set": "heldout",
     "request": "A music player: the current track's cover art, title and artist, a progress bar, play/pause, previous and next controls, and a queue of the next four tracks below."
+  },
+  {
+    "id": "booking",
+    "title": "Table booking",
+    "request": "A restaurant table booking form: a date picker, a time choice (18:00, 19:00, 20:00, 21:00), party size from 1 to 8, name and phone (both required), an optional special-requests note, and a 'Book table' button.",
+    "set": "fresh"
+  },
+  {
+    "id": "orders",
+    "title": "Order history",
+    "request": "An order history page: a status filter (All, Shipped, Delivered, Cancelled) above a list of five past orders, each showing the order number, date, item count, total and a status badge; pressing an order opens it.",
+    "set": "fresh"
+  },
+  {
+    "id": "team",
+    "title": "Team directory",
+    "request": "A team directory: a search field, a count of members, and a grid of six people, each with an avatar, name, role, and a 'Message' button.",
+    "set": "fresh"
+  },
+  {
+    "id": "onboarding",
+    "title": "Onboarding step",
+    "request": "Step 2 of 3 of a workspace onboarding wizard: a step indicator (Account, Workspace, Invite), a workspace name field (required), a team size choice (Just me, 2-10, 11-50, 51+), a 'Use for work' switch, and Back / Continue buttons.",
+    "set": "fresh"
   }
 ]

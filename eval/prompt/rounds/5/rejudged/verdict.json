@@ -1,0 +1,87 @@
+{
+  "chat": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Three MessageBubbles in a ScrollArea with a bound Composer and send event; pinning relies on maxHeight rather than layout."},
+    "B": {"fidelity": 5, "components": 4, "notes": "Same bubbles and Composer, pinned via a hand-styled flex Box, slightly less idiomatic but equally complete."},
+    "winner": "tie"
+  },
+  "checkout": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Complete address form with specific error messages, delivery radio, computed summary and seeded subtotal; radio labels omit the prices."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Same structure with priced radio labels, but every check uses the generic 'Required check failed' message."},
+    "winner": "A"
+  },
+  "contact": {
+    "A": {"fidelity": 5, "components": 4, "notes": "All fields and checks present, but bare form with no data model or placeholders."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same fields and checks inside a titled Card with placeholders and an initialized data model."},
+    "winner": "B"
+  },
+  "dashboard": {
+    "A": {"fidelity": 5, "components": 4, "notes": "Header, three stat tiles and a data-bound orders table with caption, laid out flat."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same content with the table framed in a titled Card and a vertical Stack for spacing."},
+    "winner": "tie"
+  },
+  "empty": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Idiomatic EmptyState with folder icon, title, sentence and Create project action."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Identical idiomatic EmptyState with a slightly different description."},
+    "winner": "tie"
+  },
+  "files": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Breadcrumb, search and six-file table with a wired Rename/Delete row menu and navigation/search events."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Table filters by the search query, but the row action menu and breadcrumb fire no events."},
+    "winner": "A"
+  },
+  "inbox": {
+    "A": {"fidelity": 4, "components": 4, "notes": "Hand-built header row and list with avatars and times, but the 'New' badge shows on all five items, not just the unread ones."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Uses the Page header slot for the action, but likewise shows the unread badge on every item."},
+    "winner": "B"
+  },
+  "issue": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Data-bound status/priority badges, tabs with Markdown description and assignee Row, and a List of three events."},
+    "B": {"fidelity": 5, "components": 4, "notes": "Complete with icons, but badges are hardcoded and the Activity tab repeats an 'Activity' Section title; assignee hand-built."},
+    "winner": "A"
+  },
+  "kanban": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Three Sections with counts and tints holding card-surface Rows with avatars; counts hardcoded."},
+    "B": {"fidelity": 5, "components": 4, "notes": "Data-driven columns with computed counts and real Cards, but hand-built column headers."},
+    "winner": "tie"
+  },
+  "login": {
+    "A": {"fidelity": 5, "components": 4, "notes": "All fields, checks, checkbox, submit and link; link sits outside the form and layout is plain."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same requirements in a welcoming Card with placeholders and the link grouped with the form."},
+    "winner": "B"
+  },
+  "music": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Cover, title, artist, progress, prev/play-pause/next with toggling state, and a four-track queue."},
+    "B": {"fidelity": 1, "components": 1, "notes": "Nothing rendered: the reply did not parse."},
+    "winner": "A"
+  },
+  "pricing": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Billing toggle, three titled Cards with prices reacting to billing, checked feature Lists and a highlighted recommended Pro card."},
+    "B": {"fidelity": 5, "components": 3, "notes": "Complete content but hand-builds card headers and feature lists from Text instead of Card titles and Lists."},
+    "winner": "A"
+  },
+  "products": {
+    "A": {"fidelity": 5, "components": 4, "notes": "Search field and responsive grid of four templated product cards with image, name, price, rating and add-to-cart."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same content with product ids, an image fallback and a spaced Stack inside each Card."},
+    "winner": "tie"
+  },
+  "profile": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Prefilled form with avatar and Change photo, all fields, timezone select and Save/Cancel."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same prefilled form plus sensible required/email validation."},
+    "winner": "B"
+  },
+  "settings": {
+    "A": {"fidelity": 5, "components": 5, "notes": "Two Sections with switches, theme select and 12-20 slider, with a submit event sending all values."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Same layout, but the form has no submit action so Save does nothing."},
+    "winner": "A"
+  },
+  "signup": {
+    "A": {"fidelity": 5, "components": 4, "notes": "All checks with clear messages including a must-be-checked terms rule; checkbox sits outside the field Stack."},
+    "B": {"fidelity": 4, "components": 5, "notes": "All required checks present but with generic 'Required check failed' / 'Email check failed' messages."},
+    "winner": "A"
+  },
+  "todo": {
+    "A": {"fidelity": 5, "components": 4, "notes": "Add input and button, four tasks with checkbox, text and delete, and a remaining count; checkbox has an empty label beside separate Text."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Same features in a Card with the task text as the checkbox label and a labelled delete action."},
+    "winner": "B"
+  }
+}

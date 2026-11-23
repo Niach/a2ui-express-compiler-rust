@@ -1,1 +1,25 @@
-[{"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},{"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/orders","value":[{"id":"ORD-3420","customer":"Acme Corp","amount":1250.0,"status":"Paid"},{"id":"ORD-3419","customer":"Globex","amount":480.5,"status":"Pending"},{"id":"ORD-3418","customer":"Initech","amount":9120.0,"status":"Paid"},{"id":"ORD-3417","customer":"Umbrella Ltd","amount":260.75,"status":"Refunded"},{"id":"ORD-3416","customer":"Hooli","amount":3340.0,"status":"Paid"}]}},{"version":"v0.9","updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Page","title":"Q3 overview","children":["body"]},{"id":"body","component":"Stack","gap":"lg","children":["tiles","ordersCard"]},{"id":"tiles","component":"Grid","columns":{"base":1,"md":3},"gap":"md","children":["revenue","orders","refunds"]},{"id":"revenue","component":"StatTile","label":"Revenue","value":"$1.2M","delta":"+8%","tone":"success"},{"id":"orders","component":"StatTile","label":"Orders","value":"3,420","delta":"+3%","tone":"success"},{"id":"refunds","component":"StatTile","label":"Refunds","value":"41","delta":"-12%","tone":"success"},{"id":"ordersCard","component":"Card","title":"Recent orders","children":["ordersTable"]},{"id":"ordersTable","component":"Table","rowKey":"id","columns":[{"key":"id","label":"Order ID","type":"text"},{"key":"customer","label":"Customer","type":"text"},{"key":"amount","label":"Amount","type":"currency","currency":"USD","decimals":2,"align":"end"},{"key":"status","label":"Status","type":"badge"}],"rows":{"path":"/orders"}}]}}]
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Q3 overview","children":["body"]},
+    {"id":"body","component":"Stack","direction":"vertical","gap":"lg","children":["tiles","orders"]},
+    {"id":"tiles","component":"Grid","columns":{"base":1,"md":3},"gap":"md","children":["revenue","ordersTile","refunds"]},
+    {"id":"revenue","component":"StatTile","label":"Revenue","value":"$1.2M","delta":"+8%","tone":"success"},
+    {"id":"ordersTile","component":"StatTile","label":"Orders","value":"3,420","delta":"+3%","tone":"success"},
+    {"id":"refunds","component":"StatTile","label":"Refunds","value":"41","delta":"-12%","tone":"success"},
+    {"id":"orders","component":"Card","title":"Recent orders","padded":false,"children":["ordersTable"]},
+    {"id":"ordersTable","component":"Table","rowKey":"id","rows":{"path":"/orders"},"columns":[
+      {"key":"id","label":"Order ID","type":"text"},
+      {"key":"customer","label":"Customer","type":"text"},
+      {"key":"amount","label":"Amount","type":"currency","currency":"USD","decimals":2,"align":"end"},
+      {"key":"status","label":"Status","type":"badge"}
+    ]}
+  ]}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/orders","value":[
+    {"id":"#10234","customer":"Ava Thompson","amount":249.00,"status":"Paid"},
+    {"id":"#10233","customer":"Liam Chen","amount":89.50,"status":"Shipped"},
+    {"id":"#10232","customer":"Sofia Rossi","amount":1250.00,"status":"Paid"},
+    {"id":"#10231","customer":"Noah Williams","amount":64.99,"status":"Refunded"},
+    {"id":"#10230","customer":"Mia Johnson","amount":412.75,"status":"Pending"}
+  ]}}
+]

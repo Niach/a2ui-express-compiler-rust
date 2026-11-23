@@ -1,0 +1,16 @@
+<a2ui>
+surface("main")
+$/filter = "all"
+$/orders = [
+  {id: "ord-10482", number: "Order #10482", subtitle: "Nov 14, 2026 · 3 items", total: "$128.40", status: "Shipped", variant: "secondary"},
+  {id: "ord-10455", number: "Order #10455", subtitle: "Nov 2, 2026 · 1 item", total: "$54.00", status: "Delivered", variant: "default"},
+  {id: "ord-10391", number: "Order #10391", subtitle: "Oct 19, 2026 · 5 items", total: "$212.75", status: "Delivered", variant: "default"},
+  {id: "ord-10327", number: "Order #10327", subtitle: "Oct 3, 2026 · 2 items", total: "$39.98", status: "Cancelled", variant: "destructive"},
+  {id: "ord-10268", number: "Order #10268", subtitle: "Sep 21, 2026 · 4 items", total: "$96.20", status: "Shipped", variant: "secondary"}
+]
+filter = Segmented(items=[{label: "All", value: "all"}, {label: "Shipped", value: "shipped"}, {label: "Delivered", value: "delivered"}, {label: "Cancelled", value: "cancelled"}], value=$/filter, on={change: Event("filter_orders", {status: $/filter})})
+statusBadge = Badge(text=$status, variant=$variant)
+orderRow = Row(title=$number, subtitle=$subtitle, meta=$total, pressable=true, chevron="right", slots={trailing: statusBadge}, on={press: Event("open_order", {id: $id})})
+orderList = List(divided=true, children=_template($/orders, orderRow))
+root = Page(title="Order history", children=[filter, orderList])
+</a2ui>

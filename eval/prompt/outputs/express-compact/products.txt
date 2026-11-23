@@ -1,14 +1,20 @@
 <a2ui>
 surface("main")
-$/search = ""
-$/products = [{name: "Trail Backpack", price: "$89.00", rating: 4.5, image: "https://example.com/img/backpack.jpg"}, {name: "Insulated Bottle", price: "$24.00", rating: 4, image: "https://example.com/img/bottle.jpg"}, {name: "Merino Beanie", price: "$32.00", rating: 5, image: "https://example.com/img/beanie.jpg"}, {name: "Camp Lantern", price: "$45.00", rating: 3.5, image: "https://example.com/img/lantern.jpg"}]
-searchField = Input(label="Search products", name="search", type="search", placeholder="Search products", value=$/search)
-productImage = Image(src=$image, alt=$name, fit="cover", aspectRatio=1.5)
-productName = Text(text=$name, variant="title")
+$/query = ""
+$/products = [
+  {id: "p1", name: "Trail Runner Shoes", price: "$89.00", rating: 4.5, image: "https://picsum.photos/seed/shoes/400/300"},
+  {id: "p2", name: "Insulated Water Bottle", price: "$24.50", rating: 4, image: "https://picsum.photos/seed/bottle/400/300"},
+  {id: "p3", name: "Wireless Headphones", price: "$129.99", rating: 5, image: "https://picsum.photos/seed/headphones/400/300"},
+  {id: "p4", name: "Canvas Backpack", price: "$64.00", rating: 3.5, image: "https://picsum.photos/seed/backpack/400/300"}
+]
+
+search = Input(label="Search products", name="query", type="search", placeholder="Search the catalogue", value=$/query, on={change: Event("search", {query: $/query})})
+productImage = Image(src=$image, alt=$name, fit="cover", aspectRatio=1.33)
+productName = Heading(text=$name, level="h3")
 productPrice = Text(text=$price, variant="lead")
 productRating = Rating(value=$rating, max=5, readOnly=true)
-addButton = Button(label="Add to cart", icon="shopping-cart", on={press: Event("add_to_cart", {name: $name, price: $price})})
+addButton = Button(label="Add to cart", icon="shopping-cart", on={press: Event("add_to_cart", {id: $id})})
 productCard = Card(children=[productImage, productName, productPrice, productRating, addButton])
-productGrid = Grid(columns={base: 1, sm: 2, lg: 4}, gap="md", children=_template($/products, productCard))
-root = Page(title="Products", children=[Stack(direction="vertical", gap="md", children=[searchField, productGrid])])
+grid = Grid(columns={base: 1, sm: 2, lg: 4}, gap="md", children=_template($/products, productCard))
+root = Page(title="Products", children=[Stack(gap="lg", children=[search, grid])])
 </a2ui>

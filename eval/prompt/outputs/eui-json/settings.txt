@@ -1,1 +1,15 @@
-[{"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},{"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{"settings":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":14}}}},{"version":"v0.9","updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Page","title":"Notification settings","children":["form"]},{"id":"form","component":"Form","name":"notificationSettings","children":["emailSection","appearanceSection","actions"]},{"id":"emailSection","component":"Section","title":"Email","children":["productUpdates","weeklyDigest"]},{"id":"productUpdates","component":"Switch","name":"productUpdates","label":"Product updates","checked":{"path":"/settings/productUpdates"}},{"id":"weeklyDigest","component":"Switch","name":"weeklyDigest","label":"Weekly digest","checked":{"path":"/settings/weeklyDigest"}},{"id":"appearanceSection","component":"Section","title":"Appearance","children":["themeSelect","fontSize"]},{"id":"themeSelect","component":"Select","name":"theme","label":"Theme","options":[{"label":"Light","value":"light"},{"label":"Dark","value":"dark"},{"label":"System","value":"system"}],"value":{"path":"/settings/theme"}},{"id":"fontSize","component":"Slider","label":"Font size","min":12,"max":20,"step":1,"value":{"path":"/settings/fontSize"}},{"id":"actions","component":"FormActions","submit":"Save","cancel":true}]}}]
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{"settings":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":16}}}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Notification settings","children":["form"]},
+    {"id":"form","component":"Form","name":"notificationSettings","children":["emailSection","appearanceSection","actions"]},
+    {"id":"emailSection","component":"Section","title":"Email","children":["productUpdates","weeklyDigest"]},
+    {"id":"productUpdates","component":"Switch","name":"productUpdates","label":"Product updates","checked":{"path":"/settings/productUpdates"}},
+    {"id":"weeklyDigest","component":"Switch","name":"weeklyDigest","label":"Weekly digest","checked":{"path":"/settings/weeklyDigest"}},
+    {"id":"appearanceSection","component":"Section","title":"Appearance","children":["theme","fontSize"]},
+    {"id":"theme","component":"Select","name":"theme","label":"Theme","options":[{"label":"Light","value":"light"},{"label":"Dark","value":"dark"},{"label":"System","value":"system"}],"value":{"path":"/settings/theme"}},
+    {"id":"fontSize","component":"Slider","label":"Font size","min":12,"max":20,"step":1,"value":{"path":"/settings/fontSize"}},
+    {"id":"actions","component":"FormActions","submit":"Save","cancel":true,"on":{"cancel":{"event":{"name":"cancel"}}}}
+  ]}}
+]

@@ -1,0 +1,19 @@
+<a2ui>
+surface("main")
+$/form/date = ""
+$/form/time = "19:00"
+$/form/party = 2
+$/form/name = ""
+$/form/phone = ""
+$/form/notes = ""
+date = DatePicker(label="Date", name="date", value=$/form/date)
+time = Radio(label="Time", name="time", options=[{label: "18:00", value: "18:00"}, {label: "19:00", value: "19:00"}, {label: "20:00", value: "20:00"}, {label: "21:00", value: "21:00"}], value=$/form/time, orientation="horizontal")
+party = NumberField(label="Party size", name="party", value=$/form/party, min=1, max=8, step=1)
+name = Input(label="Name", name="name", value=$/form/name, checks=[?required("Name is required")])
+phone = Input(label="Phone", name="phone", type="tel", value=$/form/phone, checks=[?required("Phone is required")])
+notes = Textarea(label="Special requests (optional)", name="notes", rows=3, value=$/form/notes)
+actions = FormActions(submit="Book table")
+form = Form(name="booking", children=[date, time, party, name, phone, notes, actions], on={submit: Event("book_table", {date: $/form/date, time: $/form/time, party: $/form/party, name: $/form/name, phone: $/form/phone, notes: $/form/notes})})
+card = Card(title="Reservation details", children=[form])
+root = Page(title="Book a table", children=[card])
+</a2ui>

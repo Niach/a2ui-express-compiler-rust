@@ -5,11 +5,11 @@ $/form/email = ""
 $/form/password = ""
 $/form/confirm = ""
 $/form/terms = false
-nameField = Input(label="Full name", name="name", value=$/form/name)
-emailField = Input(label="Email", name="email", type="email", value=$/form/email, checks=[?required, ?email])
-passwordField = Input(label="Password", name="password", type="password", value=$/form/password, checks=[?required, ?length(8, "At least 8 characters")])
-confirmField = Input(label="Confirm password", name="confirm", type="password", value=$/form/confirm, checks=[?required, ?length(8, "At least 8 characters")])
+fullName = Input(label="Full name", name="name", value=$/form/name, placeholder="Jane Doe", checks=[?required("Name is required")])
+email = Input(label="Email", name="email", type="email", value=$/form/email, placeholder="you@example.com", checks=[?required("Email is required"), ?email("Enter a valid email address")])
+password = Input(label="Password", name="password", type="password", value=$/form/password, checks=[?required("Password is required"), ?length(8, "At least 8 characters")])
+confirm = Input(label="Confirm password", name="confirm", type="password", value=$/form/confirm, checks=[?required("Please confirm your password"), ?length(8, "At least 8 characters")])
 terms = Checkbox(label="I agree to the terms", name="terms", checked=$/form/terms, checks=[?required($/form/terms, "You must agree to the terms")])
-form = Form(name="signup", children=[nameField, emailField, passwordField, confirmField, terms, FormActions(submit="Create account")], on={submit: Event("create_account", {name: $/form/name, email: $/form/email, password: $/form/password})})
-root = Page(title="Create account", children=[form])
+form = Form(name="signup", children=[fullName, email, password, confirm, terms, FormActions(submit="Create account")], on={submit: Event("create_account", {name: $/form/name, email: $/form/email, password: $/form/password})})
+root = Page(title="Create account", children=[Card(title="Sign up", children=[form])])
 </a2ui>

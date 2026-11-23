@@ -6,27 +6,28 @@ Request: A create-account screen: full name, email (validated as an email), pass
 
 ```
 Page title="Create account"
-  Form name="signup"
-    Stack
-      Input label="Full name" value={"@path":"/signup/name"} name="name" type="text"
-      Input label="Email" value={"@path":"/signup/email"} name="email" type="email" checks=[{"condition":{"@call":"email","args":{"value":{"@path":"/signup/email"}}},"messa]
-      Input label="Password" value={"@path":"/signup/password"} name="password" type="password" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/signup/password"}}},, {"condition":{"@call":"length","args":{"value":{"@path":"/signup/password"},"min]
-      Input label="Confirm password" value={"@path":"/signup/confirm"} name="confirm" type="password" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/signup/confirm"}}},", {"condition":{"@call":"length","args":{"value":{"@path":"/signup/confirm"},"min"]
-      Checkbox label="I agree to the terms" name="agree" checks=[{"condition":{"@call":"eq","args":{"a":{"@path":"/signup/agree"},"b":true}},"mes]
-    FormActions
-[data model] /signup = {"name":"","email":"","password":"","confirm":"","agree":false}
+  Card title="Sign up"
+    Form name="signup" on=[submit→event create_account {name: $/form/name, email: $/form/email, password: $/form/password}]
+      Input label="Full name" name="name" value=$/form/name placeholder="Jane Doe" checks=[required(value=$/form/name) "Name is required"]
+      Input label="Email" name="email" type="email" value=$/form/email placeholder="you@example.com" checks=[required(value=$/form/email) "Email is required", email(value=$/form/email) "Enter a valid email address"]
+      Input label="Password" name="password" type="password" value=$/form/password checks=[required(value=$/form/password) "Password is required", length(value=$/form/password, min=8) "At least 8 characters"]
+      Input label="Confirm password" name="confirm" type="password" value=$/form/confirm checks=[required(value=$/form/confirm) "Please confirm your password", length(value=$/form/confirm, min=8) "At least 8 characters"]
+      Checkbox label="I agree to the terms" name="terms" checked=$/form/terms checks=[required(value=$/form/terms) "You must agree to the terms"]
+      FormActions submit="Create account"
+[data model] {"form":{"name":"","email":"","password":"","confirm":"","terms":false}}
 ```
 
 ## Sample B
 
 ```
 Page title="Create account"
-  Form name="signup"
-    Input label="Full name" value={"@path":"/form/name"} name="name"
-    Input label="Email" value={"@path":"/form/email"} name="email" type="email" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/form/email"}}},"mess, {"condition":{"@call":"email","args":{"value":{"@path":"/form/email"}}},"message]
-    Input label="Password" value={"@path":"/form/password"} name="password" type="password" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/form/password"}}},"m, {"condition":{"@call":"length","args":{"value":{"@path":"/form/password"},"min":]
-    Input label="Confirm password" value={"@path":"/form/confirm"} name="confirm" type="password" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/form/confirm"}}},"me, {"condition":{"@call":"length","args":{"value":{"@path":"/form/confirm"},"min":8]
-    Checkbox label="I agree to the terms" name="terms" checks=[{"condition":{"@call":"required","args":{"value":{"@path":"/form/terms"}}},"mess]
-    FormActions
-[data model] {"form":{"name":"","email":"","password":"","confirm":"","terms":false}}
+  Form name="signup" on=[submit→event signup {fullName: $/fullName, email: $/email, password: $/password}]
+    Stack gap="md"
+      Input label="Full name" name="fullName" type="text" value=$/fullName checks=[required(value=$/fullName) "Enter your full name"]
+      Input label="Email" name="email" type="email" value=$/email checks=[email(value=$/email) "Enter a valid email address"]
+      Input label="Password" name="password" type="password" value=$/password checks=[required(value=$/password) "Password is required", length(value=$/password, min=8) "Use at least 8 characters"]
+      Input label="Confirm password" name="confirmPassword" type="password" value=$/confirmPassword checks=[required(value=$/confirmPassword) "Confirm your password", length(value=$/confirmPassword, min=8) "Use at least 8 characters"]
+    Checkbox label="I agree to the terms" name="agree" checked=$/agree checks=[eq(a=$/agree, b=true) "You must agree to the terms"]
+    FormActions submit="Create account"
+[data model] / = {"fullName":"","email":"","password":"","confirmPassword":"","agree":false}
 ```

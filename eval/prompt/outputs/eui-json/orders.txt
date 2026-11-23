@@ -1,0 +1,29 @@
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/","value":{
+    "filter":"all",
+    "orders":[
+      {"id":"1042","number":"#1042","date":"Nov 18, 2026","items":"3 items","total":"$128.40","status":"shipped","statusLabel":"Shipped","badge":"secondary"},
+      {"id":"1038","number":"#1038","date":"Nov 11, 2026","items":"1 item","total":"$24.99","status":"delivered","statusLabel":"Delivered","badge":"default"},
+      {"id":"1031","number":"#1031","date":"Oct 29, 2026","items":"5 items","total":"$212.75","status":"delivered","statusLabel":"Delivered","badge":"default"},
+      {"id":"1027","number":"#1027","date":"Oct 15, 2026","items":"2 items","total":"$59.00","status":"cancelled","statusLabel":"Cancelled","badge":"destructive"},
+      {"id":"1019","number":"#1019","date":"Sep 30, 2026","items":"4 items","total":"$87.20","status":"shipped","statusLabel":"Shipped","badge":"secondary"}
+    ]
+  }}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Order history","children":["body"]},
+    {"id":"body","component":"Stack","gap":"md","children":["filter","list"]},
+    {"id":"filter","component":"Segmented","variant":"segmented","value":{"path":"/filter"},"items":[
+      {"label":"All","value":"all"},
+      {"label":"Shipped","value":"shipped"},
+      {"label":"Delivered","value":"delivered"},
+      {"label":"Cancelled","value":"cancelled"}
+    ]},
+    {"id":"list","component":"List","divided":true,"children":{"componentId":"order","path":"/orders","key":"id"}},
+    {"id":"order","component":"Row","title":{"path":"number"},"subtitle":{"call":"concat","args":{"values":[{"path":"date"}," · ",{"path":"items"}]}},"value":{"path":"total"},"chevron":"right","pressable":true,
+      "visible":{"call":"or","args":{"values":[{"call":"eq","args":{"a":{"path":"/filter"},"b":"all"}},{"call":"eq","args":{"a":{"path":"/filter"},"b":{"path":"status"}}}]}},
+      "slots":{"trailing":"status"},
+      "on":{"press":{"event":{"name":"openOrder","context":{"id":{"path":"id"}}}}}},
+    {"id":"status","component":"Badge","text":{"path":"statusLabel"},"variant":{"path":"badge"}}
+  ]}}
+]

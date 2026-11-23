@@ -6,24 +6,25 @@ Request: A sales dashboard: a page header 'Q3 overview', three stat tiles (Reven
 
 ```
 Page title="Q3 overview"
-  Stack
-    Grid
-      StatTile label="Revenue" value="$1.2M"
-      StatTile label="Orders" value="3,420"
-      StatTile label="Refunds" value="41"
-    Card title="Recent orders"
-      Table columns[4]
-[data model] /orders = [{"id":"ORD-3420","customer":"Acme Corp","amount":1250,"status":"Paid"},{"id":"ORD-3419","customer":"Globex","amount":480.5,"status":"Pending"},{"id":"ORD-3418","customer":"Initech","amount":9120,"status":"Paid"},{"id":"ORD-3417","customer":"Umbrella Ltd","amount":260.75,"status":"Refunded"},{"id":"ORD-3416","customer":"Hooli","amount":3340,"status":"Paid"}]
+  Stack direction="vertical" gap="lg"
+    Grid columns={base: 1, md: 3} gap="md"
+      StatTile label="Revenue" value="$1.2M" delta="+8%" tone="success"
+      StatTile label="Orders" value="3,420" delta="+3%" tone="success"
+      StatTile label="Refunds" value="41" delta="-12%" tone="success"
+    Card title="Recent orders" padded=false
+      Table rowKey="id" rows=$/orders columns[4: "Order ID" | "Customer" | "Amount" | "Status"]
+[data model] /orders = [{"id":"#10234","customer":"Ava Thompson","amount":249,"status":"Paid"},{"id":"#10233","customer":"Liam Chen","amount":89.5,"status":"Shipped"},{"id":"#10232","customer":"Sofia Rossi","amount":1250,"status":"Paid"},{"id":"#10231","customer":"Noah Williams","amount":64.99,"status":"Refunded"},{"id":"#10230","customer":"Mia Johnson","amount":412.75,"status":"Pending"}]
 ```
 
 ## Sample B
 
 ```
 Page title="Q3 overview"
-  Grid
-    StatTile label="Revenue" value="$1.2M"
-    StatTile label="Orders" value="3,420"
-    StatTile label="Refunds" value="41"
-  Table columns[4]
-[data model] {"orders":[{"id":"#10482","customer":"Ava Thompson","amount":128.5,"status":"Paid"},{"id":"#10481","customer":"Liam Carter","amount":342,"status":"Paid"},{"id":"#10480","customer":"Noah Patel","amount":59.9,"status":"Pending"},{"id":"#10479","customer":"Mia Rossi","amount":214.25,"status":"Refunded"},{"id":"#10478","customer":"Ethan Kim","amount":87,"status":"Paid"}]}
+  Grid columns={base: 1, sm: 3} gap="md"
+    StatTile label="Revenue" value="$1.2M" delta="+8%" tone="success"
+    StatTile label="Orders" value="3,420" delta="+3%" tone="success"
+    StatTile label="Refunds" value="41" delta="-12%" tone="success"
+  Card title="Recent orders"
+    Table columns[4: "Order ID" | "Customer" | "Amount" | "Status"] rows=$/orders rowKey="id" caption="Five most recent orders"
+[data model] {"orders":[{"id":"#10482","customer":"Acme Corp","amount":1280.5,"status":"Paid"},{"id":"#10481","customer":"Globex","amount":645,"status":"Pending"},{"id":"#10480","customer":"Initech","amount":2310.75,"status":"Paid"},{"id":"#10479","customer":"Umbrella Ltd","amount":189.99,"status":"Refunded"},{"id":"#10478","customer":"Stark Industries","amount":4520,"status":"Paid"}]}
 ```

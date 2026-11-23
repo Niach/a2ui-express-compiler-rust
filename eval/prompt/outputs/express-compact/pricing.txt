@@ -2,71 +2,50 @@
 surface("main")
 $/billing = "monthly"
 
-billingToggle = Segmented(items=[{label: "Monthly", value: "monthly"}, {label: "Yearly", value: "yearly"}], type="single", value=$/billing, on={change: Event("billing_changed", {billing: $/billing})})
+billing = Segmented(items=[{label: "Monthly", value: "monthly"}, {label: "Yearly", value: "yearly"}], type="single", value=$/billing, on={change: Event("set_billing", {billing: $/billing})})
 
-freeHead = Stack(gap="xs", children=[
-  Heading(text="Free", level="h3"),
-  Text(text="For trying things out", variant="muted"),
-  Heading(text="$0", level="h2")
+freeFeatures = List(children=[
+  Row(title="1 project", icon="check"),
+  Row(title="Community support", icon="check"),
+  Row(title="1 GB storage", icon="check"),
+  Row(title="Basic analytics", icon="check")
 ])
-freeFeatures = Stack(gap="xs", children=[
-  Text(text="1 project"),
-  Text(text="Community support"),
-  Text(text="Basic analytics"),
-  Text(text="1 GB storage")
+proFeatures = List(children=[
+  Row(title="Unlimited projects", icon="check"),
+  Row(title="Priority email support", icon="check"),
+  Row(title="100 GB storage", icon="check"),
+  Row(title="Advanced analytics", icon="check")
 ])
-freeCard = Card(children=[
-  Stack(gap="md", children=[
-    freeHead,
-    freeFeatures,
-    Button(label="Choose plan", variant="outline", on={press: Event("choose_plan", {plan: "free", billing: $/billing})})
-  ])
-])
-
-proHead = Stack(gap="xs", children=[
-  Badge(text="Recommended", variant="default"),
-  Heading(text="Pro", level="h3"),
-  Text(text="For growing professionals", variant="muted"),
-  Heading(text=cond(if=eq($/billing, "yearly"), then="$10", else="$12"), level="h2"),
-  Text(text="per user / month", variant="caption")
-])
-proFeatures = Stack(gap="xs", children=[
-  Text(text="Unlimited projects"),
-  Text(text="Priority email support"),
-  Text(text="Advanced analytics"),
-  Text(text="50 GB storage")
-])
-proCard = Card(style={borderWidth: 2, borderColor: "$color.primary"}, children=[
-  Stack(gap="md", children=[
-    proHead,
-    proFeatures,
-    Button(label="Choose plan", variant="default", on={press: Event("choose_plan", {plan: "pro", billing: $/billing})})
-  ])
+teamFeatures = List(children=[
+  Row(title="Everything in Pro", icon="check"),
+  Row(title="Shared workspaces", icon="check"),
+  Row(title="Roles and permissions", icon="check"),
+  Row(title="Single sign-on", icon="check")
 ])
 
-teamHead = Stack(gap="xs", children=[
-  Heading(text="Team", level="h3"),
-  Text(text="For collaborating teams", variant="muted"),
-  Heading(text=cond(if=eq($/billing, "yearly"), then="$24", else="$30"), level="h2"),
-  Text(text="per user / month", variant="caption")
+freeCard = Card(title="Free", description="For trying things out.", children=[
+  Heading(text="$0", level="h2"),
+  Text(text="per user / month", variant="caption"),
+  freeFeatures,
+  Button(label="Choose plan", variant="outline", on={press: Event("choose_plan", {plan: "free", billing: $/billing})})
 ])
-teamFeatures = Stack(gap="xs", children=[
-  Text(text="Everything in Pro"),
-  Text(text="Shared workspaces"),
-  Text(text="Roles and permissions"),
-  Text(text="Dedicated support")
+proCard = Card(title="Pro", description="For growing professionals.", style={borderWidth: 2, borderColor: "$color.primary"}, children=[
+  Badge(text="Recommended", variant="default", icon="star"),
+  Heading(text="$12", level="h2"),
+  Text(text="per user / month", variant="caption"),
+  proFeatures,
+  Button(label="Choose plan", variant="default", on={press: Event("choose_plan", {plan: "pro", billing: $/billing})})
 ])
-teamCard = Card(children=[
-  Stack(gap="md", children=[
-    teamHead,
-    teamFeatures,
-    Button(label="Choose plan", variant="outline", on={press: Event("choose_plan", {plan: "team", billing: $/billing})})
-  ])
+teamCard = Card(title="Team", description="For teams that work together.", children=[
+  Heading(text="$30", level="h2"),
+  Text(text="per user / month", variant="caption"),
+  teamFeatures,
+  Button(label="Choose plan", variant="outline", on={press: Event("choose_plan", {plan: "team", billing: $/billing})})
 ])
 
-root = Page(title="Pricing", subtitle="Pick the plan that fits", children=[
-  Stack(gap="lg", children=[
-    billingToggle,
+root = Page(title="Pricing", subtitle="Simple plans that scale with you", children=[
+  Stack(direction="vertical", gap="lg", align="center", children=[
+    billing,
     Grid(columns={base: 1, md: 3}, gap="md", children=[freeCard, proCard, teamCard])
   ])
 ])

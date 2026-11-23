@@ -1,0 +1,22 @@
+[
+  {"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"https://ui.exponential.at/catalogs/core/v1"}},
+  {"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/booking","value":{"date":"","time":"19:00","party":2,"name":"","phone":"","notes":""}}},
+  {"version":"v0.9","updateComponents":{"surfaceId":"main","components":[
+    {"id":"root","component":"Page","title":"Book a table","subtitle":"Reserve your evening with us","children":["card"]},
+    {"id":"card","component":"Card","children":["form"]},
+    {"id":"form","component":"Form","name":"booking","children":["when","party","name","phone","notes","actions"],
+      "on":{"submit":{"event":{"name":"bookTable","context":{"date":{"path":"/booking/date"},"time":{"path":"/booking/time"},"party":{"path":"/booking/party"},"name":{"path":"/booking/name"},"phone":{"path":"/booking/phone"},"notes":{"path":"/booking/notes"}}}}}},
+    {"id":"when","component":"FieldGroup","columns":2,"children":["date","time"]},
+    {"id":"date","component":"DatePicker","name":"date","label":"Date","placeholder":"Pick a date","value":{"path":"/booking/date"},
+      "checks":[{"condition":{"call":"required","args":{"value":{"path":"/booking/date"}}},"message":"Choose a date"}]},
+    {"id":"time","component":"Select","name":"time","label":"Time","value":{"path":"/booking/time"},
+      "options":[{"label":"18:00","value":"18:00"},{"label":"19:00","value":"19:00"},{"label":"20:00","value":"20:00"},{"label":"21:00","value":"21:00"}]},
+    {"id":"party","component":"NumberField","name":"party","label":"Party size","min":1,"max":8,"step":1,"precision":0,"value":{"path":"/booking/party"}},
+    {"id":"name","component":"Input","name":"name","label":"Name","placeholder":"Your name","value":{"path":"/booking/name"},
+      "checks":[{"condition":{"call":"required","args":{"value":{"path":"/booking/name"}}},"message":"Name is required"}]},
+    {"id":"phone","component":"Input","name":"phone","label":"Phone","type":"tel","placeholder":"Phone number","value":{"path":"/booking/phone"},
+      "checks":[{"condition":{"call":"required","args":{"value":{"path":"/booking/phone"}}},"message":"Phone is required"}]},
+    {"id":"notes","component":"Textarea","name":"notes","label":"Special requests (optional)","placeholder":"Allergies, occasion, seating preference","rows":3,"value":{"path":"/booking/notes"}},
+    {"id":"actions","component":"FormActions","submit":"Book table"}
+  ]}}
+]

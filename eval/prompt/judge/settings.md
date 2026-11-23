@@ -6,28 +6,28 @@ Request: A notification settings page: a section 'Email' with switches for 'Prod
 
 ```
 Page title="Notification settings"
-  Form name="notifications"
+  Form name="notificationSettings"
     Section title="Email"
-      Switch label="Product updates" name="productUpdates"
-      Switch label="Weekly digest" name="weeklyDigest"
+      Switch name="productUpdates" label="Product updates" checked=$/settings/productUpdates
+      Switch name="weeklyDigest" label="Weekly digest" checked=$/settings/weeklyDigest
     Section title="Appearance"
-      Select label="Theme" value={"@path":"/form/theme"} name="theme" options[3]
-      Slider label="Font size" value={"@path":"/form/fontSize"}
-    FormActions
-[data model] {"form":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":16}}
+      Select name="theme" label="Theme" options[3: "Light" | "Dark" | "System"] value=$/settings/theme
+      Slider label="Font size" min=12 max=20 step=1 value=$/settings/fontSize
+    FormActions submit="Save" cancel=true on=[cancel→event cancel]
+[data model] / = {"settings":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":16}}
 ```
 
 ## Sample B
 
 ```
 Page title="Notification settings"
-  Form name="notificationSettings"
-    Section title="Email"
-      Switch label="Product updates" name="productUpdates"
-      Switch label="Weekly digest" name="weeklyDigest"
-    Section title="Appearance"
-      Select label="Theme" value={"@path":"/settings/theme"} name="theme" options[3]
-      Slider label="Font size" value={"@path":"/settings/fontSize"}
-    FormActions
-[data model] / = {"settings":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":14}}
+  Form name="notification_settings" on=[submit→event save_settings {productUpdates: $/settings/productUpdates, weeklyDigest: $/settings/weeklyDigest, theme: $/settings/theme, fontSize: $/settings/fontSize}]
+    Card title="Email"
+      Switch label="Product updates" name="productUpdates" checked=$/settings/productUpdates description="News about new features and improvements" on=[change→event update_setting {key: "productUpdates", value: $/settings/productUpdates}]
+      Switch label="Weekly digest" name="weeklyDigest" checked=$/settings/weeklyDigest description="A summary of your activity every week" on=[change→event update_setting {key: "weeklyDigest", value: $/settings/weeklyDigest}]
+    Card title="Appearance"
+      Select label="Theme" name="theme" options[3: "Light" | "Dark" | "System"] value=$/settings/theme
+      Slider label="Font size" min=12 max=20 step=1 value=$/settings/fontSize showValue=true
+    FormActions submit="Save" cancel=true on=[cancel→event cancel_settings]
+[data model] {"settings":{"productUpdates":true,"weeklyDigest":false,"theme":"system","fontSize":16}}
 ```

@@ -1,10 +1,15 @@
 <a2ui>
 surface("main")
-name = Input(label="Name", name="name", value=$/form/name)
-email = Input(label="Email", name="email", type="email", value=$/form/email, checks=[?email("Enter a valid email address")])
-subject = Select(label="Subject", name="subject", options=[{label: "Sales", value: "sales"}, {label: "Support", value: "support"}, {label: "Other", value: "other"}], value=$/form/subject)
-message = Textarea(label="Message", name="message", rows=5, value=$/form/message, checks=[?required("Message is required"), ?length(0, 500, "At most 500 characters")])
+$/form/name = ""
+$/form/email = ""
+$/form/subject = "Sales"
+$/form/message = ""
+nameField = Input(label="Name", name="name", value=$/form/name)
+emailField = Input(label="Email", name="email", type="email", value=$/form/email, checks=[?email("Enter a valid email address")])
+subjectField = Select(label="Subject", name="subject", value=$/form/subject, options=[{label: "Sales", value: "Sales"}, {label: "Support", value: "Support"}, {label: "Other", value: "Other"}])
+messageField = Textarea(label="Message", name="message", rows=5, value=$/form/message, checks=[?required("Message is required"), ?length(0, 500, "Message must be at most 500 characters")])
 actions = FormActions(submit="Send message")
-form = Form(name="contact", children=[name, email, subject, message, actions], on={submit: Event("send_contact", {name: $/form/name, email: $/form/email, subject: $/form/subject, message: $/form/message})})
-root = Page(title="Contact us", children=[form])
+contactForm = Form(name="contact", children=[nameField, emailField, subjectField, messageField, actions], on={submit: Event("send_message", {name: $/form/name, email: $/form/email, subject: $/form/subject, message: $/form/message})})
+card = Card(title="Contact us", children=[contactForm])
+root = Page(title="Contact", children=[card])
 </a2ui>

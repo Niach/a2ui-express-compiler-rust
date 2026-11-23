@@ -1,0 +1,13 @@
+<a2ui>
+surface("main")
+$/form/email = ""
+$/form/password = ""
+$/form/remember = false
+email = Input(label="Email", name="email", type="email", value=$/form/email, checks=[?required("Email is required"), ?email("Enter a valid email address")])
+password = Input(label="Password", name="password", type="password", value=$/form/password, checks=[?required("Password is required")])
+remember = Checkbox(label="Remember me", name="remember", checked=$/form/remember)
+forgot = Link(label="Forgot password?", on={press: Event("forgot_password")})
+actions = FormActions(submit="Sign in")
+form = Form(name="signin", children=[email, password, remember, actions], on={submit: Event("sign_in", {email: $/form/email, password: $/form/password, remember: $/form/remember})})
+root = Page(title="Sign in", children=[form, forgot])
+</a2ui>

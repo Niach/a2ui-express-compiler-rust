@@ -4,14 +4,27 @@ $/form/name = "Ada Lovelace"
 $/form/email = "ada@example.com"
 $/form/bio = "Analyst of engines"
 $/form/timezone = "Europe/London"
-avatar = Avatar(name=$/form/name, size="xl")
-changePhoto = Button(label="Change photo", variant="outline", size="sm", on={press: Event("change_photo")})
-photoRow = Stack(direction="horizontal", gap="md", align="center", children=[avatar, changePhoto])
-nameInput = Input(label="Display name", name="name", value=$/form/name)
-emailInput = Input(label="Email", name="email", type="email", value=$/form/email)
-bioInput = Textarea(label="Bio", name="bio", rows=4, value=$/form/bio)
-tzSelect = Select(label="Timezone", name="timezone", value=$/form/timezone, options=[{label: "Europe/London", value: "Europe/London"}, {label: "Europe/Paris", value: "Europe/Paris"}, {label: "Europe/Berlin", value: "Europe/Berlin"}, {label: "America/New_York", value: "America/New_York"}, {label: "America/Los_Angeles", value: "America/Los_Angeles"}, {label: "Asia/Tokyo", value: "Asia/Tokyo"}, {label: "UTC", value: "UTC"}])
-actions = FormActions(submit="Save", cancel=true, on={cancel: Event("cancel")})
-form = Form(name="profile", on={submit: Event("save_profile", {name: $/form/name, email: $/form/email, bio: $/form/bio, timezone: $/form/timezone})}, children=[photoRow, nameInput, emailInput, bioInput, tzSelect, actions])
-root = Page(title="Edit profile", children=[form])
+
+photoRow = Stack(direction="horizontal", align="center", gap="md", children=[
+  Avatar(name="Ada Lovelace", size="xl"),
+  Button(label="Change photo", variant="outline", icon="ui-camera", on={press: Event("change_photo")})
+])
+nameField = Input(label="Display name", name="name", value=$/form/name, checks=[?required("Name is required")])
+emailField = Input(label="Email", name="email", type="email", value=$/form/email, checks=[?required("Email is required"), ?email("Enter a valid email")])
+bioField = Textarea(label="Bio", name="bio", rows=4, value=$/form/bio)
+tzField = Select(label="Timezone", name="timezone", value=$/form/timezone, searchable=true, options=[
+  {label: "Europe/London", value: "Europe/London"},
+  {label: "Europe/Paris", value: "Europe/Paris"},
+  {label: "Europe/Berlin", value: "Europe/Berlin"},
+  {label: "America/New_York", value: "America/New_York"},
+  {label: "America/Chicago", value: "America/Chicago"},
+  {label: "America/Los_Angeles", value: "America/Los_Angeles"},
+  {label: "Asia/Tokyo", value: "Asia/Tokyo"},
+  {label: "Australia/Sydney", value: "Australia/Sydney"},
+  {label: "UTC", value: "UTC"}
+])
+actions = FormActions(submit="Save", cancel=true, on={cancel: Event("cancel_profile")})
+profileForm = Form(name="profile", children=[photoRow, nameField, emailField, bioField, tzField, actions], on={submit: Event("save_profile", {name: $/form/name, email: $/form/email, bio: $/form/bio, timezone: $/form/timezone})})
+card = Card(title="Edit profile", children=[profileForm])
+root = Page(title="Profile", children=[card])
 </a2ui>

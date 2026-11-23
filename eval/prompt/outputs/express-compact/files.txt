@@ -1,19 +1,49 @@
 <a2ui>
 surface("main")
+
 $/query = ""
 $/files = [
-  {id: "f1", name: "index.html", size: "4.2 KB", modified: "2026-03-10T09:15:00Z"},
-  {id: "f2", name: "styles.css", size: "12.8 KB", modified: "2026-03-11T14:02:00Z"},
-  {id: "f3", name: "app.js", size: "86 KB", modified: "2026-03-12T16:40:00Z"},
-  {id: "f4", name: "logo.png", size: "23 KB", modified: "2026-03-05T11:30:00Z"},
-  {id: "f5", name: "README.md", size: "1.1 KB", modified: "2026-03-01T08:00:00Z"},
-  {id: "f6", name: "sitemap.xml", size: "2.4 KB", modified: "2026-03-13T18:25:00Z"}
+  {name: "index.html", size: "4.2 KB", modified: "2026-03-14T09:12:00Z"},
+  {name: "styles.css", size: "18.7 KB", modified: "2026-03-12T16:40:00Z"},
+  {name: "app.js", size: "92 KB", modified: "2026-03-13T11:05:00Z"},
+  {name: "logo.svg", size: "2.1 KB", modified: "2026-02-28T08:30:00Z"},
+  {name: "hero.png", size: "1.4 MB", modified: "2026-03-01T14:22:00Z"},
+  {name: "README.md", size: "1.8 KB", modified: "2026-02-20T10:00:00Z"}
 ]
-crumbs = Breadcrumb(items=[{label: "Home", value: "home"}, {label: "Projects", value: "projects"}, {label: "Website", value: "website"}], on={select: Event("navigate")})
-search = Input(label="Search files", name="query", type="search", placeholder="Search files", value=$/query, on={change: Event("search", {query: $/query})})
-actionBtn = Button(icon="ellipsis", variant="ghost", size="icon")
-rowMenu = Menu(items=[{label: "Rename", value: "rename", icon: "pencil"}, {label: "Delete", value: "delete", icon: "trash-2", destructive: true}], children=[actionBtn], on={select: Event("file_action", {id: $id})})
-table = Table(columns=[{key: "name", label: "Name", type: "text", sortable: true}, {key: "size", label: "Size", type: "text", align: "end"}, {key: "modified", label: "Modified", type: "date", sortable: true}, {key: "actions", label: "", type: "slot", slot: "actions", width: 56, align: "end"}], rows=$/files, rowKey="id", slots={actions: rowMenu}, emptyText="No files found")
-content = Stack(direction="vertical", gap="md", children=[crumbs, search, table])
-root = Page(title="Files", children=[content])
+
+crumbs = Breadcrumb(items=[
+  {label: "Home", value: "home"},
+  {label: "Projects", value: "projects"},
+  {label: "Website", value: "website"}
+], on={select: Event("navigate")})
+
+search = Input(label="Search files", name="query", type="search", placeholder="Search by name", value=$/query, on={change: Event("search", {query: $/query})})
+
+rowMenu = Menu(
+  icon="ellipsis",
+  items=[
+    {label: "Rename", value: "rename", kind: "item", icon: "pencil"},
+    {label: "Delete", value: "delete", kind: "item", icon: "trash-2", destructive: true}
+  ],
+  children=[Button(icon="ellipsis", variant="ghost", size="icon")],
+  on={select: Event("file_action", {name: $name})}
+)
+
+files = Table(
+  columns=[
+    {key: "name", label: "Name", type: "text", sortable: true},
+    {key: "size", label: "Size", type: "text", align: "end"},
+    {key: "modified", label: "Modified", type: "date", sortable: true},
+    {key: "actions", label: "", type: "slot", slot: "actions", align: "end", width: 56}
+  ],
+  rows=$/files,
+  rowKey="name",
+  caption="Files in Website",
+  emptyText="No files found",
+  slots={actions: rowMenu}
+)
+
+card = Card(title="Website", children=[Stack(direction="vertical", gap="md", children=[search, files])])
+
+root = Page(title="Files", children=[Stack(direction="vertical", gap="md", children=[crumbs, card])])
 </a2ui>
