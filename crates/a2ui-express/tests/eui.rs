@@ -239,3 +239,59 @@ $/n = 1234.5
         );
     }
 }
+
+/// A check whose condition is a binding, which eui's catalog allows ("a
+/// condition is a binding or a call"), has no `?name(…)` shorthand. Upstream
+/// writes it as `?None`, which does not compile; the decompiler writes the
+/// whole list in the long form instead, and it compiles back (#AXC-18).
+#[test]
+fn a_binding_check_condition_round_trips_in_the_long_form() {
+    let compiler = compiler();
+    let input = |checks: Value| {
+        vec![serde_json::json!({"version": "1.0", "createSurface": {
+            "surfaceId": "main",
+            "catalogId": compiler.catalogs().catalogs()[0].id(),
+            "components": [{
+                "id": "root", "component": "Input", "label": "L", "name": "n",
+                "value": {"@path": "/v"}, "@checks": checks,
+            }],
+        }})]
+    };
+    let binding = serde_json::json!({"condition": {"@path": "/ok"}, "message": "x"});
+    let call = serde_json::json!({
+        "condition": {"@call": "required", "args": {"value": {"@path": "/v"}}},
+        "message": "m",
+    });
+    for (checks, expected) in [
+        (
+            serde_json::json!([binding]),
+            r#"checks=[{condition: $/ok, message: "x"}]"#,
+        ),
+        // One rule the shorthand cannot spell puts the whole list in the
+        // long form, so the rules keep their order.
+        (
+            serde_json::json!([call, binding]),
+            r#", message: "m"}, {condition: $/ok, message: "x"}]"#,
+        ),
+    ] {
+        let first = input(checks);
+        for keyword_args in [false, true] {
+            for order in [Order::Upstream, Order::TopDown] {
+                let options = DecompileOptions {
+                    keyword_args,
+                    order,
+                };
+                let express = decompile(compiler.catalogs(), &first, &options).unwrap();
+                assert!(!express.contains("?None"), "{express}");
+                assert!(express.contains(expected), "{express}");
+                let second = compiler
+                    .compile(&express, "main")
+                    .unwrap_or_else(|e| panic!("{} ({:?})\n{express}", e.message, e.kind));
+                assert!(
+                    json_eq(&Value::Array(second.clone()), &Value::Array(first.clone())),
+                    "{express}\n{second:#?}"
+                );
+            }
+        }
+    }
+}
