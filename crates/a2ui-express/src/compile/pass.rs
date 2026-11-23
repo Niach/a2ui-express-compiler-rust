@@ -26,8 +26,15 @@ pub(crate) struct Ctx {
     pub extra_components: Vec<Map<String, Value>>,
     /// Ids generated for inline components in the scope.
     pub generated_ids: HashSet<String>,
+    /// The ids of [`Ctx::generated_ids`] in the order they were generated.
+    pub generated_log: Vec<String>,
     pub inline_counter: usize,
     pub call_counter: usize,
+    /// While streaming: a value variable that is not assigned yet is
+    /// pending (`CompileErrorKind::Pending`) rather than an error.
+    pub allow_pending: bool,
+    /// The variables read since this was last cleared.
+    pub referenced: Vec<String>,
     /// The data bindings of the component whose checks are compiled, by
     /// property.
     bound_paths: HashMap<String, Value>,
@@ -44,8 +51,11 @@ impl Ctx {
         Ctx {
             extra_components: Vec::new(),
             generated_ids: HashSet::new(),
+            generated_log: Vec::new(),
             inline_counter: 0,
             call_counter: 0,
+            allow_pending: false,
+            referenced: Vec::new(),
             bound_paths: HashMap::new(),
             resolving: HashSet::new(),
             version,
@@ -605,6 +615,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
     }
 
     fn variable_ref(&mut self, name: &str, at: At<'c>) -> Result<Value, CompileError> {
+        self.ctx.referenced.push(name.to_owned());
         if let Some(id) = self.ids.get(name) {
             return Ok(id.into());
         }
@@ -619,6 +630,9 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             return r;
         }
         if !at.child_ref {
+            if self.ctx.allow_pending {
+                return Err(CompileError::pending(name));
+            }
             return Err(CompileError::validation(format!(
                 "Variable '{name}' is not assigned in surface."
             )));
@@ -702,7 +716,8 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
         {
             return Err(CompileError::id_collision(&actual_id));
         }
-        self.ctx.generated_ids.insert(actual_id);
+        self.ctx.generated_ids.insert(actual_id.clone());
+        self.ctx.generated_log.push(actual_id);
         let start = self.ctx.extra_components.len();
         match self.component(&inline_id, call)? {
             Some(compiled) => {
@@ -1019,6 +1034,9 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                 )));
             }
             let Some(value) = self.syms.get(name) else {
+                if self.ctx.allow_pending {
+                    return Err(CompileError::pending(name));
+                }
                 return Err(CompileError::validation(format!(
                     "Undefined variable '{name}'."
                 )));

@@ -23,6 +23,7 @@
 #![allow(dead_code)]
 
 use a2ui_express::compile::{Category, CompileError, Compiler};
+use a2ui_express::response;
 use a2ui_express::schema::{self, CatalogError};
 use serde_json::Value;
 
@@ -328,41 +329,121 @@ fn decompile_catalogs(catalogs: &[Catalog]) -> SdkResult<a2ui_express::schema::C
 }
 
 /// Splits a response into text and raw payload parts.
-pub fn unwrap(_parser: &ParserConfig, _response: &str) -> SdkResult<Vec<RawPart>> {
-    Err(SdkError::unimplemented("unwrap"))
+pub fn unwrap(_parser: &ParserConfig, response: &str) -> SdkResult<Vec<RawPart>> {
+    Ok(response::unwrap(response)
+        .into_iter()
+        .map(from_raw)
+        .collect())
 }
 
 /// Whether a response holds a payload (`complete`: a closed one).
 pub fn has_format_content(
     _parser: &ParserConfig,
-    _response: &str,
-    _complete: bool,
+    response: &str,
+    complete: bool,
 ) -> SdkResult<bool> {
-    Err(SdkError::unimplemented("has_format_content"))
+    Ok(response::has_format_content(response, complete))
 }
 
 /// Writes raw parts back out as a model would have emitted them.
-pub fn wrap(_parser: &ParserConfig, _parts: &[RawPart]) -> SdkResult<String> {
-    Err(SdkError::unimplemented("wrap"))
+pub fn wrap(_parser: &ParserConfig, parts: &[RawPart]) -> SdkResult<String> {
+    let parts: Vec<response::RawPart> = parts
+        .iter()
+        .map(|p| match p {
+            RawPart::Text { text, .. } => response::RawPart::Text(text.clone()),
+            RawPart::A2ui { raw, is_final } => response::RawPart::A2ui {
+                raw: raw.clone(),
+                is_final: *is_final,
+            },
+        })
+        .collect();
+    Ok(response::wrap(&parts))
+}
+
+fn from_raw(p: response::RawPart) -> RawPart {
+    match p {
+        response::RawPart::Text(text) => RawPart::Text {
+            text,
+            is_final: true,
+        },
+        response::RawPart::A2ui { raw, is_final } => RawPart::A2ui { raw, is_final },
+    }
+}
+
+fn express_parser(parser: &ParserConfig) -> SdkResult<response::ExpressParser> {
+    let p = response::ExpressParser::new(compiler(&parser.catalogs)?, &parser.surface_id);
+    Ok(match &parser.progressive_keys {
+        Some(keys) => p.with_progressive_keys(keys.iter().cloned()),
+        None => p,
+    })
+}
+
+fn from_part(p: response::Part) -> Part {
+    match p {
+        response::Part::Text(t) => Part::Text(t),
+        response::Part::A2ui(m) => Part::A2ui(m),
+        response::Part::Error(e) => Part::Error {
+            category: SdkError::from(e).category,
+        },
+    }
+}
+
+fn from_response_error(e: response::ResponseError) -> SdkError {
+    let mut error = SdkError::from(e.error);
+    error.partial_results = e.partial.into_iter().map(from_part).collect();
+    error
 }
 
 /// Unwraps a response and compiles each block (`wrapped: false`: the whole
 /// response is one block).
 pub fn parse_response(
-    _parser: &ParserConfig,
-    _response: &str,
-    _wrapped: bool,
+    parser: &ParserConfig,
+    response: &str,
+    wrapped: bool,
 ) -> SdkResult<Vec<Part>> {
-    Err(SdkError::unimplemented("parse_response"))
+    let p = express_parser(parser)?;
+    p.parse_response(response, wrapped)
+        .map(|parts| parts.into_iter().map(from_part).collect())
+        .map_err(from_response_error)
+}
+
+struct ExpressStream(response::ResponseStream);
+
+impl Stream for ExpressStream {
+    fn feed(&mut self, chunk: &str) -> SdkResult<Vec<Part>> {
+        self.0
+            .push(chunk)
+            .map(|parts| parts.into_iter().map(from_part).collect())
+            .map_err(from_response_error)
+    }
+
+    fn close(&mut self) -> SdkResult<Vec<Part>> {
+        self.0
+            .finish()
+            .map(|parts| parts.into_iter().map(from_part).collect())
+            .map_err(from_response_error)
+    }
+
+    fn is_in_block(&self) -> bool {
+        self.0.is_in_block()
+    }
 }
 
 /// Opens a stream on a new parser.
 pub fn open_stream(
-    _parser: &ParserConfig,
-    _wrapped: bool,
-    _after_rejected_block: AfterRejectedBlock,
+    parser: &ParserConfig,
+    wrapped: bool,
+    after_rejected_block: AfterRejectedBlock,
 ) -> SdkResult<Box<dyn Stream>> {
-    Err(SdkError::unimplemented("open_stream"))
+    let p = express_parser(parser)?;
+    let after = match after_rejected_block {
+        AfterRejectedBlock::End => response::AfterRejectedBlock::End,
+        AfterRejectedBlock::Continue => response::AfterRejectedBlock::Continue,
+    };
+    let state = p.new_state();
+    Ok(Box::new(ExpressStream(
+        p.open_stream_with(wrapped, after, state),
+    )))
 }
 
 /// Renders the Express prompt snippet for the active catalogs.

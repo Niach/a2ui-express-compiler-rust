@@ -8,6 +8,42 @@ and to ship as wasm for the web.
 Crate: [`a2ui-express`](crates/a2ui-express). Runtime dependencies are limited
 to `serde`, `serde_json` (`preserve_order`) and `thiserror`.
 
+## Streaming
+
+`response::ExpressParser` reads model output: prose with Express blocks
+between `<a2ui>` tags (or a bare Express body).
+
+```rust
+let parser = ExpressParser::new(compiler, "main");
+let mut stream = parser.open_stream();
+for chunk in model_output {
+    for part in stream.push(chunk)? {   // Part::Text | Part::A2ui(messages) | Part::Error
+        render(part);
+    }
+}
+render_all(stream.finish()?);
+```
+
+Each statement compiles as soon as it is complete: a new surface's
+`createSurface` once `root` is there, then `updateComponents` /
+`updateDataModel` deltas. A component may name a child that comes later (it
+renders once the child arrives), and an open string of a `text` property heals,
+so a sentence types in live. Every message is checked against a
+`state::RendererState` mirror of what the renderer holds before it is
+returned. Streamed in any chunk size, a response leaves the renderer with the
+same surfaces as `parse_response` on the whole text
+([`tests/streaming.rs`](crates/a2ui-express/tests/streaming.rs) checks every
+conformance input one character at a time). A step costs about what its
+statement costs: eui's kitchen-sink surface (251 components, 30 KB) streams
+character by character in ~0.2 s in release builds
+(`cargo run --release -p a2ui-express --example stream_bench`).
+
+`response::{unwrap, wrap, has_format_content}` split a whole response into
+text and raw blocks and back.
+
+Samples meant for streaming should be written top-down (`root` first):
+`decompile` with `Order::TopDown`.
+
 ## Conformance suite
 
 The test oracle is the upstream, language-neutral conformance suite, vendored

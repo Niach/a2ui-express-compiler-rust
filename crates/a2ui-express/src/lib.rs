@@ -5,13 +5,23 @@
 //! crate compiles it to A2UI v1.0 (and v0.9) messages, emitted as
 //! [`serde_json::Value`].
 //!
+//! - [`compile`]: one block to messages.
+//! - [`response`]: model responses (prose with `<a2ui>` blocks), whole or
+//!   streamed chunk by chunk, so a surface renders while the model types.
+//! - [`state`]: the mirror of the surfaces a renderer holds, which streamed
+//!   and parsed messages are checked against.
+//! - [`decompile`]: messages back to Express.
+//! - [`prompt`]: the system-prompt section that teaches a model Express.
+//!
 //! The behaviour is pinned by the upstream language-neutral conformance suite
 //! vendored under `vendor/a2ui/conformance/agent/express/`.
 
 pub mod compile;
 pub mod decompile;
 pub mod prompt;
+pub mod response;
 pub mod schema;
+pub mod state;
 pub mod syntax;
 
 use serde::{Deserialize, Serialize};
