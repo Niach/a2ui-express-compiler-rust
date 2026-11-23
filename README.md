@@ -48,6 +48,39 @@ The lexer's identifier tables (`crates/a2ui-express/src/syntax/xid.rs`) are
 generated too, from upstream's ANTLR lexer at the same pin, so identifiers
 lex exactly as upstream lexes them: `scripts/gen-xid-tables.py <a2ui-checkout>`.
 
+## Prompt generator
+
+`a2ui_express::prompt::generate_prompt` writes the system-prompt section
+that teaches a model Express for the active catalogs. `PromptOptions::style`
+picks the format:
+
+- `PromptStyle::Upstream` (the default) is upstream's format byte for byte;
+  the conformance suite (`prompt_generator.yaml`) checks it.
+- `PromptStyle::Compact` is opt-in, for large catalogs. Each enum or map
+  shape several properties share (a style map, an icon enum) is listed once
+  under *Shared Types* and referred to by name (`- icon: Icon`); a property
+  line several components share is listed once under *Common Properties*;
+  bindable properties are marked `~`, numbers `:n`, booleans `:b`; component
+  descriptions are cut to their first sentence and property and function
+  descriptions are left out. The rules section is upstream's.
+
+```rust
+use a2ui_express::prompt::{generate_prompt, PromptOptions, PromptStyle};
+
+let options = PromptOptions { style: PromptStyle::Compact, ..Default::default() };
+let prompt = generate_prompt(&catalogs, &options)?;
+```
+
+On eui's core catalog (`vendor/eui/catalog/core.schema.json`, 104
+components) the upstream format is 457,928 characters (~114k tokens at
+chars / 4); the compact one is about 39.5k characters (~9.9k tokens, inside
+eui's 10k budget). [`eval/prompt/`](eval/prompt/) compares it with eui's
+hand-written `catalogPrompt` on sample UIs.
+
+```sh
+cargo run -q -p a2ui-express --example express -- prompt vendor/eui/catalog/core.schema.json --compact
+```
+
 ## Running the suite
 
 `cargo test` runs every Express case through

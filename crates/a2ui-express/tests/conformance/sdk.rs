@@ -367,12 +367,14 @@ pub fn open_stream(
 
 /// Renders the Express prompt snippet for the active catalogs.
 pub fn generate_prompt(config: &PromptConfig) -> SdkResult<String> {
-    use a2ui_express::prompt::{PromptOptions, generate_prompt};
+    use a2ui_express::prompt::{PromptOptions, PromptStyle, generate_prompt};
     let catalogs = prompt_catalogs(&config.catalogs)?;
     let options = PromptOptions {
         surface_id: config.surface_id.clone(),
         examples: config.examples.clone(),
         allowed_messages: config.allowed_messages.clone(),
+        // The suite pins upstream's format.
+        style: PromptStyle::Upstream,
     };
     Ok(generate_prompt(&catalogs, &options)?)
 }

@@ -1,0 +1,9 @@
+<a2ui>
+surface("main")
+m1 = MessageBubble(text="Hi! Can you help me plan a trip to Lisbon?", side="out", author="You", time="10:01", status="read")
+m2 = MessageBubble(text="Of course! How many days will you be staying, and what do you enjoy most: food, history or beaches?", side="in", author="Assistant", time="10:02", slots={avatar: Avatar(name="Assistant")})
+m3 = MessageBubble(text="Four days, mostly food and history.", side="out", author="You", time="10:03", status="sent")
+messages = ScrollArea(direction="vertical", children=[Stack(direction="vertical", gap="md", children=[m1, m2, m3])], style={flexGrow: 1, minHeight: 0, padding: 16})
+composer = Composer(placeholder="Type a message", submitLabel="Send", on={submit: Event("send_message")})
+root = Page(title="Chat", children=[Stack(direction="vertical", gap="sm", style={height: "100%"}, children=[messages, composer])])
+</a2ui>
