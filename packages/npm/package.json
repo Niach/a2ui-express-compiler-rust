@@ -1,6 +1,6 @@
 {
   "name": "@niach/a2ui-express",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A2UI Express compiler (Rust, WebAssembly): compile, stream, parse and decompile the Express inference format",
   "license": "Apache-2.0",
   "repository": {
