@@ -220,3 +220,156 @@ fn a_check_with_nothing_to_read_is_an_error() {
     );
     assert_eq!(checks[0]["message"], "Accept the terms");
 }
+
+/// A catalog with one function per caller rule, for the post-compile checks
+/// (#AXC-16).
+fn callers_catalog() -> Catalog {
+    let function = |callers: &str, activation: bool| {
+        json!({
+            "allowedCallers": callers,
+            "requiresUserActivation": activation,
+            "properties": {"@call": {}, "args": {"type": "object", "properties": {
+                "value": {"type": "string"}
+            }}}
+        })
+    };
+    let mut doc = json!({
+        "catalogId": "demo",
+        "protocolVersion": "1.0",
+        "components": {"Text": {"properties": {
+            "component": {"const": "Text"},
+            "text": {"$ref": "common_types.json#/$defs/DynamicString"}
+        }, "required": ["component", "text"]}},
+        "functions": {
+            "toast": function("agentOnly", false),
+            "notify": function("rendererOrAgent", false),
+            "format": function("rendererOnly", false),
+            "launch": function("rendererOnly", true)
+        }
+    });
+    for (name, f) in doc["functions"].as_object_mut().unwrap() {
+        f["properties"]["@call"] = json!({"const": name});
+    }
+    Catalog::from_json(doc).unwrap()
+}
+
+/// The public compile API (not only the conformance seam) refuses a
+/// standalone call the agent may not make, in every entry point.
+#[test]
+fn standalone_calls_name_functions_the_agent_may_call() {
+    use a2ui_express::response::{ExpressParser, Part};
+
+    let compiler = Compiler::new(vec![callers_catalog()], None).unwrap();
+    for ok in [r#"toast("hi")"#, r#"notify("hi")"#] {
+        let messages = compiler.compile(ok, "main").unwrap();
+        assert!(messages[0].get("callRendererFunction").is_some(), "{ok}");
+    }
+    for (source, reason) in [
+        (r#"format("hi")"#, "only the renderer may call"),
+        (r#"launch("hi")"#, "only the renderer may call"),
+    ] {
+        let error = compiler.compile(source, "main").unwrap_err();
+        assert_eq!(error.category(), Category::Validation, "{source}");
+        assert!(
+            error.message.contains(reason),
+            "{source}: {}",
+            error.message
+        );
+
+        // The response parser and the stream run the same check.
+        let parser = ExpressParser::new(compiler.clone(), "main");
+        let wrapped = format!("<a2ui>\n{source}\n</a2ui>");
+        let parts = parser.parse_response(&wrapped, true);
+        assert!(
+            parts.is_err()
+                || parts
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .any(|p| matches!(p, Part::Error(_))),
+            "{source}: {parts:?}"
+        );
+        let mut stream = parser.open_stream();
+        let streamed = stream.push(&wrapped).and_then(|mut parts| {
+            parts.extend(stream.finish()?);
+            Ok(parts)
+        });
+        let emitted_call = streamed.as_ref().is_ok_and(|parts| {
+            parts.iter().any(|p| match p {
+                Part::A2ui(messages) => messages
+                    .iter()
+                    .any(|m| m.get("callRendererFunction").is_some()),
+                _ => false,
+            })
+        });
+        assert!(!emitted_call, "{source}: {streamed:?}");
+    }
+}
+
+/// `compile::validate` is public, for messages that did not come from the
+/// compiler.
+#[test]
+fn validate_checks_messages_from_elsewhere() {
+    use a2ui_express::compile::validate;
+
+    let compiler = Compiler::new(vec![callers_catalog()], None).unwrap();
+    let catalogs = compiler.catalogs();
+    let create = |components: Value| {
+        vec![json!({"version": "1.0", "createSurface": {
+            "surfaceId": "main", "catalogId": "demo", "components": components
+        }})]
+    };
+    let message = |messages: &[Value]| validate(catalogs, messages).unwrap_err().message;
+
+    assert!(
+        validate(
+            catalogs,
+            &create(json!([{"id": "root", "component": "Text", "text": "x"}]))
+        )
+        .is_ok()
+    );
+    assert_eq!(
+        message(&create(json!([
+            {"id": "root", "component": "Text", "text": "x"},
+            {"id": "root", "component": "Text", "text": "y"}
+        ]))),
+        "Duplicate component id 'root' in one message."
+    );
+    assert_eq!(
+        message(&create(json!([{"id": "root", "component": "Text",
+            "text": {"@call": "missing", "args": {}}}]))),
+        "Unrecognized function 'missing'"
+    );
+    // A renderer-only function inside a component is fine: the renderer runs it.
+    assert!(
+        validate(
+            catalogs,
+            &create(json!([{"id": "root", "component": "Text",
+        "text": {"@call": "format", "args": {"value": "x"}}}]))
+        )
+        .is_ok()
+    );
+    assert_eq!(
+        message(&create(
+            json!([{"id": "root", "component": "Text", "text": {"@path": "/a~"}}])
+        )),
+        "Invalid path syntax: '/a~'"
+    );
+    let mut nested = json!({"@path": "/v"});
+    for _ in 0..6 {
+        nested = json!({"@call": "notify", "args": {"value": nested}});
+    }
+    assert_eq!(
+        message(&create(
+            json!([{"id": "root", "component": "Text", "text": nested}])
+        )),
+        "Recursion limit exceeded: functionCall depth > 5"
+    );
+    assert_eq!(
+        message(&[json!({"version": "1.0", "callRendererFunction": {
+            "functionCallId": "c1",
+            "callFunction": {"@call": "toast", "catalogId": "other", "args": {}}
+        }})]),
+        "Function call 'c1' names catalog 'other', which isn't one of the active catalogs."
+    );
+}

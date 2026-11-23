@@ -161,12 +161,23 @@ impl ScopeSession {
         let has_emitted = self.has_emitted;
         let mut undo = Vec::new();
         match self.step(compiler, text, is_final, existing, cache_prefix, &mut undo) {
-            Ok((messages, cache)) => Ok(Step {
-                messages,
-                undo,
-                has_emitted,
-                cache,
-            }),
+            Ok((messages, cache)) => {
+                let step = Step {
+                    messages,
+                    undo,
+                    has_emitted,
+                    cache,
+                };
+                // What the step emits is checked like a whole block's
+                // messages; a step that fails it is undone.
+                match super::validate(compiler.catalogs(), &step.messages) {
+                    Ok(()) => Ok(step),
+                    Err(e) => {
+                        self.undo(step);
+                        Err(e)
+                    }
+                }
+            }
             Err(e) => {
                 self.undo(Step {
                     messages: Vec::new(),

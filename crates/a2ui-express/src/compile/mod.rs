@@ -14,6 +14,9 @@
 //!   `update=true`, or without `root`, becomes `updateComponents` and one
 //!   `updateDataModel` per assigned path.
 //! - A standalone call becomes `callRendererFunction` (v1.0 only).
+//! - The messages are checked with [`validate`] (a standalone call must
+//!   name a function the agent may call, and so on) before they are
+//!   returned, as upstream validates what it compiled.
 //!
 //! ```
 //! use a2ui_express::compile::Compiler;
@@ -57,6 +60,7 @@ mod data;
 mod error;
 mod pass;
 mod sentinel;
+mod validate;
 pub(crate) use sentinel::strip_sentinel_tags;
 pub(crate) mod session;
 
@@ -68,6 +72,7 @@ use crate::schema::{Catalog, CatalogError, CatalogSet, CatalogVersion, LoadOptio
 use crate::syntax::{self, Call, Expr, ExprKind, Program, Statement, StatementForm, Target};
 
 pub use error::{Category, CompileError, CompileErrorKind};
+pub use validate::{MAX_CALL_DEPTH, MAX_DEPTH, validate};
 
 use data::{set_nested_path, to_json_pointer};
 use pass::{CallArgs, Ctx, Pass};
@@ -133,7 +138,8 @@ impl Compiler {
     /// surface of statements before any `surface(...)` line).
     ///
     /// `<a2ui>` sentinel tags around the block are stripped first. Errors
-    /// are those upstream raises, with its categories and wording.
+    /// are those upstream raises, with its categories and wording. The
+    /// messages are checked with [`validate`] before they are returned.
     pub fn compile(&self, source: &str, surface_id: &str) -> Result<Vec<Value>, CompileError> {
         let body = sentinel::strip_sentinel_tags(source);
         let program = syntax::parse(&body).into_result()?;
@@ -168,6 +174,7 @@ impl Compiler {
                 Unit::Scope(i) => out.extend(self.compile_scope(&scopes[i], &mut ctx)?),
             }
         }
+        validate(&self.set, &out)?;
         Ok(out)
     }
 

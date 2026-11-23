@@ -158,109 +158,13 @@ pub enum AfterRejectedBlock {
     Continue,
 }
 
-/// Compiles one block (no sentinel tags) and validates the messages it emits
-/// against their envelope schema, the way upstream's `compile_checked` does.
-/// A surface the block updates without creating is assumed to exist.
+/// Compiles one block (no sentinel tags). The crate checks the messages
+/// it emits the way upstream's `compile_checked` validates them
+/// (`a2ui_express::compile::validate`). A surface the block updates without
+/// creating is assumed to exist.
 pub fn compile_checked(parser: &ParserConfig, payload: &str) -> SdkResult<Vec<Value>> {
     let compiler = compiler(&parser.catalogs)?;
-    let messages = compiler.compile(payload, &parser.surface_id)?;
-    validate_payload(&compiler, &messages)?;
-    Ok(messages)
-}
-
-/// The part of upstream's `validate_payload` the compiler suite relies on,
-/// beyond what the compiler checks itself:
-///
-/// - a `callRendererFunction` names a function the agent may call
-///   (`allowedCallers` `agentOnly` or `rendererOrAgent`, no user activation);
-/// - from v1.0, every `@call` in a component names a declared function.
-///
-/// Full schema validation of the messages is not ported.
-fn validate_payload(compiler: &Compiler, messages: &[Value]) -> SdkResult<()> {
-    let invalid = |m: String| SdkError::new("ValidationError", m);
-    let set = compiler.catalogs();
-    for message in messages {
-        if let Some(body) = message.get("callRendererFunction") {
-            let subject = format!(
-                "Function call '{}'",
-                body.get("functionCallId")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-            );
-            let call = &body["callFunction"];
-            let name = call.get("@call").and_then(Value::as_str).unwrap_or("");
-            let catalog_id = call.get("catalogId").and_then(Value::as_str).unwrap_or("");
-            let Some(catalog) = set.get(catalog_id) else {
-                return Err(invalid(format!(
-                    "{subject} names catalog '{catalog_id}', which isn't one of the active catalogs."
-                )));
-            };
-            let Some(function) = catalog.function(name).filter(|f| !f.is_system()) else {
-                return Err(invalid(format!(
-                    "{subject} names '{name}', which catalog '{catalog_id}' does not declare."
-                )));
-            };
-            let callers = function.allowed_callers();
-            if !callers.admits_agent() {
-                return Err(invalid(format!(
-                    "{subject} names '{name}', which only the renderer may call (allowedCallers is {}).",
-                    callers.as_str()
-                )));
-            }
-            if function.requires_user_activation() {
-                return Err(invalid(format!(
-                    "{subject} names '{name}', which requires a user activation, and a call from the agent has none."
-                )));
-            }
-        }
-        if !compiler.version().at_least_v1() {
-            continue;
-        }
-        for key in ["createSurface", "updateComponents"] {
-            let components = message
-                .get(key)
-                .and_then(|b| b.get("components"))
-                .and_then(Value::as_array);
-            for component in components.into_iter().flatten() {
-                let Some(map) = component.as_object() else {
-                    continue;
-                };
-                for (k, v) in map {
-                    if k != "id" && k != "component" {
-                        check_calls(compiler, v)?;
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Every `{"@call": name, …}` in a value names a declared function.
-fn check_calls(compiler: &Compiler, value: &Value) -> SdkResult<()> {
-    match value {
-        Value::Array(items) => items.iter().try_for_each(|v| check_calls(compiler, v)),
-        Value::Object(map) => {
-            if map.contains_key("@path") {
-                return Ok(());
-            }
-            if let Some(Value::String(name)) = map.get("@call") {
-                let declared = compiler
-                    .catalogs()
-                    .catalogs()
-                    .iter()
-                    .any(|c| c.function(name).is_some());
-                if !declared {
-                    return Err(SdkError::new(
-                        "ValidationError",
-                        format!("Unrecognized function '{name}'"),
-                    ));
-                }
-            }
-            map.values().try_for_each(|v| check_calls(compiler, v))
-        }
-        _ => Ok(()),
-    }
+    Ok(compiler.compile(payload, &parser.surface_id)?)
 }
 
 /// The catalog a case registers, with its transformers applied.
