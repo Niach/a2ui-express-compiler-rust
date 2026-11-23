@@ -296,6 +296,18 @@ fn every_conformance_catalog_loads_or_fails_as_a_catalog_error() {
                 assert!(c.id().ends_with("catalog_without_id.json"));
                 assert_eq!(c.version(), CatalogVersion::DEFAULT);
             }
+            // An extension key that is not a UAX #31 identifier.
+            "component_metadata_invalid_key_catalog_v1_0.json" => {
+                let error = result.unwrap_err();
+                assert!(
+                    matches!(error, CatalogError::InvalidMetadata { .. }),
+                    "{error}"
+                );
+                assert_eq!(
+                    error.to_string(),
+                    "Invalid UAX #31 extension identifier 'com.example.policy' in component 'Card' metadata.extensions."
+                );
+            }
             n if n.contains("v08") || n.contains("v0_8") => {
                 assert!(
                     matches!(result, Err(CatalogError::UnsupportedVersion(_)) | Ok(_)),
@@ -902,4 +914,144 @@ fn eui_fixture_bindings_are_all_allowed() {
         check_fixture_bindings(&catalog, &doc, &mut found);
     }
     assert!(found > 0, "the fixtures bind something");
+}
+
+fn v1_catalog(components: Value, functions: Value) -> Result<Catalog, CatalogError> {
+    Catalog::from_json(json!({
+        "catalogId": "ids",
+        "protocolVersion": "1.0",
+        "components": components,
+        "functions": functions,
+    }))
+}
+
+/// Upstream's loader: from v1.0, component, property, function and argument
+/// names are UAX #31 identifiers (#AXC-14).
+#[test]
+fn v1_names_are_uax31_identifiers() {
+    let text = json!({"properties": {"component": {"const": "Text"}, "text": {"type": "string"}}});
+    let message = |r: Result<Catalog, CatalogError>| {
+        let error = r.unwrap_err();
+        assert!(
+            matches!(error, CatalogError::InvalidIdentifier { .. }),
+            "{error}"
+        );
+        error.to_string()
+    };
+
+    assert_eq!(
+        message(v1_catalog(json!({"My-Text": text}), json!({}))),
+        "Invalid UAX #31 component identifier: 'My-Text'"
+    );
+    assert_eq!(
+        message(v1_catalog(
+            json!({"Text": {"properties": {"aria-label": {"type": "string"}}}}),
+            json!({})
+        )),
+        "Invalid UAX #31 property identifier: 'aria-label' in component 'Text'"
+    );
+    let function = |name: &str, arg: &str| {
+        json!({name: {"properties": {
+            "@call": {"const": name},
+            "args": {"type": "object", "properties": {arg: {"type": "string"}}}
+        }}})
+    };
+    assert_eq!(
+        message(v1_catalog(json!({}), function("open.url", "url"))),
+        "Invalid UAX #31 function identifier: 'open.url'"
+    );
+    assert_eq!(
+        message(v1_catalog(json!({}), function("openUrl", "the url"))),
+        "Invalid UAX #31 argument identifier: 'the url' in function 'openUrl'"
+    );
+
+    // Unicode identifiers and the `@` spelling of the standard mixins pass.
+    let ok = v1_catalog(
+        json!({"Überschrift": {"properties": {
+            "component": {"const": "Überschrift"},
+            "größe": {"type": "number"},
+            "@checks": {"type": "array"},
+            "@catalogId": {"type": "string"}
+        }}}),
+        function("öffne", "ziel_1"),
+    )
+    .unwrap();
+    assert!(ok.has_component("Überschrift") && ok.has_function("öffne"));
+    // Any other `@` name is not a mixin.
+    assert_eq!(
+        message(v1_catalog(
+            json!({"Text": {"properties": {"@style": {"type": "string"}}}}),
+            json!({})
+        )),
+        "Invalid UAX #31 property identifier: '@style' in component 'Text'"
+    );
+
+    // Below v1.0 the names are not checked, as upstream does not.
+    let v0_9 = Catalog::from_json(json!({
+        "catalogId": "ids",
+        "protocolVersion": "0.9",
+        "components": {"My-Text": {"properties": {"aria-label": {"type": "string"}}}},
+    }))
+    .unwrap();
+    assert!(v0_9.has_component("My-Text"));
+}
+
+/// Upstream's `validate_metadata`: a v1.0 `metadata` (of the catalog, a
+/// component or a function) is an object whose only key is `extensions`,
+/// keyed by identifiers (#AXC-14).
+#[test]
+fn v1_metadata_is_validated() {
+    let with = |metadata: Value| {
+        v1_catalog(
+            json!({"Card": {"metadata": metadata, "properties": {"component": {"const": "Card"}}}}),
+            json!({}),
+        )
+    };
+    let message = |metadata: Value| {
+        let error = with(metadata).unwrap_err();
+        assert!(
+            matches!(&error, CatalogError::InvalidMetadata { owner, .. } if owner == "component 'Card'"),
+            "{error}"
+        );
+        error.to_string()
+    };
+    assert!(with(json!({"extensions": {"a2ui_policy": {"x": 1}}})).is_ok());
+    assert!(with(json!({})).is_ok());
+    assert!(with(Value::Null).is_ok());
+    assert_eq!(
+        message(json!([])),
+        "Expected component 'Card' metadata to be an object, got array."
+    );
+    assert_eq!(
+        message(json!({"vendor": {}})),
+        "Unexpected property 'vendor' in component 'Card' metadata; only 'extensions' is allowed."
+    );
+    assert_eq!(
+        message(json!({"extensions": "x"})),
+        "Expected component 'Card' metadata.extensions to be an object, got string."
+    );
+    assert_eq!(
+        message(json!({"extensions": {"com.example": 1}})),
+        "Invalid UAX #31 extension identifier 'com.example' in component 'Card' metadata.extensions."
+    );
+    assert!(conformance("component_metadata_catalog_v1_0.json").has_component("Card"));
+    assert!(conformance("function_metadata_catalog_v1_0.json").has_function("launch"));
+
+    let function = v1_catalog(
+        json!({}),
+        json!({"open": {"metadata": {"extensions": {"a-b": 1}}, "properties": {"@call": {"const": "open"}}}}),
+    );
+    assert_eq!(
+        function.unwrap_err().to_string(),
+        "Invalid UAX #31 extension identifier 'a-b' in function 'open' metadata.extensions."
+    );
+    let catalog = Catalog::from_json(json!({
+        "catalogId": "ids", "protocolVersion": "1.0", "metadata": {"owner": "x"},
+    }));
+    assert_eq!(
+        catalog.unwrap_err().to_string(),
+        "Unexpected property 'owner' in catalog metadata; only 'extensions' is allowed."
+    );
+    // Below v1.0 there is no metadata envelope to check.
+    assert!(Catalog::from_json(json!({"catalogId": "ids", "metadata": {"owner": "x"}})).is_ok());
 }

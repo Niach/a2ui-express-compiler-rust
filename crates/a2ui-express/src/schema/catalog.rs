@@ -11,6 +11,7 @@ use super::refs::{
 };
 use super::resolve::{Schemas, Segment, SlotKind};
 use super::{CatalogError, CatalogVersion};
+use crate::syntax::lexer::is_identifier;
 
 const STANDARD_CATALOG_ID_DESCRIPTION: &str =
     "The catalog ID for this component, overriding any surface-level default catalogId.";
@@ -332,9 +333,15 @@ impl Catalog {
             let permitted_components = permitted_names(map, "anyComponent", "#/components/");
             let permitted_functions = permitted_names(map, "anyFunction", "#/functions/");
 
+            if version.at_least_v1() {
+                check_metadata(map.get("metadata"), "catalog")?;
+            }
             let mut components = Vec::new();
             if let Some(Value::Object(raw)) = map.get("components") {
                 for (name, schema) in raw {
+                    if version.at_least_v1() && schema.is_object() {
+                        check_v1_component(name, schema)?;
+                    }
                     if permitted_components
                         .as_ref()
                         .is_some_and(|p| !p.contains(name))
@@ -352,6 +359,9 @@ impl Catalog {
                     return Ok(());
                 }
                 let function = read_function(&schemas, name, schema, false)?;
+                if version.at_least_v1() {
+                    check_v1_function(&function)?;
+                }
                 if version.at_least_v1()
                     && function.requires_user_activation
                     && function.allowed_callers != AllowedCallers::RendererOnly
@@ -677,6 +687,106 @@ impl Catalog {
     /// Whether a schema holds component ids (`ComponentId`, `Child`, `ChildList`).
     pub fn is_component_reference(&self, schema: &Value) -> bool {
         self.schemas().is_component_reference(schema)
+    }
+}
+
+/// From v1.0 a component's name and the properties it declares are UAX #31
+/// identifiers, and its static `metadata` holds only `extensions`.
+fn check_v1_component(name: &str, schema: &Value) -> Result<(), CatalogError> {
+    if !is_identifier(name) {
+        return Err(CatalogError::InvalidIdentifier {
+            kind: "component",
+            name: name.to_owned(),
+            owner: None,
+        });
+    }
+    if let Some(Value::Object(properties)) = schema.get("properties") {
+        // The standard mixins are spelled with a leading `@` from v1.0.
+        let invalid = properties.keys().find(|p| {
+            !is_identifier(p)
+                && !p
+                    .strip_prefix('@')
+                    .is_some_and(|bare| ENVELOPE_MIXIN_NAMES.contains(&bare))
+        });
+        if let Some(property) = invalid {
+            return Err(CatalogError::InvalidIdentifier {
+                kind: "property",
+                name: property.clone(),
+                owner: Some(format!("component '{name}'")),
+            });
+        }
+    }
+    check_metadata(schema.get("metadata"), &format!("component '{name}'"))
+}
+
+/// From v1.0 a function's name and its arguments are UAX #31 identifiers.
+fn check_v1_function(function: &Function) -> Result<(), CatalogError> {
+    let name = function.name();
+    if !is_identifier(name) {
+        return Err(CatalogError::InvalidIdentifier {
+            kind: "function",
+            name: name.to_owned(),
+            owner: None,
+        });
+    }
+    if let Some(argument) = function.arguments().iter().find(|a| !is_identifier(a)) {
+        return Err(CatalogError::InvalidIdentifier {
+            kind: "argument",
+            name: argument.clone(),
+            owner: Some(format!("function '{name}'")),
+        });
+    }
+    check_metadata(
+        function.schema().get("metadata"),
+        &format!("function '{name}'"),
+    )
+}
+
+/// A `metadata` envelope is an object whose only key is `extensions`, an
+/// object keyed by UAX #31 identifiers.
+fn check_metadata(metadata: Option<&Value>, owner: &str) -> Result<(), CatalogError> {
+    let invalid = |reason: String| CatalogError::InvalidMetadata {
+        owner: owner.to_owned(),
+        reason,
+    };
+    let metadata = match metadata {
+        None | Some(Value::Null) => return Ok(()),
+        Some(Value::Object(metadata)) => metadata,
+        Some(other) => {
+            return Err(invalid(format!(
+                "Expected {owner} metadata to be an object, got {}.",
+                json_type(other)
+            )));
+        }
+    };
+    if let Some(key) = metadata.keys().find(|k| *k != "extensions") {
+        return Err(invalid(format!(
+            "Unexpected property '{key}' in {owner} metadata; only 'extensions' is allowed."
+        )));
+    }
+    match metadata.get("extensions") {
+        None => Ok(()),
+        Some(Value::Object(extensions)) => match extensions.keys().find(|k| !is_identifier(k)) {
+            Some(key) => Err(invalid(format!(
+                "Invalid UAX #31 extension identifier '{key}' in {owner} metadata.extensions."
+            ))),
+            None => Ok(()),
+        },
+        Some(other) => Err(invalid(format!(
+            "Expected {owner} metadata.extensions to be an object, got {}.",
+            json_type(other)
+        ))),
+    }
+}
+
+fn json_type(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
     }
 }
 
