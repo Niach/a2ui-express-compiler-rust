@@ -1,0 +1,13 @@
+[package]
+name = "a2ui-express-ffi"
+description = "The JSON-level API the a2ui-express language bindings (wasm, Python) share"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+a2ui-express = { path = "../a2ui-express" }
+serde_json.workspace = true

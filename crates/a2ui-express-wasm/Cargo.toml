@@ -1,0 +1,28 @@
+[package]
+name = "a2ui-express-wasm"
+description = "WebAssembly bindings for the A2UI Express compiler (the @niach/a2ui-express npm package)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Ships to npm (packages/npm), not crates.io.
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+a2ui-express-ffi = { path = "../a2ui-express-ffi" }
+serde_json.workspace = true
+# Pinned exactly: the wasm-bindgen CLI that generates the JS glue must be the
+# same version (wasm-pack downloads the matching one).
+wasm-bindgen = "=0.2.130"
+js-sys = "0.3.107"
+
+# Smaller (and faster) than the default dlmalloc on wasm32.
+[target.'cfg(target_family = "wasm")'.dependencies]
+talc = "5.1"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

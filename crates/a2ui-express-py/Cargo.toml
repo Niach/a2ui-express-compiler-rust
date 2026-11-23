@@ -1,0 +1,23 @@
+[package]
+name = "a2ui-express-py"
+description = "Python bindings for the A2UI Express compiler (the a2ui-express wheel)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+# Ships to PyPI as a wheel (maturin), not to crates.io.
+publish = false
+
+[lib]
+name = "a2ui_express"
+crate-type = ["cdylib"]
+# The extension links against the interpreter that loads it; a Rust test
+# binary would have none. The binding is tested from Python (tests/).
+test = false
+doctest = false
+
+[dependencies]
+a2ui-express-ffi = { path = "../a2ui-express-ffi" }
+serde_json.workspace = true
+pyo3 = { version = "0.30", features = ["abi3-py39"] }

@@ -1,6 +1,11 @@
 [workspace]
 resolver = "3"
-members = ["crates/a2ui-express"]
+members = [
+    "crates/a2ui-express",
+    "crates/a2ui-express-ffi",
+    "crates/a2ui-express-py",
+    "crates/a2ui-express-wasm",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,3 +20,10 @@ serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "2"
 serde_yaml_ng = "0.10"
 regex = "1"
+
+# Release builds of the bindings (wasm, Python wheel): one codegen unit and
+# fat LTO keep the wasm small; wasm-opt -Oz runs on top (see
+# crates/a2ui-express-wasm).
+[profile.release]
+lto = true
+codegen-units = 1
