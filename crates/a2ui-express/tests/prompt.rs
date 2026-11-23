@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use a2ui_express::prompt::{PromptOptions, agent_callable_functions, generate_prompt};
+use a2ui_express::prompt::{PromptOptions, PromptStyle, agent_callable_functions, generate_prompt};
 use a2ui_express::schema::{Catalog, CatalogSet};
 use serde_json::{Value, json};
 
@@ -142,4 +142,93 @@ fn eui_catalog_generates() {
         text.len(),
         text.len() / 4
     );
+}
+
+fn compact() -> PromptOptions {
+    PromptOptions {
+        style: PromptStyle::Compact,
+        ..Default::default()
+    }
+}
+
+/// eui's budget (`prompt-budget.json`): 10,000 tokens at chars / 4, counted
+/// in characters as eui counts them. The compact prompt fits; every
+/// component still gets a signature; the shared style map and icon enum
+/// are listed once and referred to by name.
+#[test]
+fn eui_compact_prompt_fits_the_budget() {
+    let catalog = load("../../vendor/eui/catalog/core.schema.json");
+    let names: Vec<String> = catalog
+        .components()
+        .iter()
+        .map(|c| c.name().to_owned())
+        .collect();
+    let text = prompt(vec![catalog], &compact());
+    let chars = text.chars().count();
+    println!(
+        "eui compact prompt: {chars} chars, ~{} tokens (chars / 4)",
+        chars.div_ceil(4)
+    );
+    assert!(chars.div_ceil(4) <= 10_000, "{chars} chars");
+    for name in &names {
+        assert!(
+            text.contains(&format!("\n• {name}(")),
+            "no signature for {name}"
+        );
+    }
+    assert_eq!(text.matches("a-large-small").count(), 1);
+    assert_eq!(text.matches("\n- Style: {display: ").count(), 1);
+    assert!(text.contains("\n- Icon: one of a-large-small|"));
+    assert!(text.contains("Every component also takes style? (Style), visible?~"));
+    assert!(text.contains("\n- icon: Icon\n"));
+    assert!(text.contains("aspectRatio?:n"));
+    assert!(!text.contains("visible? (static)"));
+    // The rules section is upstream's.
+    let upstream = prompt(
+        vec![load("../../vendor/eui/catalog/core.schema.json")],
+        &PromptOptions::default(),
+    );
+    let rules = |t: &str| t[..t.find("\n\n## ").unwrap()].to_owned();
+    assert_eq!(rules(&text), rules(&upstream));
+}
+
+#[test]
+fn compact_names_shared_shapes_and_keeps_the_rest_inline() {
+    let catalog = Catalog::from_json(json!({
+        "catalogId": "demo",
+        "protocolVersion": "1.0",
+        "$defs": {
+            "Pad": {"type": "object", "properties": {
+                "top": {"type": "number"}, "bottom": {"type": "number"},
+                "left": {"type": "number"}, "right": {"type": "number"},
+                "unit": {"enum": ["px", "rem"]}
+            }}
+        },
+        "components": {
+            "Badge": {"description": "Small label. Second sentence.", "properties": {
+                "component": {"const": "Badge"},
+                "text": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Shown."},
+                "tone": {"enum": ["neutral", "success", "warning", "danger", "info"]},
+                "pad": {"$ref": "#/$defs/Pad"},
+                "kind": {"enum": ["a", "b"]}
+            }, "required": ["component", "text"]},
+            "Tag": {"properties": {
+                "component": {"const": "Tag"},
+                "tone": {"enum": ["neutral", "success", "warning", "danger", "info"]},
+                "pad": {"$ref": "#/$defs/Pad"},
+                "count": {"type": "number"}
+            }, "required": ["component"]}
+        }
+    }))
+    .unwrap();
+    let text = prompt(vec![catalog], &compact());
+    // Shared and long: named, listed once.
+    assert!(
+        text.contains("\n- Pad: {top, bottom, left, right, unit: px|rem}\n"),
+        "{text}"
+    );
+    assert!(text.contains("\n• Badge(text~, tone?, pad?, kind?) — Small label.\n  - tone: neutral|success|warning|danger|info\n  - pad: Pad\n  - kind: a|b\n"), "{text}");
+    // Short enums stay inline; numbers are marked.
+    assert!(text.contains("\n• Tag(tone?, pad?, count?:n)\n"), "{text}");
+    assert!(!text.contains("Second sentence"));
 }

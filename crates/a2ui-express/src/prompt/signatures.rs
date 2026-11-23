@@ -2,7 +2,7 @@
 
 use serde_json::{Map, Value};
 
-use crate::schema::{Catalog, common_def_name, is_object_or_ref_schema};
+use crate::schema::{Catalog, Component, common_def_name, is_object_or_ref_schema};
 
 /// How deep the union walks go; stands in for upstream's visited sets, which
 /// guard against `$ref` cycles.
@@ -16,7 +16,7 @@ fn deref(catalog: &Catalog, schema: &Value) -> Value {
         .unwrap_or_else(|| schema.clone())
 }
 
-fn str_field<'v>(schema: &'v Value, key: &str) -> Option<&'v str> {
+pub(super) fn str_field<'v>(schema: &'v Value, key: &str) -> Option<&'v str> {
     schema.get(key).and_then(Value::as_str)
 }
 
@@ -38,7 +38,7 @@ fn own_properties(s: &Value) -> Option<&Map<String, Value>> {
 }
 
 /// The allowed values of an enum, searching unions.
-fn schema_enum(catalog: &Catalog, schema: &Value, depth: usize) -> Option<Vec<Value>> {
+pub(super) fn schema_enum(catalog: &Catalog, schema: &Value, depth: usize) -> Option<Vec<Value>> {
     if !schema.is_object() || depth > MAX_DEPTH {
         return None;
     }
@@ -149,12 +149,16 @@ fn object_properties(
 
 /// A property that holds a map, or a list of maps, with keys the model has
 /// to be told.
-enum Structured {
+pub(super) enum Structured {
     Map(Map<String, Value>),
     ListOfMaps(Map<String, Value>),
 }
 
-fn structured_property(catalog: &Catalog, schema: &Value, depth: usize) -> Option<Structured> {
+pub(super) fn structured_property(
+    catalog: &Catalog,
+    schema: &Value,
+    depth: usize,
+) -> Option<Structured> {
     if !schema.is_object() || depth > MAX_DEPTH {
         return None;
     }
@@ -209,7 +213,7 @@ fn sub_key_lines(catalog: &Catalog, properties: &Map<String, Value>) -> String {
         .join("\n")
 }
 
-fn enum_value(v: &Value) -> String {
+pub(super) fn enum_value(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
         other => other.to_string(),
@@ -254,7 +258,12 @@ fn property_detail(catalog: &Catalog, name: &str, schema: Option<&Value>) -> Opt
     detail
 }
 
-fn entry(name: &str, args: &[String], description: Option<&str>, details: &[String]) -> String {
+pub(super) fn entry(
+    name: &str,
+    args: &[String],
+    description: Option<&str>,
+    details: &[String],
+) -> String {
     let mut sig = format!("• {name}({})", args.join(", "));
     if let Some(desc) = description.filter(|d| !d.is_empty()) {
         sig.push_str("\n  - Description: ");
@@ -267,6 +276,23 @@ fn entry(name: &str, args: &[String], description: Option<&str>, details: &[Stri
     sig
 }
 
+/// A component property as its signature lists it: `name`, `?` when
+/// optional, then `(component ID)` or `(static)` when it takes no binding.
+pub(super) fn argument_label(catalog: &Catalog, component: &Component, p: &str) -> String {
+    let schema = component.property_schema(p);
+    let mut label = format!("{p}{}", if component.is_required(p) { "" } else { "?" });
+    let is_component_id = schema
+        .and_then(|s| str_field(s, "$ref"))
+        .and_then(common_def_name)
+        == Some("ComponentId");
+    if is_component_id {
+        label.push_str(" (component ID)");
+    } else if !schema.is_some_and(|s| catalog.admits_path(s)) {
+        label.push_str(" (static)");
+    }
+    label
+}
+
 /// One signature per component, sorted by name.
 pub(super) fn components(catalog: &Catalog) -> String {
     let mut list: Vec<_> = catalog.components().iter().collect();
@@ -277,17 +303,7 @@ pub(super) fn components(catalog: &Catalog) -> String {
             let mut details = Vec::new();
             for p in component.properties() {
                 let schema = component.property_schema(p);
-                let mut label = format!("{p}{}", if component.is_required(p) { "" } else { "?" });
-                let is_component_id = schema
-                    .and_then(|s| str_field(s, "$ref"))
-                    .and_then(common_def_name)
-                    == Some("ComponentId");
-                if is_component_id {
-                    label.push_str(" (component ID)");
-                } else if !schema.is_some_and(|s| catalog.admits_path(s)) {
-                    label.push_str(" (static)");
-                }
-                args.push(label);
+                args.push(argument_label(catalog, component, p));
                 if let Some(detail) = property_detail(catalog, p, schema) {
                     details.push(detail);
                 }

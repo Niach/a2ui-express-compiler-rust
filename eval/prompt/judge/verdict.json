@@ -1,0 +1,42 @@
+{
+  "login": {
+    "A": {"fidelity": 3, "components": 4, "notes": "Validation checks are broken: required/email are applied to the error-message string instead of the field value, and the inputs are unbound."},
+    "B": {"fidelity": 5, "components": 5, "notes": "All elements present; checks validate the bound /email and /password values; Card-wrapped form is idiomatic."},
+    "winner": "B"
+  },
+  "dashboard": {
+    "A": {"fidelity": 4, "components": 5, "notes": "Header, tiles and bound order data present, but the up/down trend percentages are not shown on the tiles; titled Card around the Table is a good fit."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Same omission of the tile trends; the Table sits bare in the Stack with no section title."},
+    "winner": "A"
+  },
+  "settings": {
+    "A": {"fidelity": 4, "components": 5, "notes": "Sections, switches, select and slider all present, but the switches are not bound to the existing data model values."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Effectively identical to A, with the same unbound switches."},
+    "winner": "tie"
+  },
+  "chat": {
+    "A": {"fidelity": 4, "components": 5, "notes": "ScrollArea of three bubbles plus a Composer, but no visible send action and no draft binding."},
+    "B": {"fidelity": 4, "components": 4, "notes": "Same structure, Composer bound to /draft; no visible send event, and an extra Box wrapper adds nesting."},
+    "winner": "B"
+  },
+  "products": {
+    "A": {"fidelity": 4, "components": 4, "notes": "Search field and four hard-coded cards with every field, but the images have no source and Add to cart has no action."},
+    "B": {"fidelity": 4, "components": 5, "notes": "Search bound to /query and a data-driven card template over four products; the Image still lacks a bound source and Add to cart has no action."},
+    "winner": "B"
+  },
+  "empty": {
+    "A": {"fidelity": 5, "components": 5, "notes": "EmptyState with folder icon, title, one-sentence description and Create project action."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Equivalent EmptyState with every requested element."},
+    "winner": "tie"
+  },
+  "checkout": {
+    "A": {"fidelity": 5, "components": 5, "notes": "All fields bound with correct required checks, radio delivery choice, computed summary rows, and everything grouped in titled Cards."},
+    "B": {"fidelity": 3, "components": 4, "notes": "Text inputs are unbound and their required checks test literal message strings (broken); otherwise all sections are present, using Heading/Separator layout."},
+    "winner": "A"
+  },
+  "issue": {
+    "A": {"fidelity": 4, "components": 3, "notes": "All content present, but there is no Page header and the layout is ad-hoc nested Stacks with a static timeline."},
+    "B": {"fidelity": 5, "components": 5, "notes": "Page header with the Close button in the trailing slot, data-bound badges and tabs, and a List template over three events."},
+    "winner": "B"
+  }
+}

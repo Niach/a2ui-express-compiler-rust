@@ -1,0 +1,245 @@
+[
+  {
+    "arm": "express-compact",
+    "request": "login",
+    "replyChars": 625,
+    "parsed": true,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": true,
+    "renamedChecks": 2,
+    "components": 7,
+    "distinct": 7,
+    "types": [
+      "Box",
+      "Button",
+      "Checkbox",
+      "Form",
+      "Input",
+      "Link",
+      "Text"
+    ]
+  },
+  {
+    "arm": "express-compact",
+    "request": "dashboard",
+    "replyChars": 1091,
+    "parsed": true,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": true,
+    "renamedChecks": 0,
+    "components": 6,
+    "distinct": 3,
+    "types": [
+      "Box",
+      "Table",
+      "Text"
+    ]
+  },
+  {
+    "arm": "express-compact",
+    "request": "settings",
+    "replyChars": 1305,
+    "parsed": false,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": false,
+    "renamedChecks": 0,
+    "components": 0,
+    "distinct": 0,
+    "types": [],
+    "error": "compile: Property 'action' is not a valid property of component 'Button'."
+  },
+  {
+    "arm": "express-compact",
+    "request": "chat",
+    "replyChars": 873,
+    "parsed": true,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": true,
+    "renamedChecks": 0,
+    "components": 9,
+    "distinct": 5,
+    "types": [
+      "Box",
+      "Composer",
+      "Icon",
+      "Markdown",
+      "Text"
+    ]
+  },
+  {
+    "arm": "express-compact",
+    "request": "products",
+    "replyChars": 2001,
+    "parsed": true,
+    "refused": 0,
+    "issues": 4,
+    "issueSamples": [
+      "img1: props.aspectRatio: expected a number",
+      "img2: props.aspectRatio: expected a number",
+      "img3: props.aspectRatio: expected a number",
+      "img4: props.aspectRatio: expected a number"
+    ],
+    "validates": false,
+    "renamedChecks": 0,
+    "components": 27,
+    "distinct": 6,
+    "types": [
+      "Box",
+      "Button",
+      "Icon",
+      "Image",
+      "Input",
+      "Text"
+    ]
+  },
+  {
+    "arm": "express-compact",
+    "request": "empty",
+    "replyChars": 246,
+    "parsed": true,
+    "refused": 0,
+    "issues": 1,
+    "issueSamples": [
+      "root: props.subtitle: expected a string"
+    ],
+    "validates": false,
+    "renamedChecks": 0,
+    "components": 2,
+    "distinct": 2,
+    "types": [
+      "Box",
+      "Text"
+    ]
+  },
+  {
+    "arm": "eui-json",
+    "request": "login",
+    "replyChars": 1418,
+    "parsed": true,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": true,
+    "renamedChecks": 0,
+    "components": 8,
+    "distinct": 7,
+    "types": [
+      "Box",
+      "Button",
+      "Checkbox",
+      "Form",
+      "Input",
+      "Link",
+      "Text"
+    ]
+  },
+  {
+    "arm": "eui-json",
+    "request": "dashboard",
+    "replyChars": 1644,
+    "parsed": true,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": true,
+    "renamedChecks": 0,
+    "components": 8,
+    "distinct": 3,
+    "types": [
+      "Box",
+      "Table",
+      "Text"
+    ]
+  },
+  {
+    "arm": "eui-json",
+    "request": "settings",
+    "replyChars": 1466,
+    "parsed": true,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": true,
+    "renamedChecks": 0,
+    "components": 9,
+    "distinct": 8,
+    "types": [
+      "Box",
+      "Button",
+      "Form",
+      "List",
+      "Select",
+      "Slider",
+      "Switch",
+      "Text"
+    ]
+  },
+  {
+    "arm": "eui-json",
+    "request": "chat",
+    "replyChars": 1641,
+    "parsed": true,
+    "refused": 0,
+    "issues": 1,
+    "issueSamples": [
+      "composerBox: style.borderTop: not in the Box style whitelist"
+    ],
+    "validates": false,
+    "renamedChecks": 0,
+    "components": 10,
+    "distinct": 6,
+    "types": [
+      "Avatar",
+      "Box",
+      "Composer",
+      "Icon",
+      "Markdown",
+      "Text"
+    ]
+  },
+  {
+    "arm": "eui-json",
+    "request": "products",
+    "replyChars": 1960,
+    "parsed": true,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": true,
+    "renamedChecks": 0,
+    "components": 11,
+    "distinct": 3,
+    "types": [
+      "Box",
+      "Input",
+      "Text"
+    ]
+  },
+  {
+    "arm": "eui-json",
+    "request": "empty",
+    "replyChars": 533,
+    "parsed": true,
+    "refused": 0,
+    "issues": 0,
+    "issueSamples": [],
+    "validates": true,
+    "renamedChecks": 0,
+    "components": 2,
+    "distinct": 4,
+    "types": [
+      "Box",
+      "Button",
+      "Icon",
+      "Text"
+    ]
+  }
+]

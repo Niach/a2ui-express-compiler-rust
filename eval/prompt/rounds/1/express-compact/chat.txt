@@ -1,0 +1,11 @@
+<a2ui>
+surface("main")
+m1 = MessageBubble("Hi! Can you help me plan my trip to Lisbon?", side="out", time="10:02", status="read")
+m2 = MessageBubble("Of course! How many days will you be staying, and what do you like to do?", side="in", time="10:02", author="Assistant")
+m3 = MessageBubble("Four days. I love food and walking around old neighborhoods.", side="out", time="10:03", status="sent")
+messages = ScrollArea("vertical", children=[m1, m2, m3], style={flexGrow: 1, padding: 16})
+messageList = Stack("vertical", "md", children=[m1, m2, m3])
+scroller = ScrollArea("vertical", children=[messageList], style={flexGrow: 1})
+composer = Composer(placeholder="Type a message", submitLabel="Send", on={submit: Event("send_message", {text: $/draft})}, value=$/draft)
+root = Stack("vertical", "none", children=[scroller, Separator(), composer], style={height: "100%"})
+</a2ui>
