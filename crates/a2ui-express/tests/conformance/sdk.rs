@@ -447,11 +447,28 @@ pub fn open_stream(
 }
 
 /// Renders the Express prompt snippet for the active catalogs.
-pub fn generate_prompt(_config: &PromptConfig) -> SdkResult<String> {
-    Err(SdkError::unimplemented("generate_prompt"))
+pub fn generate_prompt(config: &PromptConfig) -> SdkResult<String> {
+    use a2ui_express::prompt::{PromptOptions, generate_prompt};
+    let catalogs = prompt_catalogs(&config.catalogs)?;
+    let options = PromptOptions {
+        surface_id: config.surface_id.clone(),
+        examples: config.examples.clone(),
+        allowed_messages: config.allowed_messages.clone(),
+    };
+    Ok(generate_prompt(&catalogs, &options)?)
 }
 
 /// The functions an agent may call standalone, across the catalogs.
-pub fn agent_callable_functions(_catalogs: &[Catalog]) -> SdkResult<Vec<String>> {
-    Err(SdkError::unimplemented("agent_callable_functions"))
+pub fn agent_callable_functions(catalogs: &[Catalog]) -> SdkResult<Vec<String>> {
+    let catalogs = prompt_catalogs(catalogs)?;
+    Ok(a2ui_express::prompt::agent_callable_functions(&catalogs))
+}
+
+/// The active catalogs of a prompt case, with their transformers applied.
+fn prompt_catalogs(catalogs: &[Catalog]) -> SdkResult<a2ui_express::schema::CatalogSet> {
+    let loaded = catalogs
+        .iter()
+        .map(load_catalog)
+        .collect::<SdkResult<_>>()?;
+    a2ui_express::schema::CatalogSet::new(loaded).map_err(SdkError::from)
 }

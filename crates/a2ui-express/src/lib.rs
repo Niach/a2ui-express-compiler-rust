@@ -11,12 +11,14 @@
 //! - [`state`]: the mirror of the surfaces a renderer holds, which streamed
 //!   and parsed messages are checked against.
 //! - [`decompile`]: messages back to Express.
+//! - [`prompt`]: the system-prompt section that teaches a model Express.
 //!
 //! The behaviour is pinned by the upstream language-neutral conformance suite
 //! vendored under `vendor/a2ui/conformance/agent/express/`.
 
 pub mod compile;
 pub mod decompile;
+pub mod prompt;
 pub mod response;
 pub mod schema;
 pub mod state;
