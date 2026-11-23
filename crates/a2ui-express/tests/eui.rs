@@ -211,3 +211,31 @@ $/rows = [{id: "a", label: "A"}]
         );
     }
 }
+
+/// With `keyword_args`, function calls name their arguments and leave unset
+/// ones out (`formatNumber(value=…, grouping=false)`, not
+/// `formatNumber(…, _, false)`), and still compile back to the same call.
+#[test]
+fn keyword_args_name_function_arguments() {
+    let compiler = compiler();
+    let source = r#"root = Text(text=formatNumber(value=$/n, grouping=false))
+$/n = 1234.5
+"#;
+    let first = compiler.compile(source, "main").unwrap();
+    for (keyword_args, expected) in [
+        (true, "formatNumber(value=$/n, grouping=false)"),
+        (false, "formatNumber($/n, _, false)"),
+    ] {
+        let options = DecompileOptions {
+            keyword_args,
+            order: Order::TopDown,
+        };
+        let express = decompile(compiler.catalogs(), &first, &options).unwrap();
+        assert!(express.contains(expected), "{express}");
+        let second = compiler.compile(&express, "main").unwrap();
+        assert!(
+            json_eq(&Value::Array(second), &Value::Array(first.clone())),
+            "{express}"
+        );
+    }
+}

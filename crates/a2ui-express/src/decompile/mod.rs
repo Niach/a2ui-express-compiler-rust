@@ -890,15 +890,23 @@ impl<'c> Decompiler<'c> {
         };
 
         let mut args = Vec::new();
+        // With keyword arguments, a call names what it sets and leaves out
+        // what it doesn't (`f(toggle=true)`, not `f(_, _, true)`). Arguments
+        // given as a list have no names and stay positional.
+        let keyword = self.options.keyword_args && list_args.is_none();
         for (idx, p) in catalog.function_arguments(func_name).iter().enumerate() {
             let value = match list_args {
                 Some(list) => list.get(idx),
                 None => dict_args.get(p),
             };
-            args.push(match value {
-                Some(v) => self.value(v, var_names, false, catalog, surface_catalog_id)?,
-                None => "_".to_owned(),
-            });
+            match value {
+                Some(v) => {
+                    let v = self.value(v, var_names, false, catalog, surface_catalog_id)?;
+                    args.push(if keyword { format!("{p}={v}") } else { v });
+                }
+                None if keyword => {}
+                None => args.push("_".to_owned()),
+            }
         }
         trim_placeholders(&mut args);
         if let Some(cid) = emit_catalog_id {
