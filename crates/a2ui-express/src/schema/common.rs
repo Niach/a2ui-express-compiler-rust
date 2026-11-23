@@ -1,4 +1,8 @@
 //! The protocol common types (`common_types.json`), embedded per version.
+//!
+//! `schemas/` in the crate holds copies of `vendor/a2ui/specification/*/json/
+//! common_types.json`, written by `scripts/sync-upstream.sh`, so the
+//! published crate carries them.
 
 use std::collections::HashSet;
 use std::sync::OnceLock;
@@ -7,10 +11,8 @@ use serde_json::{Map, Value};
 
 use super::CatalogVersion;
 
-const V0_9_COMMON_TYPES: &str =
-    include_str!("../../../../vendor/a2ui/specification/v0_9/json/common_types.json");
-const V1_0_COMMON_TYPES: &str =
-    include_str!("../../../../vendor/a2ui/specification/v1_0/json/common_types.json");
+const V0_9_COMMON_TYPES: &str = include_str!("../../schemas/v0_9/common_types.json");
+const V1_0_COMMON_TYPES: &str = include_str!("../../schemas/v1_0/common_types.json");
 
 fn parse(text: &str) -> Value {
     serde_json::from_str(text).expect("vendored common_types.json is valid JSON")

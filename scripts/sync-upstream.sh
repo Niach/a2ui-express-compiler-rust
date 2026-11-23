@@ -58,6 +58,12 @@ done
 # Express suite: only the YAML cases.
 find "$dest/conformance/agent/express" -type f ! -name '*.yaml' -delete
 
+# The crate embeds the common types, so it ships its own copy of them.
+for v in v0_9 v1_0; do
+  mkdir -p "$root/crates/a2ui-express/schemas/$v"
+  cp "$dest/specification/$v/json/common_types.json" "$root/crates/a2ui-express/schemas/$v/common_types.json"
+done
+
 cat > "$dest/UPSTREAM" <<META
 repository: https://github.com/a2ui-project/a2ui
 commit: $commit
