@@ -665,6 +665,9 @@ impl<'c> Decompiler<'c> {
         };
 
         let mut args: Vec<String> = Vec::new();
+        // Rules the `?name(…)` shorthand cannot spell, written after the
+        // positional arguments as `checks=[{condition: …, message: …}]`.
+        let mut long_form_checks: Option<String> = None;
         for (idx, prop) in properties.iter().enumerate() {
             let keyword = keyword_args && positional_until.is_none_or(|until| idx > until);
             if prop == "metadata" && !is_custom("metadata") && extensions.is_some() {
@@ -676,6 +679,15 @@ impl<'c> Decompiler<'c> {
                         envelope_value(comp, "checks", self.is_v1, custom)
                     } else {
                         comp.get(cp)
+                    };
+                    let checks = match checks {
+                        Some(rules) if self.needs_long_form(rules) => {
+                            let rules =
+                                self.value(rules, var_names, false, catalog, surface_catalog_id)?;
+                            long_form_checks = Some(format!("{prop}={rules}"));
+                            None
+                        }
+                        checks => checks,
                     };
                     self.check_property_arg(
                         prop,
@@ -714,16 +726,26 @@ impl<'c> Decompiler<'c> {
         trim_placeholders(&mut args);
 
         if check_prop == Some("checks") && is_custom("checks") {
-            let arg = self.check_property_arg(
-                "checks",
-                envelope_value(comp, "checks", self.is_v1, custom),
-                comp,
-                var_names,
-                surface_catalog_id,
-                false,
-            )?;
-            args.extend(arg.filter(|a| a != "_"));
+            let checks = envelope_value(comp, "checks", self.is_v1, custom);
+            let arg = match checks {
+                Some(rules) if self.needs_long_form(rules) => Some(format!(
+                    "checks={}",
+                    self.value(rules, var_names, false, catalog, surface_catalog_id)?
+                )),
+                checks => self
+                    .check_property_arg(
+                        "checks",
+                        checks,
+                        comp,
+                        var_names,
+                        surface_catalog_id,
+                        false,
+                    )?
+                    .filter(|a| a != "_"),
+            };
+            args.extend(arg);
         }
+        args.extend(long_form_checks);
         if let Some(cid) = emit_catalog_id {
             args.push(format!("catalogId={}", literal::string(cid)));
         }
@@ -766,6 +788,28 @@ impl<'c> Decompiler<'c> {
         } else {
             repr
         }))
+    }
+
+    /// Whether a list of check rules has one the `?name(…)` shorthand cannot
+    /// spell: a rule whose condition is not a function call, such as a
+    /// binding (`{condition: {"@path": "/ok"}}`) or a literal. Upstream
+    /// writes such a rule as `?None`, which does not compile (#AXC-18); the
+    /// whole list is written in the long form instead, so the rules keep
+    /// their order.
+    fn needs_long_form(&self, checks: &Value) -> bool {
+        let Value::Array(rules) = checks else {
+            return false;
+        };
+        rules.iter().filter_map(Value::as_object).any(|rule| {
+            let condition = rule
+                .get("condition")
+                .and_then(Value::as_object)
+                .unwrap_or(rule);
+            !present(condition.get("@call"))
+                .or_else(|| condition.get("call"))
+                .and_then(Value::as_str)
+                .is_some_and(|name| !name.is_empty())
+        })
     }
 
     /// Writes a check rule as `?name(...)` or `?name`.
