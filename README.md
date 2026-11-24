@@ -203,6 +203,18 @@ The lexer's identifier tables (`crates/a2ui-express/src/syntax/xid.rs`) are
 generated too, from upstream's ANTLR lexer at the same pin, so identifiers
 lex exactly as upstream lexes them: `scripts/gen-xid-tables.py <a2ui-checkout>`.
 
+A v1.0 identifier (a component id, a catalog's component, property, function
+and argument names, an extension key) is a different set:
+`^[\p{XID_Start}_][\p{XID_Continue}]*$` of Unicode 17.0.0, the version eui
+pins, where upstream's SDKs read whatever their JS engine or Python has
+(`a2ui_express::syntax::uax31`). ANTLR's tables are older, so a few v1.0
+identifiers are not Express names: `a` + U+200D (ZWJ, `XID_Continue` since
+Unicode 15.1) is a valid component id, and the decompiler writes it as
+`a_ = Text(…, id="a‍")`, the way it writes a reserved word. Upstream's TS
+decompiler writes such an id bare, which upstream's lexer does not read back.
+`syntax/uax31_tables.rs` holds what Unicode adds to the lexer's tables:
+`scripts/gen-uax31-tables.py <DerivedCoreProperties.txt>`.
+
 ## Prompt generator
 
 `a2ui_express::prompt::generate_prompt` writes the system-prompt section

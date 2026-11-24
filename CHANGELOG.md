@@ -2,6 +2,23 @@
 
 All crates and bindings of this workspace share one version.
 
+## Unreleased
+
+### Fixed
+
+- v1.0 identifiers (component ids, catalog names, extension keys) follow
+  Unicode 17.0.0, as eui does, instead of the Express lexer's older tables:
+  an id with ZWJ or ZWNJ (`XID_Continue` since Unicode 15.1) is accepted, and
+  the decompiler writes it under a derived variable name with `id="…"`.
+  The lexer is unchanged (#AXC-28).
+- A v1.0 catalog may name a component, property, function or argument `true`,
+  `false`, `null` or `_`, as upstream's loaders allow.
+
+### Added
+
+- `syntax::uax31`: `is_uax31_identifier`, `is_xid_start`, `is_xid_continue`
+  and `UNICODE_VERSION`.
+
 ## 0.2.0
 
 ### Breaking

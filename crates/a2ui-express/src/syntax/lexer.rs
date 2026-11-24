@@ -207,7 +207,7 @@ pub struct Lexed {
     pub errors: Vec<LexError>,
 }
 
-fn in_ranges(c: char, ranges: &[(u32, u32)]) -> bool {
+pub(super) fn in_ranges(c: char, ranges: &[(u32, u32)]) -> bool {
     let c = c as u32;
     ranges
         .binary_search_by(|&(lo, hi)| {
@@ -222,7 +222,8 @@ fn in_ranges(c: char, ranges: &[(u32, u32)]) -> bool {
         .is_ok()
 }
 
-/// `[\p{XID_Start}_]`, with upstream's exact tables.
+/// `[\p{XID_Start}_]`, with upstream's exact tables: what Express lexes, not
+/// what a v1.0 identifier is (see [`uax31`](super::uax31)).
 pub fn is_id_start(c: char) -> bool {
     in_ranges(c, ID_START)
 }

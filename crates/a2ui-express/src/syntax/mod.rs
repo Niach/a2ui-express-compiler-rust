@@ -13,6 +13,8 @@ pub mod lexer;
 pub mod normalize;
 pub mod parser;
 pub mod stream;
+pub mod uax31;
+mod uax31_tables;
 mod xid;
 
 pub use ast::*;

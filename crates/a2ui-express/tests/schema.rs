@@ -977,6 +977,23 @@ fn v1_names_are_uax31_identifiers() {
     )
     .unwrap();
     assert!(ok.has_component("Überschrift") && ok.has_function("öffne"));
+    // The identifiers are those of the Unicode version eui and current
+    // engines read, not the older tables of the Express lexer: ZWJ and ZWNJ
+    // continue an identifier since Unicode 15.1 (#AXC-28). Reserved words of
+    // Express are identifiers as well, as in Python's `isidentifier`.
+    let ok = v1_catalog(
+        json!({
+            "a\u{200d}": {"properties": {
+                "component": {"const": "a\u{200d}"},
+                "b\u{200c}c": {"type": "string"},
+                "true": {"type": "string"}
+            }},
+            "_": {"properties": {"component": {"const": "_"}}}
+        }),
+        function("f\u{200d}", "x\u{200c}"),
+    )
+    .unwrap();
+    assert!(ok.has_component("a\u{200d}") && ok.has_component("_") && ok.has_function("f\u{200d}"));
     // Any other `@` name is not a mixin.
     assert_eq!(
         message(v1_catalog(
