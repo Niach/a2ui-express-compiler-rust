@@ -730,9 +730,4 @@ fn literal_value(e: &Expr) -> Value {
     }
 }
 
-/// `[\p{XID_Start}_][\p{XID_Continue}]*`, the identifiers of the v1.0 spec.
-pub(crate) fn is_uax31_identifier(s: &str) -> bool {
-    let mut chars = s.chars();
-    matches!(chars.next(), Some(c) if syntax::lexer::is_id_start(c))
-        && chars.all(syntax::lexer::is_id_continue)
-}
+pub(crate) use syntax::uax31::is_uax31_identifier;

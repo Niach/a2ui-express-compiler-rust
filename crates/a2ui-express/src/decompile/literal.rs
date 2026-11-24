@@ -4,20 +4,18 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::Number;
 
-use crate::syntax::lexer::{is_id_continue, is_id_start, is_identifier};
+use crate::syntax::lexer::{is_id_continue, is_identifier};
 use crate::{Error, Result};
 
-/// Whether `s` is a UAX #31 identifier (reserved words included), which is
-/// what a v1.0 component id must be.
-pub fn is_uax31_identifier(s: &str) -> bool {
-    let mut chars = s.chars();
-    matches!(chars.next(), Some(c) if is_id_start(c)) && chars.all(is_id_continue)
-}
+pub use crate::syntax::uax31::is_uax31_identifier;
 
 /// Derives an Express variable name from an arbitrary component id.
 ///
-/// Every code point outside `XID_Continue` becomes `_`, then `_` is
-/// prefixed until the result is a non-reserved identifier.
+/// Every code point outside the lexer's `XID_Continue` becomes `_`, then `_`
+/// is prefixed until the result is a non-reserved identifier. The lexer's
+/// set, not the v1.0 one: the name has to lex. Upstream's TS decompiler asks
+/// the JS engine instead and writes `a\u{200d}` bare, which its own lexer
+/// does not read back.
 pub fn derive_variable_name(component_id: &str) -> String {
     let mut base: String = component_id
         .chars()
@@ -32,8 +30,9 @@ pub fn derive_variable_name(component_id: &str) -> String {
 /// Maps each component id of a block to the variable name it is written as.
 ///
 /// An id that is an Express identifier is its own name. Any other id (a
-/// pre-v1.0 `content-grid`, or a reserved word like `true`) gets a derived
-/// name (`content_grid`, `_true`) that no other id or variable of the block
+/// pre-v1.0 `content-grid`, a reserved word like `true`, or a v1.0
+/// identifier the lexer's older Unicode tables do not have, `a\u{200d}`)
+/// gets a derived name (`content_grid`, `_true`, `a_`) that no other id or variable of the block
 /// uses, suffixed `_2`, `_3`, … on a collision.
 pub fn assign_variable_names<'a>(
     component_ids: impl IntoIterator<Item = &'a str> + Clone,

@@ -11,7 +11,7 @@ use super::refs::{
 };
 use super::resolve::{Schemas, Segment, SlotKind};
 use super::{CatalogError, CatalogVersion};
-use crate::syntax::lexer::is_identifier;
+use crate::syntax::uax31::is_uax31_identifier;
 
 const STANDARD_CATALOG_ID_DESCRIPTION: &str =
     "The catalog ID for this component, overriding any surface-level default catalogId.";
@@ -693,7 +693,7 @@ impl Catalog {
 /// From v1.0 a component's name and the properties it declares are UAX #31
 /// identifiers, and its static `metadata` holds only `extensions`.
 fn check_v1_component(name: &str, schema: &Value) -> Result<(), CatalogError> {
-    if !is_identifier(name) {
+    if !is_uax31_identifier(name) {
         return Err(CatalogError::InvalidIdentifier {
             kind: "component",
             name: name.to_owned(),
@@ -703,7 +703,7 @@ fn check_v1_component(name: &str, schema: &Value) -> Result<(), CatalogError> {
     if let Some(Value::Object(properties)) = schema.get("properties") {
         // The standard mixins are spelled with a leading `@` from v1.0.
         let invalid = properties.keys().find(|p| {
-            !is_identifier(p)
+            !is_uax31_identifier(p)
                 && !p
                     .strip_prefix('@')
                     .is_some_and(|bare| ENVELOPE_MIXIN_NAMES.contains(&bare))
@@ -722,14 +722,14 @@ fn check_v1_component(name: &str, schema: &Value) -> Result<(), CatalogError> {
 /// From v1.0 a function's name and its arguments are UAX #31 identifiers.
 fn check_v1_function(function: &Function) -> Result<(), CatalogError> {
     let name = function.name();
-    if !is_identifier(name) {
+    if !is_uax31_identifier(name) {
         return Err(CatalogError::InvalidIdentifier {
             kind: "function",
             name: name.to_owned(),
             owner: None,
         });
     }
-    if let Some(argument) = function.arguments().iter().find(|a| !is_identifier(a)) {
+    if let Some(argument) = function.arguments().iter().find(|a| !is_uax31_identifier(a)) {
         return Err(CatalogError::InvalidIdentifier {
             kind: "argument",
             name: argument.clone(),
@@ -766,7 +766,7 @@ fn check_metadata(metadata: Option<&Value>, owner: &str) -> Result<(), CatalogEr
     }
     match metadata.get("extensions") {
         None => Ok(()),
-        Some(Value::Object(extensions)) => match extensions.keys().find(|k| !is_identifier(k)) {
+        Some(Value::Object(extensions)) => match extensions.keys().find(|k| !is_uax31_identifier(k)) {
             Some(key) => Err(invalid(format!(
                 "Invalid UAX #31 extension identifier '{key}' in {owner} metadata.extensions."
             ))),
