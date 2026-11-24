@@ -223,8 +223,16 @@ fn eui_fixture() -> Value {
     serde_json::from_str(&text).unwrap()
 }
 
-/// Ids eui reads as identifiers under Unicode 15.1 and the crate does not.
-const UNICODE_15_1_ID_CONTINUE: &[&str] = &["a\u{200d}"];
+/// Ids that are v1.0 identifiers and that Express does not lex as one
+/// `IDENTIFIER`, with the variable name the decompiler writes instead.
+///
+/// Unicode 15.1 added ZWJ and ZWNJ (U+200D, U+200C) to `XID_Continue`, so
+/// `a\u{200d}` is a v1.0 component id in eui, in upstream's TS SDK (the
+/// engine's `\p{XID_Continue}`) and in Python's `isidentifier`. Upstream's
+/// ANTLR lexer has older tables compiled in and does not lex it, so the
+/// decompiler writes it like a reserved word: under a derived name, with
+/// `id="a\u{200d}"` (#AXC-28).
+const NOT_LEXED: &[(&str, &str)] = &[("a\u{200d}", "a_")];
 
 fn eui_compiler() -> Compiler {
     let path = manifest().join("../../vendor/eui/catalog/core.schema.json");
@@ -237,10 +245,8 @@ fn eui_compiler() -> Compiler {
 /// decompiler derives is the id eui's 0.9 → 1.0 upgrade renames it to
 /// (`mangle`). An id that is an identifier keeps its name in both.
 ///
-/// Except where eui reads a newer Unicode: Unicode 15.1 added ZWJ and ZWNJ
-/// (U+200D, U+200C) to `XID_Continue`. eui (and Python's `isidentifier`)
-/// accept `a\u{200d}`; the crate's tables are generated from upstream's
-/// ANTLR lexer, which predates that, so Express does not lex it.
+/// The exception is an id Express does not lex ([`NOT_LEXED`]): eui keeps
+/// it, the decompiler has to rename it.
 #[test]
 fn eui_id_mangling_matches() {
     let fixture = eui_fixture();
@@ -252,11 +258,6 @@ fn eui_id_mangling_matches() {
         let expected = &entry["expected"];
         let identifier = expected["identifier"].as_bool().unwrap();
         let mangle = expected["mangle"].as_str().unwrap();
-        if UNICODE_15_1_ID_CONTINUE.contains(&id) {
-            // Listed until the tables catch up: fails when they do.
-            assert!(identifier && !is_uax31_identifier(id), "{id:?} agrees now");
-            continue;
-        }
         assert_eq!(is_uax31_identifier(id), identifier, "identifier {id:?}");
         if identifier {
             assert_eq!(mangle, id, "eui keeps identifier {id:?}");
@@ -265,7 +266,10 @@ fn eui_id_mangling_matches() {
         }
         // Express renames a reserved word once more: `_` is its skip
         // placeholder, so an id eui mangles to `_` is written `__`.
-        let want = if is_identifier(mangle) {
+        let want = if let Some((_, name)) = NOT_LEXED.iter().find(|(i, _)| *i == id) {
+            assert!(identifier && !is_identifier(id), "Express lexes {id:?} now");
+            (*name).to_owned()
+        } else if is_identifier(mangle) {
             mangle.to_owned()
         } else {
             format!("_{mangle}")
@@ -277,6 +281,40 @@ fn eui_id_mangling_matches() {
         );
     }
     assert!(mangled >= 8, "only {mangled} non-identifier ids");
+}
+
+/// Every id eui reads as an identifier is a v1.0 component id and
+/// extension key here too: a surface that uses it compiles back to itself in
+/// every mode, whether Express lexes the id (a bare variable name) or not
+/// (`id="…"`, a quoted key).
+#[test]
+fn eui_identifier_ids_round_trip() {
+    let fixture = eui_fixture();
+    let compiler = eui_compiler();
+    let core = compiler.catalogs().catalogs()[0].id().to_owned();
+    let mut checked = 0;
+    for entry in fixture["ids"].as_array().unwrap() {
+        if !entry["expected"]["identifier"].as_bool().unwrap() {
+            continue;
+        }
+        let id = entry["id"].as_str().unwrap();
+        let message = serde_json::json!({
+            "version": "1.0",
+            "createSurface": {
+                "surfaceId": "ids",
+                "catalogId": core,
+                "components": [
+                    {"id": "root", "component": "Stack", "children": [id]},
+                    {"id": id, "component": "Text", "text": "Hi"},
+                ],
+                "metadata": {"extensions": {id: 1}},
+            }
+        });
+        round_trip_all(&compiler, "ids", std::slice::from_ref(&message))
+            .unwrap_or_else(|e| panic!("id {id:?}: {e}"));
+        checked += 1;
+    }
+    assert!(checked >= 12, "only {checked} identifier ids");
 }
 
 /// The v1.0 messages eui's router accepts, against eui's core catalog.
