@@ -729,7 +729,11 @@ fn check_v1_function(function: &Function) -> Result<(), CatalogError> {
             owner: None,
         });
     }
-    if let Some(argument) = function.arguments().iter().find(|a| !is_uax31_identifier(a)) {
+    if let Some(argument) = function
+        .arguments()
+        .iter()
+        .find(|a| !is_uax31_identifier(a))
+    {
         return Err(CatalogError::InvalidIdentifier {
             kind: "argument",
             name: argument.clone(),
@@ -766,12 +770,14 @@ fn check_metadata(metadata: Option<&Value>, owner: &str) -> Result<(), CatalogEr
     }
     match metadata.get("extensions") {
         None => Ok(()),
-        Some(Value::Object(extensions)) => match extensions.keys().find(|k| !is_uax31_identifier(k)) {
-            Some(key) => Err(invalid(format!(
-                "Invalid UAX #31 extension identifier '{key}' in {owner} metadata.extensions."
-            ))),
-            None => Ok(()),
-        },
+        Some(Value::Object(extensions)) => {
+            match extensions.keys().find(|k| !is_uax31_identifier(k)) {
+                Some(key) => Err(invalid(format!(
+                    "Invalid UAX #31 extension identifier '{key}' in {owner} metadata.extensions."
+                ))),
+                None => Ok(()),
+            }
+        }
         Some(other) => Err(invalid(format!(
             "Expected {owner} metadata.extensions to be an object, got {}.",
             json_type(other)
