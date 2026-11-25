@@ -2,13 +2,10 @@
 //!
 //! Loads `vendor/a2ui/conformance/agent/express/*.yaml`, runs every case
 //! through the calls in `conformance/sdk.rs`, and prints the pass count per
-//! suite. As upstream's Python and TypeScript harnesses do, each case runs as
-//! written (`v1.0`) and again lowered to v0.9 (`v0.9-lowered`), unless it
-//! cannot be lowered.
+//! suite. `conformance/out_of_scope.txt` lists the pre-1.0 cases left out.
 //!
 //! `conformance/known_failures.txt` (at the repository root) lists the cases
-//! expected to fail, as `<case>` (every version) or `<case>::<version>`. The
-//! run fails when a case not listed fails, when a listed case passes, or when
+//! expected to fail. The run fails when a case not listed fails, when a listed case passes, or when
 //! the list names a case that does not exist, so the list only ever shrinks.
 //!
 //! ```sh
@@ -22,8 +19,6 @@
 mod cases;
 #[path = "conformance/check.rs"]
 mod check;
-#[path = "conformance/lowering.rs"]
-mod lowering;
 #[path = "conformance/run.rs"]
 mod run;
 #[path = "conformance/sdk.rs"]
@@ -36,7 +31,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use cases::{Case, SUITES, check_case_keys, load_suite};
-use run::{Version, run_case};
+use run::run_case;
 
 fn known_failures_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/known_failures.txt")
@@ -45,10 +40,8 @@ fn known_failures_path() -> PathBuf {
 const KNOWN_FAILURES_HEADER: &str = "\
 # Upstream Express conformance cases expected to fail.
 #
-# One entry per line: `<case>` fails in every version it runs in, and
-# `<case>::v1.0` or `<case>::v0.9-lowered` in that version only. The
-# conformance test fails when a listed case passes, so remove its entry when
-# you fix it. Regenerate with:
+# One case per line. The conformance test fails when a listed case passes, so
+# remove its entry when you fix it. Regenerate with:
 #
 #   CONFORMANCE_BLESS=1 cargo test -p a2ui-express --test conformance
 ";
@@ -71,17 +64,15 @@ fn read_known_failures() -> Result<BTreeSet<String>, String> {
 enum Outcome {
     Pass,
     Fail(String),
-    Skip(String),
 }
 
 struct Record<'a> {
     case: &'a Case,
-    version: Version,
     outcome: Outcome,
 }
 
-fn run_guarded(case: &Case, version: Version) -> Outcome {
-    match catch_unwind(AssertUnwindSafe(|| run_case(case, version))) {
+fn run_guarded(case: &Case) -> Outcome {
+    match catch_unwind(AssertUnwindSafe(|| run_case(case))) {
         Ok(Ok(())) => Outcome::Pass,
         Ok(Err(reason)) => Outcome::Fail(reason),
         Err(panic) => {
@@ -92,15 +83,6 @@ fn run_guarded(case: &Case, version: Version) -> Outcome {
                 .unwrap_or_else(|| "panic".to_owned());
             Outcome::Fail(format!("panicked: {message}"))
         }
-    }
-}
-
-fn versions_for(case: &Case) -> &'static [Version] {
-    // Upstream times the scaling cases as written only.
-    if case.action == "measure_growth" {
-        &Version::ALL[..1]
-    } else {
-        &Version::ALL
     }
 }
 
@@ -158,20 +140,8 @@ fn main() -> ExitCode {
             {
                 continue;
             }
-            for &version in versions_for(case) {
-                let outcome = match version {
-                    Version::V0_9Lowered => match lowering::v09_skip_reason(case) {
-                        Some(reason) => Outcome::Skip(reason),
-                        None => run_guarded(case, version),
-                    },
-                    Version::V1_0 => run_guarded(case, version),
-                };
-                records.push(Record {
-                    case,
-                    version,
-                    outcome,
-                });
-            }
+            let outcome = run_guarded(case);
+            records.push(Record { case, outcome });
         }
     }
 
@@ -180,26 +150,20 @@ fn main() -> ExitCode {
     let mut unexpected_failures = Vec::new();
     let mut unexpected_passes = Vec::new();
     for record in &records {
-        let qualified = format!("{}::{}", record.case.name, record.version.key());
-        let entry: Option<&str> = known
-            .get(&qualified)
-            .or_else(|| known.get(&record.case.name))
-            .map(String::as_str);
+        let name = record.case.name.as_str();
+        let entry: Option<&str> = known.get(name).map(String::as_str);
         if let Some(entry) = entry {
             used.insert(entry);
         }
         match (&record.outcome, entry) {
-            (Outcome::Fail(reason), None) => unexpected_failures.push((qualified, reason)),
-            (Outcome::Pass, Some(entry)) => unexpected_passes.push((qualified, entry)),
+            (Outcome::Fail(reason), None) => unexpected_failures.push((name, reason)),
+            (Outcome::Pass, Some(_)) => unexpected_passes.push(name),
             (Outcome::Fail(reason), Some(_)) if verbose => {
                 println!(
-                    "known failure {}/{qualified}\n{}",
+                    "known failure {}/{name}\n{}",
                     record.case.suite,
                     indent(reason)
                 );
-            }
-            (Outcome::Skip(reason), _) if verbose => {
-                println!("skipped {}/{qualified}: {reason}", record.case.suite);
             }
             _ => {}
         }
@@ -236,15 +200,10 @@ fn main() -> ExitCode {
             indent(reason)
         );
     }
-    for (name, entry) in &unexpected_passes {
+    for name in &unexpected_passes {
         let _ = writeln!(
             report,
-            "\nPASS {name}, listed as `{entry}` in known_failures.txt: remove the entry{}",
-            if entry.contains("::") {
-                ""
-            } else {
-                " (or narrow it to the version that still fails)"
-            }
+            "\nPASS {name}, listed in known_failures.txt: remove the entry"
         );
     }
     for entry in &stale {
@@ -267,106 +226,34 @@ fn main() -> ExitCode {
     }
 }
 
-#[derive(Default, Clone, Copy)]
-struct Tally {
-    pass: usize,
-    run: usize,
-    skip: usize,
-}
-
-impl Tally {
-    fn add(&mut self, outcome: &Outcome) {
-        match outcome {
-            Outcome::Pass => {
-                self.pass += 1;
-                self.run += 1;
-            }
-            Outcome::Fail(_) => self.run += 1,
-            Outcome::Skip(_) => self.skip += 1,
-        }
-    }
-
-    fn show(self) -> String {
-        if self.run == 0 && self.skip == 0 {
-            return "-".to_owned();
-        }
-        let mut s = format!("{}/{}", self.pass, self.run);
-        if self.skip > 0 {
-            let _ = write!(s, " ({} skipped)", self.skip);
-        }
-        s
-    }
-}
-
 fn print_summary(suites: &[(&str, Vec<Case>)], records: &[Record]) {
-    let mut by_suite: BTreeMap<(&str, &str), Tally> = BTreeMap::new();
-    let mut totals: BTreeMap<&str, Tally> = BTreeMap::new();
+    let mut by_suite: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for record in records {
-        let key = record.version.key();
-        by_suite
-            .entry((record.case.suite, key))
-            .or_default()
-            .add(&record.outcome);
-        totals.entry(key).or_default().add(&record.outcome);
+        let tally = by_suite.entry(record.case.suite).or_default();
+        tally.0 += usize::from(matches!(record.outcome, Outcome::Pass));
+        tally.1 += 1;
     }
-    let (v10, v09) = (Version::V1_0.key(), Version::V0_9Lowered.key());
     println!("\nExpress conformance (passed/run)");
-    println!("{:<20} {:<14} {}", "suite", v10, v09);
     for (suite, _) in suites {
-        let get = |v| by_suite.get(&(*suite, v)).copied().unwrap_or_default();
-        println!("{:<20} {:<14} {}", suite, get(v10).show(), get(v09).show());
+        let (pass, run) = by_suite.get(suite).copied().unwrap_or_default();
+        println!("{suite:<20} {pass}/{run}");
     }
-    let get = |v| totals.get(v).copied().unwrap_or_default();
-    println!(
-        "{:<20} {:<14} {}",
-        "total",
-        get(v10).show(),
-        get(v09).show()
-    );
+    let pass: usize = by_suite.values().map(|t| t.0).sum();
+    println!("{:<20} {pass}/{}", "total", records.len());
 }
 
 fn write_known_failures(records: &[Record]) -> Result<PathBuf, String> {
-    // Per case, in suite order: the versions it fails in and the ones it ran in.
-    let mut order: Vec<&str> = Vec::new();
-    let mut failing: BTreeMap<&str, (Vec<&str>, usize)> = BTreeMap::new();
-    for record in records {
-        let name = record.case.name.as_str();
-        if !failing.contains_key(name) {
-            order.push(name);
-        }
-        let entry = failing.entry(name).or_default();
-        match record.outcome {
-            Outcome::Fail(_) => {
-                entry.0.push(record.version.key());
-                entry.1 += 1;
-            }
-            Outcome::Pass => entry.1 += 1,
-            Outcome::Skip(_) => {}
-        }
-    }
     let mut text = KNOWN_FAILURES_HEADER.to_owned();
     let mut suite = "";
     for record in records {
-        let name = record.case.name.as_str();
-        if order.first() != Some(&name) {
-            continue;
-        }
-        order.remove(0);
-        let (versions, ran) = &failing[name];
-        if versions.is_empty() {
+        if !matches!(record.outcome, Outcome::Fail(_)) {
             continue;
         }
         if record.case.suite != suite {
             suite = record.case.suite;
             let _ = write!(text, "\n# {suite}\n");
         }
-        if versions.len() == *ran {
-            let _ = writeln!(text, "{name}");
-        } else {
-            for v in versions {
-                let _ = writeln!(text, "{name}::{v}");
-            }
-        }
+        let _ = writeln!(text, "{}", record.case.name);
     }
     let path = known_failures_path();
     std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))?;

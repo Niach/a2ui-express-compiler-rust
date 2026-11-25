@@ -4,7 +4,7 @@
 //! that the response parser and the response stream rely on. Messages are
 //! checked against what the renderer already received before they are sent:
 //!
-//! - every message states the catalogs' protocol version;
+//! - every message states the protocol version;
 //! - a `createSurface` names an active catalog and a surface that does not
 //!   exist yet; every other message names a surface that does;
 //! - every component names a component its catalog declares.
@@ -228,10 +228,10 @@ impl RendererState {
         };
         let wire = self.version.wire();
         match map.get("version").and_then(Value::as_str) {
-            Some(v) if versions_match(v, wire) => {}
+            Some(v) if v == wire => {}
             other => {
                 return Err(invalid(format!(
-                    "Message {index} states version {}, but the catalogs expect '{wire}'.",
+                    "Message {index} states version {}, expected '{wire}'.",
                     other.map_or("none".to_owned(), |v| format!("'{v}'"))
                 )));
             }
@@ -377,13 +377,10 @@ impl RendererState {
         }
     }
 
-    /// The catalog a component resolves to: its own `catalogId`, else the
+    /// The catalog a component resolves to: its own `@catalogId`, else the
     /// surface's, else the first active catalog declaring it.
     fn catalog_for(&self, c: &Component, surface: Option<&str>, kind: &str) -> Option<&Catalog> {
-        let own = c
-            .get("catalogId")
-            .or_else(|| c.get("@catalogId"))
-            .and_then(Value::as_str);
+        let own = c.get("@catalogId").and_then(Value::as_str);
         if let Some(id) = own.or(surface) {
             return self.catalogs.get(id).filter(|cat| cat.has_component(kind));
         }
@@ -544,12 +541,6 @@ impl RendererState {
         };
         self.record(Undo::Component(surface_id.to_owned(), id.to_owned(), old));
     }
-}
-
-fn versions_match(stated: &str, wire: &str) -> bool {
-    let norm = |v: &str| v.trim_start_matches('v').to_owned();
-    let (a, b) = (norm(stated), norm(wire));
-    a == b || (a.starts_with("0.9") && b.starts_with("0.9"))
 }
 
 /// The component ids `value` holds where `schema` declares child slots.

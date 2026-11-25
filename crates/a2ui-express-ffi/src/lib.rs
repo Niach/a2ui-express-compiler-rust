@@ -156,17 +156,20 @@ pub fn load_catalogs(catalogs: Value) -> Result<Vec<Catalog>> {
         .collect()
 }
 
-/// Parses a protocol version option (`"1.0"`, `"0.9"`, …).
+/// Parses a protocol version option (`"1.0"`, the only one).
 pub fn parse_version(version: Option<&str>) -> Result<Option<CatalogVersion>> {
     version
         .map(|v| {
-            CatalogVersion::parse(v)
-                .ok_or_else(|| FfiError::argument(format!("unsupported protocol version {v:?}")))
+            CatalogVersion::parse(v).ok_or_else(|| {
+                FfiError::argument(format!(
+                    "unsupported protocol version {v:?}; expected \"1.0\""
+                ))
+            })
         })
         .transpose()
 }
 
-/// A compiler for `catalogs`, at `version` (default: the catalogs').
+/// A compiler for `catalogs`, at `version` (`"1.0"`, the default).
 pub fn compiler(catalogs: Value, version: Option<&str>) -> Result<Compiler> {
     let version = parse_version(version)?;
     Ok(Compiler::new(load_catalogs(catalogs)?, version)?)
@@ -373,7 +376,7 @@ pub struct ResponseOptions {
     pub progressive_keys: Option<Vec<String>>,
     /// What a stream does after a rejected block.
     pub after_rejected_block: AfterRejectedBlock,
-    /// The protocol version (default: the catalogs').
+    /// The protocol version (`"1.0"`, the default).
     pub version: Option<String>,
 }
 
@@ -534,8 +537,8 @@ pub struct Catalogs {
 type CachedParser = (String, Option<Vec<String>>, ExpressParser);
 
 impl Catalogs {
-    /// Loads catalog documents (one, or a list) for `version` (default:
-    /// the catalogs' own).
+    /// Loads catalog documents (one, or a list) for `version` (`"1.0"`,
+    /// the default).
     pub fn new(catalogs: Value, version: Option<&str>) -> Result<Self> {
         Self::with_surface(catalogs, version, None)
     }
@@ -557,7 +560,7 @@ impl Catalogs {
         })
     }
 
-    /// The protocol version messages are compiled for (`"1.0"`, `"v0.9"`…).
+    /// The protocol version messages are compiled for (`"1.0"`).
     pub fn version(&self) -> &'static str {
         self.base.compiler().version().wire()
     }

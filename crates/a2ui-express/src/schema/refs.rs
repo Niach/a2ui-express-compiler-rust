@@ -69,53 +69,21 @@ pub(crate) fn resolve_json_pointer<'a>(root: &'a Value, pointer: &str) -> Option
 }
 
 /// The envelope mixin names that `ComponentCommon` and `Checkable` add to
-/// component objects (`id` and `component` stay bare in every version).
+/// component objects as `@<name>` (`id` and `component` stay bare).
 pub const ENVELOPE_MIXIN_NAMES: [&str; 4] = ["catalogId", "metadata", "accessibility", "checks"];
 
-/// The wire key of an envelope mixin: `@<name>` on v1.0, `<name>` below.
-pub fn envelope_key(name: &str, at_least_v1: bool) -> String {
-    if at_least_v1 {
-        format!("@{name}")
-    } else {
-        name.to_owned()
-    }
+/// The wire key of an envelope mixin: `@<name>`.
+pub fn envelope_key(name: &str) -> String {
+    format!("@{name}")
 }
 
-/// The key under which `component` holds envelope mixin `name`, if any.
-///
-/// On v1.0 prefers `@<name>`, falling back to a legacy bare `<name>` only when
-/// the component does not declare `<name>` as a custom property.
-pub fn envelope_read_key(
-    component: &Map<String, Value>,
-    name: &str,
-    at_least_v1: bool,
-    custom_properties: &[String],
-) -> Option<String> {
-    if at_least_v1 {
-        let at_key = format!("@{name}");
-        if component.contains_key(&at_key) {
-            return Some(at_key);
-        }
-        if custom_properties.iter().any(|p| p == name) {
-            return None;
-        }
-    }
-    component.contains_key(name).then(|| name.to_owned())
+/// Reads envelope mixin `name` from a component object, under its `@` key.
+pub fn envelope_value<'a>(component: &'a Map<String, Value>, name: &str) -> Option<&'a Value> {
+    component.get(&envelope_key(name))
 }
 
-/// Reads envelope mixin `name` from a component object.
-pub fn envelope_value<'a>(
-    component: &'a Map<String, Value>,
-    name: &str,
-    at_least_v1: bool,
-    custom_properties: &[String],
-) -> Option<&'a Value> {
-    envelope_read_key(component, name, at_least_v1, custom_properties)
-        .and_then(|k| component.get(&k))
-}
-
-/// Whether `$ref` is one a v1.0 catalog may hold: into itself or `common_types.json`.
-pub(crate) fn is_supported_v1_ref(reference: &str) -> bool {
+/// Whether `$ref` is one a catalog may hold: into itself or `common_types.json`.
+pub(crate) fn is_supported_ref(reference: &str) -> bool {
     if reference.starts_with('#') {
         return true;
     }
@@ -131,7 +99,7 @@ mod tests {
     #[test]
     fn recognizes_common_type_refs() {
         assert_eq!(
-            common_def_name("https://a2ui.org/specification/v0_9/common_types.json#/$defs/Action"),
+            common_def_name("https://a2ui.org/specification/v1_0/common_types.json#/$defs/Action"),
             Some("Action")
         );
         assert_eq!(
@@ -162,29 +130,21 @@ mod tests {
     }
 
     #[test]
-    fn envelope_keys_follow_the_version() {
-        assert_eq!(envelope_key("checks", true), "@checks");
-        assert_eq!(envelope_key("checks", false), "checks");
-        let comp = json!({"@checks": [1], "checks": 2});
+    fn envelope_keys_carry_an_at() {
+        assert_eq!(envelope_key("checks"), "@checks");
+        let comp = json!({"@checks": [1], "checks": 2, "metadata": 3});
         let comp = comp.as_object().unwrap();
-        assert_eq!(envelope_value(comp, "checks", true, &[]), Some(&json!([1])));
-        assert_eq!(envelope_value(comp, "checks", false, &[]), Some(&json!(2)));
-        let bare = json!({"metadata": 3});
-        let bare = bare.as_object().unwrap();
-        assert_eq!(envelope_value(bare, "metadata", true, &[]), Some(&json!(3)));
-        assert_eq!(
-            envelope_value(bare, "metadata", true, &["metadata".into()]),
-            None
-        );
+        assert_eq!(envelope_value(comp, "checks"), Some(&json!([1])));
+        assert_eq!(envelope_value(comp, "metadata"), None);
     }
 
     #[test]
-    fn v1_refs_stay_in_the_catalog_or_common_types() {
-        assert!(is_supported_v1_ref("#/$defs/X"));
-        assert!(is_supported_v1_ref("catalog.json#/components/X"));
-        assert!(is_supported_v1_ref(
+    fn refs_stay_in_the_catalog_or_common_types() {
+        assert!(is_supported_ref("#/$defs/X"));
+        assert!(is_supported_ref("catalog.json#/components/X"));
+        assert!(is_supported_ref(
             "https://a2ui.org/specification/v1_0/common_types.json#/$defs/X"
         ));
-        assert!(!is_supported_v1_ref("other.json#/$defs/X"));
+        assert!(!is_supported_ref("other.json#/$defs/X"));
     }
 }

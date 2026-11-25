@@ -90,14 +90,7 @@ fn is_wire_envelope(catalog: &Catalog, s: &Value, depth: usize) -> bool {
         }
         return false;
     }
-    if catalog.call_key() == "@call" {
-        if props.contains_key("@call") && requires("@call") {
-            return true;
-        }
-    } else if props.contains_key("call")
-        && (props.contains_key("args") || props.contains_key("returnType"))
-        && requires("call")
-    {
+    if props.contains_key("@call") && requires("@call") {
         return true;
     }
     props.len() == 2

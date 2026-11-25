@@ -12,10 +12,9 @@ keywords = ["a2ui", "genui", "llm", "compiler", "ui"]
 categories = ["compilers", "parser-implementations", "wasm"]
 include = ["src/**/*", "schemas/**/*", "Cargo.toml", "LICENSE", "NOTICE"]
 
-# Runtime dependencies stay limited to serde, serde_json and thiserror so the
+# Runtime dependencies stay limited to serde_json and thiserror so the
 # crate embeds cleanly in eui-core and builds for wasm32-unknown-unknown.
 [dependencies]
-serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 

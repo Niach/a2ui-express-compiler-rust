@@ -1,8 +1,8 @@
-//! The protocol common types (`common_types.json`), embedded per version.
+//! The protocol common types (`common_types.json`), embedded.
 //!
-//! `schemas/` in the crate holds copies of `vendor/a2ui/specification/*/json/
+//! `schemas/` in the crate holds a copy of `vendor/a2ui/specification/*/json/
 //! common_types.json`, written by `scripts/sync-upstream.sh`, so the
-//! published crate carries them.
+//! published crate carries it.
 
 use std::collections::HashSet;
 use std::sync::OnceLock;
@@ -11,7 +11,6 @@ use serde_json::{Map, Value};
 
 use super::CatalogVersion;
 
-const V0_9_COMMON_TYPES: &str = include_str!("../../schemas/v0_9/common_types.json");
 const V1_0_COMMON_TYPES: &str = include_str!("../../schemas/v1_0/common_types.json");
 
 fn parse(text: &str) -> Value {
@@ -20,12 +19,8 @@ fn parse(text: &str) -> Value {
 
 /// The `common_types.json` document of a protocol version.
 pub fn common_types(version: CatalogVersion) -> &'static Value {
-    static V0_9: OnceLock<Value> = OnceLock::new();
     static V1_0: OnceLock<Value> = OnceLock::new();
     match version {
-        CatalogVersion::V0_9 | CatalogVersion::V0_9_1 => {
-            V0_9.get_or_init(|| parse(V0_9_COMMON_TYPES))
-        }
         CatalogVersion::V1_0 => V1_0.get_or_init(|| parse(V1_0_COMMON_TYPES)),
     }
 }
@@ -38,7 +33,7 @@ pub(crate) fn defs_of(common: &Value) -> Option<&Map<String, Value>> {
         .and_then(Value::as_object)
 }
 
-/// The names of every standard common type, across protocol versions.
+/// The names of every standard common type.
 ///
 /// A catalog-local `#/$defs/<Name>` whose name is one of these is read as an
 /// alias of the common type.
@@ -50,10 +45,8 @@ pub(crate) fn common_def_names() -> &'static HashSet<String> {
                 .into_iter()
                 .map(String::from)
                 .collect();
-        for version in [CatalogVersion::V0_9, CatalogVersion::V1_0] {
-            if let Some(defs) = defs_of(common_types(version)) {
-                names.extend(defs.keys().cloned());
-            }
+        if let Some(defs) = defs_of(common_types(CatalogVersion::V1_0)) {
+            names.extend(defs.keys().cloned());
         }
         names
     })
@@ -87,19 +80,10 @@ mod tests {
             .map(|(n, _)| n)
             .collect();
         assert_eq!(names, ["@index"]);
-        assert!(system_function_schemas(common_types(CatalogVersion::V0_9)).is_empty());
     }
 
     #[test]
-    fn v0_9_1_reads_the_v0_9_common_types() {
-        assert!(std::ptr::eq(
-            common_types(CatalogVersion::V0_9),
-            common_types(CatalogVersion::V0_9_1)
-        ));
-    }
-
-    #[test]
-    fn standard_names_cover_both_versions() {
+    fn standard_names_are_the_common_types() {
         let names = common_def_names();
         for n in [
             "Action",

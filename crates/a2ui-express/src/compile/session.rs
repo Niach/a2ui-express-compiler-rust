@@ -280,7 +280,7 @@ impl ScopeSession {
             }
             return Ok((Vec::new(), None));
         }
-        let mut ctx = Ctx::new(compiler.version());
+        let mut ctx = Ctx::new();
         ctx.allow_pending = !is_final;
         let mut active: HashSet<String> = existing.clone();
         let mut out = Vec::new();

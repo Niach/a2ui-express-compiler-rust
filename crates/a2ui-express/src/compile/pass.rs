@@ -9,7 +9,7 @@ use serde_json::{Map, Value, json};
 
 use super::error::CompileError;
 use super::{CompIds, Compiler, Symbols, is_uax31_identifier, string_literal};
-use crate::schema::{Catalog, CatalogVersion, SlotKind, SymbolKind, envelope_key};
+use crate::schema::{Catalog, SlotKind, SymbolKind, envelope_key};
 use crate::syntax::{Call, Expr, ExprKind, MapEntry};
 
 /// Calls Express reads as constructs, which a variable holding them names
@@ -40,14 +40,10 @@ pub(crate) struct Ctx {
     bound_paths: HashMap<String, Value>,
     /// Variables whose values are being compiled.
     resolving: HashSet<String>,
-    version: CatalogVersion,
-    path_key: &'static str,
-    call_key: &'static str,
 }
 
 impl Ctx {
-    pub fn new(version: CatalogVersion) -> Self {
-        let v1 = version.at_least_v1();
+    pub fn new() -> Self {
         Ctx {
             extra_components: Vec::new(),
             generated_ids: HashSet::new(),
@@ -58,14 +54,7 @@ impl Ctx {
             referenced: Vec::new(),
             bound_paths: HashMap::new(),
             resolving: HashSet::new(),
-            version,
-            path_key: if v1 { "@path" } else { "path" },
-            call_key: if v1 { "@call" } else { "call" },
         }
-    }
-
-    fn v1(&self) -> bool {
-        self.version.at_least_v1()
     }
 }
 
@@ -248,22 +237,16 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
         } else {
             args.remove("extensions")
         };
-        let v1 = self.ctx.v1();
 
         let mut dict = Map::new();
         dict.insert("id".into(), comp_id.clone().into());
         dict.insert("component".into(), name.into());
         if let Some(cid) = resolved.catalog_id {
-            dict.insert(envelope_key("catalogId", v1), cid.into());
+            dict.insert(envelope_key("catalogId"), cid.into());
         }
         if let Some(raw) = raw_extensions {
-            if !v1 {
-                return Err(CompileError::validation(format!(
-                    "extensions on component '{name}' is only supported in A2UI v1.0 or later."
-                )));
-            }
             let ext = self.extensions_map(raw, &format!("component '{name}'"))?;
-            dict.insert(envelope_key("metadata", v1), json!({"extensions": ext}));
+            dict.insert(envelope_key("metadata"), json!({"extensions": ext}));
         }
 
         let check_prop = cat.check_rule_property(name);
@@ -348,7 +331,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
         }
 
         // The standard check mixin is written under its envelope key
-        // (`@checks` from v1.0) however it is spelled: as `?check(…)` or as a
+        // (`@checks`) however it is spelled: as `?check(…)` or as a
         // long-form `checks=[{condition, message}]`. Upstream writes the
         // long form under the bare legacy key, which its own decompiler then
         // reads back as `?check(…)` shorthand and recompiles to `@checks`, so
@@ -356,7 +339,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
         let standard_checks = check_prop == Some("checks") && !custom.iter().any(|c| c == "checks");
         let wire_key = |prop: &str| -> String {
             if standard_checks && prop == "checks" {
-                envelope_key("checks", v1)
+                envelope_key("checks")
             } else {
                 prop.to_owned()
             }
@@ -462,7 +445,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             }
             if !compiled.is_empty() {
                 let key = if check_prop == "checks" {
-                    envelope_key("checks", v1)
+                    envelope_key("checks")
                 } else {
                     check_prop.to_owned()
                 };
@@ -602,7 +585,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                 }
                 Value::Object(out)
             }
-            ExprKind::Path(p) => json!({ self.ctx.path_key: p }),
+            ExprKind::Path(p) => json!({ "@path": p }),
             ExprKind::Variable(name) => return self.variable_ref(name, at),
             ExprKind::Skipped => {
                 return Err(CompileError::validation(
@@ -679,7 +662,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             ));
         }
         let path = self.value(args[0], At::action(action))?;
-        let Some(path) = path.get(self.ctx.path_key).cloned() else {
+        let Some(path) = path.get("@path").cloned() else {
             return Err(CompileError::parse(format!(
                 "The first argument to _template must be a dynamic data binding path (prefixed by $), got: {}",
                 format_value(args[0])
@@ -785,7 +768,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             .resolve(SymbolKind::Function, name, explicit_catalog)?;
         let args = self.call_args(resolved.catalog, name, pos, &kw, action)?;
         let mut out = Map::new();
-        out.insert(self.ctx.call_key.into(), name.into());
+        out.insert("@call".into(), name.into());
         if let Some(cid) = resolved.catalog_id {
             out.insert("catalogId".into(), cid.into());
         }
@@ -807,7 +790,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             .system_function(name, get(&kw, "catalogId").is_some())?;
         let args = self.call_args(cat, name, pos, &kw, action)?;
         let mut out = Map::new();
-        out.insert(self.ctx.call_key.into(), name.into());
+        out.insert("@call".into(), name.into());
         if !args.is_empty() {
             out.insert("args".into(), Value::Object(args));
         }
@@ -880,16 +863,11 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
         event.insert("name".into(), name);
 
         if let Some(raw) = args.get("userMessage") {
-            if !self.ctx.v1() {
-                return Err(CompileError::validation(
-                    "Event userMessage requires protocol v1.0 or later; the target version 0.9 has no userMessage field.",
-                ));
-            }
             // A DynamicString: a string, a data binding or a function call.
             let message = self.plain_value(raw)?;
-            let binding_or_call = message.as_object().is_some_and(|m| {
-                m.contains_key(self.ctx.path_key) || m.contains_key(self.ctx.call_key)
-            });
+            let binding_or_call = message
+                .as_object()
+                .is_some_and(|m| m.contains_key("@path") || m.contains_key("@call"));
             if !message.is_string() && !binding_or_call {
                 return Err(CompileError::validation(format!(
                     "Event userMessage must be a string, a $path data binding or a function call, got {}.",
@@ -996,7 +974,7 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                 return None;
             }
             let bound = self.ctx.bound_paths.get(first)?;
-            let raw = match bound.get(self.ctx.path_key) {
+            let raw = match bound.get("@path") {
                 Some(Value::String(s)) => s.clone(),
                 Some(Value::Null) | None => String::new(),
                 Some(other) => other.to_string(),

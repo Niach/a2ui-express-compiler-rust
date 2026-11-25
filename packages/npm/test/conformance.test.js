@@ -3,7 +3,7 @@
 //
 // Every compile, decompile, parse_response, parse_chunk (also fed one
 // character at a time) and generate_prompt_snippet case runs as written
-// (v1.0), except those conformance/bindings_skip.txt lists; the Python
+// (v1.0), except those conformance/bindings_skip.txt and out_of_scope.txt list; the Python
 // binding's test (crates/a2ui-express-py/tests) runs the same cases. The
 // renderer build runs the cases its calls cover.
 //
@@ -31,8 +31,8 @@ for (const suite of SUITES) {
   for (const c of YAML.parse(text)) CASES.set(c.name, c);
 }
 
-const SKIPPED = readFileSync(join(ROOT, "conformance/bindings_skip.txt"), "utf8")
-  .split("\n")
+const SKIPPED = ["bindings_skip", "out_of_scope"]
+  .flatMap((name) => readFileSync(join(ROOT, `conformance/${name}.txt`), "utf8").split("\n"))
   .map((l) => l.split("#")[0].trim())
   .filter(Boolean);
 

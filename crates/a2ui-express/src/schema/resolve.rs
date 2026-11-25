@@ -103,7 +103,7 @@ impl<'x> View<'x> {
 pub(crate) struct Schemas<'a> {
     pub doc: &'a Value,
     pub common: &'a Value,
-    /// The binding key: `@path` on v1.0, `path` below.
+    /// The binding key: `@path`.
     pub path_key: &'static str,
 }
 
@@ -187,7 +187,7 @@ impl<'a> Schemas<'a> {
     ///
     /// True when the schema is, or combines via `$ref`/`oneOf`/`anyOf`/`allOf`,
     /// an object schema whose only property is the required binding key
-    /// (`@path` on v1.0, `path` below), or the common types' child-list
+    /// (`@path`), or the common types' child-list
     /// template (`componentId` + `path`). Never descends into `items` or
     /// property values: see [`Schemas::schema_at`] for positions inside a value.
     pub(crate) fn admits_path(&self, schema: &Value) -> bool {

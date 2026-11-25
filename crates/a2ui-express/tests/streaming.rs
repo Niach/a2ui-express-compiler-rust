@@ -22,9 +22,6 @@ mod cases;
 #[allow(dead_code)]
 #[path = "conformance/check.rs"]
 mod check;
-#[allow(dead_code)]
-#[path = "conformance/lowering.rs"]
-mod lowering;
 #[path = "conformance/sdk.rs"]
 mod sdk;
 
@@ -262,7 +259,7 @@ fn inputs() -> Vec<(String, Value, String, bool)> {
 /// A case whose catalogs cannot form a compiler (the suites test those
 /// errors elsewhere) is skipped.
 fn parser_for(args: &Value) -> Option<ExpressParser> {
-    let catalogs = cases::resolve_catalogs(args, false).ok()?;
+    let catalogs = cases::resolve_catalogs(args).ok()?;
     let compiler = sdk::compiler(&catalogs).ok()?;
     let p = ExpressParser::new(compiler, SURFACE);
     Some(

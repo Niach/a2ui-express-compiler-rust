@@ -1,12 +1,12 @@
 # a2ui-express-compiler-rust
 
 Compiles [A2UI Express](https://a2ui.org/concepts/inference-formats/) into
-A2UI v1.0 (and v0.9) JSON messages. A Rust port of the Express format from
+A2UI 1.0 JSON messages, and back. A Rust port of the Express format from
 Google's A2UI agent SDK, built to embed in eui-core (iOS, Android, desktop)
 and to ship as wasm for the web.
 
 Crate: [`a2ui-express`](crates/a2ui-express). Runtime dependencies are limited
-to `serde`, `serde_json` (`preserve_order`) and `thiserror`. The same compiler
+to `serde_json` (`preserve_order`) and `thiserror`. The same compiler
 ships to JavaScript (wasm, `@niach/a2ui-express`) and Python (`a2ui-express`);
 see [Bindings](#bindings).
 
@@ -166,21 +166,26 @@ Samples meant for streaming should be written top-down (`root` first):
 ## Conformance suite
 
 The test oracle is the upstream, language-neutral conformance suite, vendored
-unmodified under `vendor/a2ui/` with upstream paths preserved:
+unmodified under `vendor/a2ui/` with upstream paths preserved (its pre-1.0
+test catalogs are left out):
 
 | Path | What |
 |---|---|
 | `conformance/agent/express/*.yaml` | Express cases: compiler, decompiler, response parser, streaming, prompt generator, scaling |
 | `conformance/test_data/{catalogs,examples}/` | Catalogs and examples the cases refer to |
-| `specification/v0_9/json/{common_types,server_to_client}.json` | v0.9 schemas |
 | `specification/v1_0/json/{common_types,agent_to_renderer}.json` | v1.0 schemas (`agent_to_renderer` is v1.0's server-to-client schema) |
 | `catalogs/basic/v1/catalog.json` | v1.0 basic catalog |
 | `specification/inference_formats/express/Express.g4` | Express grammar |
 
-It is pinned to the head of
-[a2ui-project/a2ui#4184](https://github.com/a2ui-project/a2ui/pull/4184)
-(`$defs`/union and nested-array bindings), which is not merged yet. Re-pin
-once it lands on `main`.
+It is pinned to a commit of upstream's `main` (`vendor/a2ui/UPSTREAM`).
+
+The compiler reads and writes A2UI 1.0 only. A catalog must declare
+`"protocolVersion": "1.0"` and a decompiled message `"version": "1.0"`;
+anything else is refused, and so is a component's bare pre-1.0 `catalogId`,
+`metadata`, `accessibility` or `checks` (now `@catalogId`, …) unless its schema
+declares a property of that name. `version` options accept only `"1.0"`.
+[`conformance/out_of_scope.txt`](conformance/out_of_scope.txt) lists the
+upstream cases this leaves out.
 
 `vendor/eui/` holds eui's catalog (`core.schema.json`) and the `dashboard`,
 `demo-surface` and `kitchen-sink` fixtures from `@exponential_app/eui`.
@@ -254,9 +259,7 @@ cargo run -q -p a2ui-express --example express -- prompt vendor/eui/catalog/core
 ## Running the suite
 
 `cargo test` runs every Express case through
-[`tests/conformance.rs`](crates/a2ui-express/tests/conformance.rs), as written
-(`v1.0`) and again lowered to v0.9 (`v0.9-lowered`, mirroring upstream's Python
-and TypeScript harnesses), and prints the passing count per suite. The number
+[`tests/conformance.rs`](crates/a2ui-express/tests/conformance.rs), and prints the passing count per suite. The number
 of passing cases is the project's progress metric.
 
 The crate is reached only through
@@ -265,7 +268,7 @@ one JSON-in, JSON-out function per suite call, each `unimplemented` until it is
 wired to the crate.
 
 [`conformance/known_failures.txt`](conformance/known_failures.txt) lists the
-cases expected to fail (`<case>`, or `<case>::<version>`). The test fails when
+cases expected to fail. The test fails when
 an unlisted case fails, a listed case passes, or an entry names no case, so the
 list only shrinks. After fixing cases, regenerate it:
 

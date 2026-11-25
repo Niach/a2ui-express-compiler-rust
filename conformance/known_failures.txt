@@ -1,8 +1,6 @@
 # Upstream Express conformance cases expected to fail.
 #
-# One entry per line: `<case>` fails in every version it runs in, and
-# `<case>::v1.0` or `<case>::v0.9-lowered` in that version only. The
-# conformance test fails when a listed case passes, so remove its entry when
-# you fix it. Regenerate with:
+# One case per line. The conformance test fails when a listed case passes, so
+# remove its entry when you fix it. Regenerate with:
 #
 #   CONFORMANCE_BLESS=1 cargo test -p a2ui-express --test conformance

@@ -27,8 +27,6 @@ paths=(
   conformance/agent/express
   conformance/test_data/catalogs
   conformance/test_data/examples
-  specification/v0_9/json/common_types.json
-  specification/v0_9/json/server_to_client.json
   specification/v1_0/json/common_types.json
   specification/v1_0/json/agent_to_renderer.json
   catalogs/basic/v1/catalog.json
@@ -58,11 +56,14 @@ done
 # Express suite: only the YAML cases.
 find "$dest/conformance/agent/express" -type f ! -name '*.yaml' -delete
 
+# A2UI 1.0 only: no pre-1.0 test catalogs (conformance/out_of_scope.txt lists
+# the cases that register one).
+find "$dest/conformance/test_data/catalogs" -type f \
+  \( -name '*v08*' -o -name '*v0_8*' -o -name '*v09*' -o -name '*v0_9*' \) -delete
+
 # The crate embeds the common types, so it ships its own copy of them.
-for v in v0_9 v1_0; do
-  mkdir -p "$root/crates/a2ui-express/schemas/$v"
-  cp "$dest/specification/$v/json/common_types.json" "$root/crates/a2ui-express/schemas/$v/common_types.json"
-done
+mkdir -p "$root/crates/a2ui-express/schemas/v1_0"
+cp "$dest/specification/v1_0/json/common_types.json" "$root/crates/a2ui-express/schemas/v1_0/common_types.json"
 
 cat > "$dest/UPSTREAM" <<META
 repository: https://github.com/a2ui-project/a2ui

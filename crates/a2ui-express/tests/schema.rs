@@ -290,11 +290,9 @@ fn every_conformance_catalog_loads_or_fails_as_a_catalog_error() {
                     "{name}"
                 )
             }
-            // No catalogId: the `$id` names it, as upstream reads it.
+            // No protocolVersion, which means 0.9.
             "catalog_without_id.json" => {
-                let c = result.unwrap();
-                assert!(c.id().ends_with("catalog_without_id.json"));
-                assert_eq!(c.version(), CatalogVersion::DEFAULT);
+                assert_eq!(result.unwrap_err(), CatalogError::MissingVersion);
             }
             // An extension key that is not a UAX #31 identifier.
             "component_metadata_invalid_key_catalog_v1_0.json" => {
@@ -307,12 +305,6 @@ fn every_conformance_catalog_loads_or_fails_as_a_catalog_error() {
                     error.to_string(),
                     "Invalid UAX #31 extension identifier 'com.example.policy' in component 'Card' metadata.extensions."
                 );
-            }
-            n if n.contains("v08") || n.contains("v0_8") => {
-                assert!(
-                    matches!(result, Err(CatalogError::UnsupportedVersion(_)) | Ok(_)),
-                    "{name}"
-                )
             }
             _ => {
                 result.unwrap_or_else(|e| panic!("{name}: {e}"));
@@ -365,7 +357,7 @@ fn tiny(id: &str, version: &str, component: &str) -> Catalog {
 }
 
 #[test]
-fn catalog_set_checks_versions_and_ids() {
+fn catalog_set_checks_ids() {
     assert_eq!(
         CatalogSet::new(vec![]).unwrap_err(),
         CatalogError::NoCatalogs
@@ -374,21 +366,9 @@ fn catalog_set_checks_versions_and_ids() {
         CatalogSet::new(vec![tiny("a", "1.0", "A"), tiny("a", "1.0", "B")]).unwrap_err(),
         CatalogError::DuplicateId("a".into())
     );
-    assert!(matches!(
-        CatalogSet::new(vec![tiny("a", "1.0", "A"), tiny("b", "0.9", "B")]),
-        Err(CatalogError::MixedVersions { .. })
-    ));
-    assert!(matches!(
-        CatalogSet::new(vec![tiny("a", "0.9", "A"), tiny("b", "0.9.1", "B")]),
-        Err(CatalogError::SeveralBelowV1(_))
-    ));
-    let one = CatalogSet::new(vec![tiny("a", "0.9", "A")]).unwrap();
+    let one = CatalogSet::new(vec![tiny("a", "1.0", "A")]).unwrap();
     assert_eq!(one.surface_catalog_id(), Some("a"));
-    assert_eq!(
-        one.resolve_version(Some(CatalogVersion::V0_9_1)).unwrap(),
-        CatalogVersion::V0_9_1
-    );
-    assert!(one.resolve_version(Some(CatalogVersion::V1_0)).is_err());
+    assert_eq!(one.version(), CatalogVersion::V1_0);
 }
 
 #[test]
@@ -438,12 +418,8 @@ fn catalog_set_resolves_names_with_catalog_id_override() {
             .is_err()
     );
 
-    let v09 = CatalogSet::new(vec![tiny("a", "0.9", "A")]).unwrap();
-    assert!(
-        v09.resolve(SymbolKind::Component, "A", Some(&json!("a")))
-            .is_err()
-    );
-    let r = v09.resolve(SymbolKind::Component, "A", None).unwrap();
+    let one = CatalogSet::new(vec![tiny("a", "1.0", "A")]).unwrap();
+    let r = one.resolve(SymbolKind::Component, "A", None).unwrap();
     assert_eq!(r.catalog_id, None);
 }
 
@@ -482,7 +458,7 @@ fn catalog_local_defs_are_not_common_types() {
             }
         }
     });
-    let c = Catalog::from_json(doc.clone()).unwrap();
+    let c = Catalog::from_json(doc).unwrap();
     assert!(!c.is_action_property("CustomComp", "actionSlot"));
     assert_eq!(c.is_static("CustomComp", "actionSlot"), Some(true));
     assert!(!c.is_action_property("CustomComp", "dynamicFoo"));
@@ -491,12 +467,6 @@ fn catalog_local_defs_are_not_common_types() {
     assert_eq!(c.is_static("CustomComp", "withBarePath"), Some(true));
     assert_eq!(c.is_static("CustomComp", "withOptionalAtPath"), Some(true));
     assert_eq!(c.is_static("CustomComp", "withLabelAndPath"), Some(true));
-
-    let mut v09 = doc;
-    v09["protocolVersion"] = json!("v0.9");
-    let c = Catalog::from_json(v09).unwrap();
-    assert_eq!(c.is_static("CustomComp", "withBarePath"), Some(false));
-    assert_eq!(c.is_static("CustomComp", "withAtPath"), Some(true));
 }
 
 #[test]
@@ -592,10 +562,11 @@ fn own_definition_wins_and_keeps_first_position() {
 }
 
 #[test]
-fn nested_local_mixin_v0_9() {
-    let common = "https://a2ui.org/specification/v0_9/common_types.json#/$defs";
+fn nested_local_mixin() {
+    let common = "https://a2ui.org/specification/v1_0/common_types.json#/$defs";
     let c = Catalog::from_json(json!({
         "catalogId": "test_nested_mixin",
+        "protocolVersion": "1.0",
         "components": {
             "MaterialText": {"type": "object", "allOf": [
                 {"$ref": "#/$defs/MaterialComponentCommon"},
@@ -632,7 +603,6 @@ fn nested_local_mixin_v0_9() {
         }
     }))
     .unwrap();
-    assert_eq!(c.version(), CatalogVersion::V0_9);
     assert_eq!(
         strings(c.component_properties("MaterialText")),
         ["text", "usageHint", "weight", "style"]
@@ -659,7 +629,7 @@ fn nested_local_mixin_v0_9() {
     );
     assert_eq!(
         c.check_rule_wire_key("MaterialButton").as_deref(),
-        Some("checks")
+        Some("@checks")
     );
     assert!(c.is_action_property("MaterialButton", "action"));
 }
@@ -768,31 +738,30 @@ fn option_objects() {
 // ---- loading ----------------------------------------------------------------
 
 #[test]
-fn load_options_override_id_and_version() {
+fn load_options_override_id() {
     let doc = json!({"catalogId": "x", "protocolVersion": "1.0", "components": {}});
     let c = Catalog::load(
         doc.clone(),
         LoadOptions {
             catalog_id: Some("y".into()),
-            protocol_version: Some(CatalogVersion::V0_9_1),
             ..LoadOptions::default()
         },
     )
     .unwrap();
     assert_eq!(
         (c.id(), c.version(), c.path_key()),
-        ("y", CatalogVersion::V0_9_1, "path")
+        ("y", CatalogVersion::V1_0, "@path")
     );
     assert_eq!(
         c.common_types()["$id"],
-        "https://a2ui.org/specification/v0_9/common_types.json"
+        "https://a2ui.org/specification/v1_0/common_types.json"
     );
     let c = Catalog::from_json(doc).unwrap();
     assert_eq!((c.path_key(), c.call_key()), ("@path", "@call"));
 }
 
 #[test]
-fn v1_rejects_external_refs_and_bad_activation_callers() {
+fn rejects_other_versions_external_refs_and_bad_activation_callers() {
     let err = Catalog::from_json(json!({
         "catalogId": "x", "protocolVersion": "1.0",
         "components": {"A": {"properties": {"b": {"$ref": "other.json#/$defs/B"}}}}
@@ -811,10 +780,24 @@ fn v1_rejects_external_refs_and_bad_activation_callers() {
     }))
     .unwrap_err();
     assert!(matches!(err, CatalogError::UserActivationCallers { .. }));
-    assert!(matches!(
-        Catalog::from_json(json!({"catalogId": "x", "protocolVersion": "0.8"})),
-        Err(CatalogError::UnsupportedVersion(_))
-    ));
+    for version in ["0.8", "0.9", "v0.9", "0.9.1", "2.0"] {
+        assert_eq!(
+            Catalog::from_json(json!({"catalogId": "x", "protocolVersion": version})).unwrap_err(),
+            CatalogError::UnsupportedVersion(version.into())
+        );
+    }
+    // Upstream's `catalog_definition.json` defaults to 0.9.
+    assert_eq!(
+        Catalog::from_json(json!({"catalogId": "x"})).unwrap_err(),
+        CatalogError::MissingVersion
+    );
+    assert_eq!(
+        Catalog::from_json(json!({
+            "catalogId": "x", "protocolVersion": "1.0", "functions": [{"name": "f"}]
+        }))
+        .unwrap_err(),
+        CatalogError::FunctionsNotAnObject
+    );
 }
 
 #[test]
@@ -925,7 +908,7 @@ fn v1_catalog(components: Value, functions: Value) -> Result<Catalog, CatalogErr
     }))
 }
 
-/// Upstream's loader: from v1.0, component, property, function and argument
+/// Upstream's loader: component, property, function and argument
 /// names are UAX #31 identifiers (#AXC-14).
 #[test]
 fn v1_names_are_uax31_identifiers() {
@@ -1002,15 +985,6 @@ fn v1_names_are_uax31_identifiers() {
         )),
         "Invalid UAX #31 property identifier: '@style' in component 'Text'"
     );
-
-    // Below v1.0 the names are not checked, as upstream does not.
-    let v0_9 = Catalog::from_json(json!({
-        "catalogId": "ids",
-        "protocolVersion": "0.9",
-        "components": {"My-Text": {"properties": {"aria-label": {"type": "string"}}}},
-    }))
-    .unwrap();
-    assert!(v0_9.has_component("My-Text"));
 }
 
 /// Upstream's `validate_metadata`: a v1.0 `metadata` (of the catalog, a
@@ -1069,6 +1043,4 @@ fn v1_metadata_is_validated() {
         catalog.unwrap_err().to_string(),
         "Unexpected property 'owner' in catalog metadata; only 'extensions' is allowed."
     );
-    // Below v1.0 there is no metadata envelope to check.
-    assert!(Catalog::from_json(json!({"catalogId": "ids", "metadata": {"owner": "x"}})).is_ok());
 }

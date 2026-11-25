@@ -54,12 +54,11 @@ use thiserror::Error;
 pub use catalog::{AllowedCallers, Catalog, Component, Function, LoadOptions};
 pub use catalogs::{CatalogSet, Resolved, SymbolKind};
 pub use common::common_types;
-pub use refs::{
-    ENVELOPE_MIXIN_NAMES, common_def_name, envelope_key, envelope_read_key, envelope_value,
-};
+pub use refs::{ENVELOPE_MIXIN_NAMES, common_def_name, envelope_key, envelope_value};
 pub(crate) use resolve::is_object_or_ref_schema;
 pub use resolve::{Segment, SlotKind};
 pub use version::CatalogVersion;
+pub(crate) use version::check_message_version;
 
 /// A catalog document that cannot be loaded, or catalogs that cannot be
 /// used together.
@@ -76,9 +75,16 @@ pub enum CatalogError {
     #[error("Catalog ID must be specified via catalog metadata ('catalogId' or '$id').")]
     MissingId,
     /// A `protocolVersion` this crate does not read.
-    #[error("Unsupported catalog protocol version {0}; expected 0.9, 0.9.1 or 1.0.")]
+    #[error("Unsupported catalog protocol version {0}; expected 1.0.")]
     UnsupportedVersion(String),
-    /// A v1.0 `$ref` to another document.
+    /// No `protocolVersion`, which upstream's `catalog_definition.json` reads
+    /// as v0.9.
+    #[error("The catalog declares no protocolVersion, which means 0.9; expected \"1.0\".")]
+    MissingVersion,
+    /// `functions` as a list, the pre-1.0 form.
+    #[error("Catalog 'functions' must be an object keyed by function name.")]
+    FunctionsNotAnObject,
+    /// A `$ref` to another document.
     #[error(
         "Unsupported external $ref '{reference}' at {pointer}: a v1.0 catalog may only reference its own components and functions (#/...) or common_types.json."
     )]
@@ -98,7 +104,7 @@ pub enum CatalogError {
         /// Its declared callers.
         callers: String,
     },
-    /// A v1.0 component, property, function or argument name that is not a
+    /// A component, property, function or argument name that is not a
     /// UAX #31 identifier.
     #[error("Invalid UAX #31 {kind} identifier: '{name}'{}", in_owner(.owner))]
     InvalidIdentifier {
@@ -110,7 +116,7 @@ pub enum CatalogError {
         /// `component 'Name'` or `function 'name'`.
         owner: Option<String>,
     },
-    /// A v1.0 `metadata` that is not `{"extensions": {<identifier>: …}}`.
+    /// A `metadata` that is not `{"extensions": {<identifier>: …}}`.
     #[error("{reason}")]
     InvalidMetadata {
         /// Whose metadata it is: `catalog`, `component 'Name'` or
@@ -133,33 +139,6 @@ pub enum CatalogError {
     /// Two catalogs with one ID.
     #[error("Duplicate catalog ID: '{0}'")]
     DuplicateId(String),
-    /// Catalogs on different release lines.
-    #[error(
-        "Express catalogs must share one protocol version, but '{first}' is '{first_version}' and '{other}' is '{other_version}'."
-    )]
-    MixedVersions {
-        /// The first catalog.
-        first: String,
-        /// Its version.
-        first_version: String,
-        /// The catalog that differs.
-        other: String,
-        /// Its version.
-        other_version: String,
-    },
-    /// Several catalogs below v1.0.
-    #[error(
-        "Several catalogs need A2UI v1.0 or later, where components and function calls carry their own catalogId, but got '{0}'."
-    )]
-    SeveralBelowV1(String),
-    /// A requested version off the catalogs' release line.
-    #[error("Requested protocol version '{requested}' does not match catalog version '{catalogs}'")]
-    RequestedVersionMismatch {
-        /// The requested version.
-        requested: String,
-        /// The catalogs' version.
-        catalogs: String,
-    },
 }
 
 fn in_owner(owner: &Option<String>) -> String {
