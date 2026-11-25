@@ -120,6 +120,18 @@ impl Compiler {
         }
     }
 
+    /// Compiles `patch` against `screen`, the Express of a surface that
+    /// exists: the messages that change it, and the new screen (see
+    /// [`crate::ext::patch`]). Needs the `at_exponential_express` extension.
+    pub fn compile_patch(
+        &self,
+        screen: &str,
+        patch: &str,
+        surface_id: &str,
+    ) -> Result<ext::patch::Patch, CompileError> {
+        ext::patch::compile_patch(self, screen, patch, surface_id)
+    }
+
     /// Parses a block (without sentinel tags) in [`Compiler::dialect`].
     pub fn parse_block(&self, body: &str) -> syntax::ParseOutput {
         syntax::parse_dialect(body, syntax::Pos::START, &HashSet::new(), self.dialect())
@@ -130,10 +142,13 @@ impl Compiler {
     pub(crate) fn desugar<'s>(
         &self,
         statements: &'s [Statement],
-    ) -> Result<std::borrow::Cow<'s, [Statement]>, CompileError> {
+    ) -> Result<(std::borrow::Cow<'s, [Statement]>, Arc<HashMap<String, String>>), CompileError> {
         match &self.ext {
-            None => Ok(std::borrow::Cow::Borrowed(statements)),
-            Some(e) => Ok(std::borrow::Cow::Owned(ext::desugar(statements, e, self)?)),
+            None => Ok((std::borrow::Cow::Borrowed(statements), Arc::default())),
+            Some(e) => {
+                let (statements, classes) = ext::desugar(statements, e, self)?;
+                Ok((std::borrow::Cow::Owned(statements), Arc::new(classes)))
+            }
         }
     }
 
@@ -165,12 +180,13 @@ impl Compiler {
         program: &Program,
         surface_id: &str,
     ) -> Result<Vec<Value>, CompileError> {
-        let statements = self.desugar(&program.statements)?;
+        let (statements, classes) = self.desugar(&program.statements)?;
         let (scopes, units) = self.build_units(statements.iter(), surface_id)?;
         if units.is_empty() {
             return Err(CompileError::undefined_root("root"));
         }
         let mut ctx = Ctx::new();
+        ctx.classes = classes;
         let mut out = Vec::new();
         for unit in units {
             match unit {
@@ -480,6 +496,9 @@ impl Compiler {
             let mut out = Vec::new();
             if let Some(theme) = &scope.theme {
                 out.push(self.theme_call(&scope.surface_id, theme, pass.ctx)?);
+                if components.is_empty() && scope.data.is_empty() {
+                    return Ok(out);
+                }
             }
             out.extend(self.compile_update_scope(scope, components, &mut pass)?);
             return Ok(out);
@@ -546,7 +565,7 @@ impl Compiler {
                 "functionCallId": format!("call_{}", ctx.call_counter),
                 "callFunction": {
                     "catalogId": catalog_id,
-                    "call": function,
+                    "@call": function,
                     "args": {"theme": theme},
                 },
             },
@@ -766,6 +785,11 @@ fn parse_delete_surface_id(call: &Call) -> Result<String, CompileError> {
 }
 
 // ---- helpers ----------------------------------------------------------------
+
+/// A fresh compile context (for the extension's messages).
+pub(crate) fn pass_ctx() -> Ctx {
+    Ctx::new()
+}
 
 /// The text of a string literal.
 pub(crate) fn string_literal(e: &Expr) -> Option<&str> {

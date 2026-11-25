@@ -56,9 +56,12 @@
 mod literal;
 mod order;
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use serde_json::{Map, Value};
+
+use crate::ext::{self, Express};
 
 use crate::schema::{Catalog, CatalogSet, SymbolKind, check_message_version, envelope_value};
 use crate::{Error, Result};
@@ -164,6 +167,11 @@ struct Decompiler<'c> {
     catalogs: &'c CatalogSet,
     sole_catalog_id: Option<&'c str>,
     options: DecompileOptions,
+    /// The `at_exponential_express` extension, when a catalog declares it:
+    /// the sugar is written back.
+    ext: Option<Express>,
+    /// Style classes of the block: words → class name.
+    classes: RefCell<HashMap<String, String>>,
 }
 
 impl<'c> Decompiler<'c> {
@@ -172,6 +180,8 @@ impl<'c> Decompiler<'c> {
             catalogs,
             sole_catalog_id: catalogs.surface_catalog_id(),
             options,
+            ext: Express::from_catalogs(catalogs),
+            classes: RefCell::new(HashMap::new()),
         }
     }
 
@@ -278,6 +288,13 @@ impl<'c> Decompiler<'c> {
             let func_op = crf
                 .and_then(|c| c.get("callFunction"))
                 .and_then(Value::as_object);
+            if let (Some(func_op), Some(ext)) = (func_op, &self.ext) {
+                if let Some(line) = self.theme_call_line(crf.expect("a call"), func_op, ext, is_first)? {
+                    call_index += 1;
+                    blocks.push(line);
+                    continue;
+                }
+            }
             if let Some(func_op) = func_op {
                 call_index += 1;
                 let call_id = crf
@@ -421,11 +438,28 @@ impl<'c> Decompiler<'c> {
         let (surface_catalog_id, catalog) = self.surface_context(&surface_id, surface_catalogs);
 
         let send_data_model = cs.get("sendDataModel").and_then(Value::as_bool);
-        let extensions = cs
+        let mut extensions = cs
             .get("metadata")
             .and_then(Value::as_object)
             .and_then(|m| m.get("extensions"))
-            .filter(|e| e.is_object());
+            .filter(|e| e.is_object())
+            .cloned();
+        // The extension writes the theme as theme(...).
+        let mut theme_line = None;
+        if self.ext.is_some() {
+            if let Some(Value::Object(ext_map)) = &mut extensions {
+                if let Some(theme) = ext_map.get(ext::THEME_EXTENSION) {
+                    if let Some(line) = theme_line_of(theme) {
+                        theme_line = Some(line);
+                        ext_map.remove(ext::THEME_EXTENSION);
+                    }
+                }
+                if ext_map.is_empty() {
+                    extensions = None;
+                }
+            }
+        }
+        let extensions = extensions.as_ref();
         let mut lines = Vec::new();
         if !(is_first
             && surface_id == "default_surface"
@@ -434,6 +468,7 @@ impl<'c> Decompiler<'c> {
         {
             lines.push(self.surface_header(&surface_id, send_data_model, false, extensions)?);
         }
+        lines.extend(theme_line);
 
         let components = component_list(cs);
         let var_names = self.variable_names(&components)?;
@@ -495,10 +530,135 @@ impl<'c> Decompiler<'c> {
             .ok()
             .map(|(catalog, _)| catalog)
         });
+        if self.ext.is_some() {
+            self.define_classes(components, surface_catalog_id, lines);
+        }
         for i in arranged {
             lines.push(self.component(&components[i], var_names, surface_catalog_id)?);
         }
         Ok(())
+    }
+
+    // ---- the extension's sugar ---------------------------------------------
+
+    /// Whether `comp`'s component declares `prop` itself (so no sugar of
+    /// that name applies).
+    fn declares(&self, comp: &Obj, prop: &str, surface_catalog_id: Option<&str>) -> bool {
+        let name = comp.get("component").and_then(Value::as_str).unwrap_or("");
+        self.resolve(SymbolKind::Component, name, comp.get("@catalogId"), surface_catalog_id)
+            .is_ok_and(|(c, _)| c.component_properties(name).iter().any(|p| p == prop))
+    }
+
+    /// What the extension writes for a component: the component without
+    /// the props its sugar covers, and the sugar keyword arguments.
+    fn sugar(&self, comp: &Obj, surface_catalog_id: Option<&str>) -> (Obj, Vec<(String, String)>) {
+        let Some(ext) = &self.ext else {
+            return (comp.clone(), Vec::new());
+        };
+        let mut comp = comp.clone();
+        let mut out: Vec<(String, String)> = Vec::new();
+        let free = |k: &str| !self.declares(&comp, k, surface_catalog_id);
+        let name = comp.get("component").and_then(Value::as_str).unwrap_or("").to_owned();
+        let style_free = free("s");
+        let motion_free: Vec<bool> = ext::motion::KEYS.iter().map(|(k, _)| free(k)).collect();
+        let (ref_free, kf_free) = (free("ref"), free("kf"));
+        if let Some(Value::Object(style)) = comp.get("style").cloned() {
+            let mut style = style;
+            let mut motion = Vec::new();
+            for ((kw, key), ok) in ext::motion::KEYS.iter().zip(&motion_free) {
+                let Some(v) = style.get(*key) else { continue };
+                let expr = ext::json_to_expr(v, crate::syntax::Span::default());
+                if *ok && ext::motion::sugar_key(kw, &expr).is_ok() {
+                    motion.push(((*kw).to_owned(), literal_json_text(v)));
+                    style.remove(*key);
+                }
+            }
+            let (words, rest) = if style_free {
+                ext::style::encode(&style, &[])
+            } else {
+                (Vec::new(), style)
+            };
+            if !words.is_empty() {
+                let words = words.join(" ");
+                let class = self.classes.borrow().get(&words).cloned();
+                out.push(("s".into(), class.unwrap_or_else(|| literal::string(&words))));
+            }
+            out.extend(motion);
+            if rest.is_empty() {
+                comp.remove("style");
+            } else {
+                comp.insert("style".into(), Value::Object(rest));
+            }
+        }
+        if name == "Motion" {
+            if ref_free {
+                if let Some((r, same)) = ext::motion::registry_match(ext, &comp) {
+                    for k in same {
+                        comp.remove(&k);
+                    }
+                    out.push(("ref".into(), literal::string(r)));
+                }
+            }
+            if kf_free {
+                if let Some(text) = comp.get("layers").and_then(ext::motion::kf_text) {
+                    comp.remove("layers");
+                    out.push(("kf".into(), literal::string(&text)));
+                }
+            }
+        }
+        (comp, out)
+    }
+
+    /// `style(kN, "…")` lines for the shorthand strings several components
+    /// share (three or more words used twice, or two words used three
+    /// times), named in order of first use.
+    fn define_classes(&self, components: &[Obj], surface_catalog_id: Option<&str>, lines: &mut Vec<String>) {
+        let mut counts: Vec<(String, usize)> = Vec::new();
+        for c in components {
+            let (_, sugar) = self.sugar(c, surface_catalog_id);
+            if let Some((_, s)) = sugar.iter().find(|(k, _)| k == "s") {
+                let Some(words) = unquote(s) else { continue };
+                match counts.iter_mut().find(|(w, _)| *w == words) {
+                    Some(e) => e.1 += 1,
+                    None => counts.push((words, 1)),
+                }
+            }
+        }
+        for (words, n) in counts {
+            let size = words.split_whitespace().count();
+            if (n >= 2 && size >= 3) || (n >= 3 && size >= 2) {
+                let mut classes = self.classes.borrow_mut();
+                if classes.contains_key(&words) {
+                    continue;
+                }
+                let name = format!("k{}", classes.len() + 1);
+                lines.push(format!("style({name}, {})", literal::string(&words)));
+                classes.insert(words, name);
+            }
+        }
+    }
+
+    /// A `setTheme` call written as `theme(...)` in its surface.
+    fn theme_call_line(&self, crf: &Obj, func: &Obj, ext: &Express, is_first: bool) -> Result<Option<String>> {
+        if func.get("@call").and_then(Value::as_str) != Some(ext.theme_function.as_str()) {
+            return Ok(None);
+        }
+        let Some(sid) = crf.get("surfaceId").and_then(Value::as_str) else {
+            return Ok(None);
+        };
+        let args = func.get("args").and_then(Value::as_object);
+        let Some(theme) = args.filter(|a| a.len() == 1).and_then(|a| a.get("theme")) else {
+            return Ok(None);
+        };
+        let Some(line) = theme_line_of(theme) else {
+            return Ok(None);
+        };
+        let mut out = Vec::new();
+        if !(is_first && sid == "default_surface") {
+            out.push(self.surface_header(sid, None, false, None)?);
+        }
+        out.push(line);
+        Ok(Some(out.join("\n")))
     }
 
     fn variable_names(&self, components: &[Obj]) -> Result<VarNames> {
@@ -590,6 +750,8 @@ impl<'c> Decompiler<'c> {
 
         self.catalogs
             .refuse_legacy_envelope(comp, surface_catalog_id)?;
+        let (sugared, sugar) = self.sugar(comp, surface_catalog_id);
+        let comp = &sugared;
         let (catalog, emit_catalog_id) = self.resolve(
             SymbolKind::Component,
             comp_name,
@@ -607,7 +769,9 @@ impl<'c> Decompiler<'c> {
             .and_then(Value::as_object)
             .and_then(|m| m.get("extensions"))
             .filter(|e| e.is_object());
-        let keyword_args = self.options.keyword_args;
+        // A Motion written by ref= or kf= names the props it keeps.
+        let keyword_args = self.options.keyword_args
+            || sugar.iter().any(|(k, _)| k == "ref" || k == "kf");
         let positional_until = if keyword_args && comp.contains_key("catalogId") {
             properties.iter().position(|p| p == "catalogId")
         } else {
@@ -696,6 +860,7 @@ impl<'c> Decompiler<'c> {
             args.extend(arg);
         }
         args.extend(long_form_checks);
+        args.extend(sugar.into_iter().map(|(k, v)| format!("{k}={v}")));
         if let Some(cid) = emit_catalog_id {
             args.push(format!("catalogId={}", literal::string(cid)));
         }
@@ -1145,4 +1310,53 @@ mod tests {
         let err = decompile(&catalogs(), &messages, &DecompileOptions::default()).unwrap_err();
         assert!(matches!(err, Error::Validation(m) if m.contains("UAX #31")));
     }
+}
+
+// ---- the extension's literals ----------------------------------------------------
+
+/// A JSON literal in Express (numbers, strings, lists, maps).
+fn literal_json_text(v: &Value) -> String {
+    match v {
+        Value::Null => "null".into(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => literal::number(n).unwrap_or_else(|_| n.to_string()),
+        Value::String(s) => literal::string(s),
+        Value::Array(items) => format!("[{}]", items.iter().map(literal_json_text).collect::<Vec<_>>().join(", ")),
+        Value::Object(m) => format!(
+            "{{{}}}",
+            m.iter().map(|(k, v)| format!("{}: {}", literal::key(k), literal_json_text(v))).collect::<Vec<_>>().join(", ")
+        ),
+    }
+}
+
+/// A theme value inside `theme(...)`: colours as bare `#hex` literals.
+fn theme_literal(v: &Value) -> String {
+    match v {
+        Value::String(s) if ext::color::Rgba::parse(s).is_some_and(|c| c.hex() == *s) => s.clone(),
+        Value::Array(items) => format!("[{}]", items.iter().map(theme_literal).collect::<Vec<_>>().join(", ")),
+        Value::Object(m) => format!(
+            "{{{}}}",
+            m.iter().map(|(k, v)| format!("{}: {}", literal::key(k), theme_literal(v))).collect::<Vec<_>>().join(", ")
+        ),
+        other => literal_json_text(other),
+    }
+}
+
+/// `theme(...)` for a surface's theme: a built-in id as `theme("id")`, an
+/// expanded theme as its seeds; `None` when no seeds reach it.
+fn theme_line_of(theme: &Value) -> Option<String> {
+    match theme {
+        Value::String(id) if !id.is_empty() => Some(format!("theme({})", literal::string(id))),
+        Value::Object(_) => {
+            let seeds = ext::theme::recover(theme)?;
+            let args: Vec<String> = seeds.iter().map(|(k, v)| format!("{k}={}", theme_literal(v))).collect();
+            Some(format!("theme({})", args.join(", ")))
+        }
+        _ => None,
+    }
+}
+
+/// The text of a string literal the decompiler wrote.
+fn unquote(s: &str) -> Option<String> {
+    serde_json::from_str::<String>(s).ok()
 }

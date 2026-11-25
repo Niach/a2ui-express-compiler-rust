@@ -35,7 +35,7 @@ use serde_json::{Map, Value};
 
 use crate::compile::CompileError;
 use crate::schema::CatalogSet;
-use crate::syntax::{Arg, Call, Expr, ExprKind, MapEntry, Number, NumberValue, Span, Statement, StatementKind};
+use crate::syntax::{Call, Expr, ExprKind, MapEntry, Number, NumberValue, Span, Statement, StatementKind};
 
 /// The catalog extension key that turns the extension on.
 pub const EXTENSION: &str = "at_exponential_express";
@@ -226,12 +226,39 @@ impl Desugarer {
                 return Ok(Desugared::Statement(stmt.clone()));
             }
         }
-        let mut out = stmt.clone();
-        match &mut out.kind {
-            StatementKind::Assign { value, .. } => self.expr(value, ext, cat)?,
-            StatementKind::Expr(value) => self.expr(value, ext, cat)?,
+        let _ = ext;
+        match &stmt.kind {
+            StatementKind::Assign { value, .. } | StatementKind::Expr(value) => self.check_uses(value, cat)?,
         }
-        Ok(Desugared::Statement(out))
+        Ok(Desugared::Statement(stmt.clone()))
+    }
+
+    /// A class is defined before its first use: the `s=` of the components
+    /// in `e` may only name classes defined so far (as a stream sees it).
+    fn check_uses(&self, e: &Expr, cat: &dyn Components) -> Result<(), CompileError> {
+        match &e.kind {
+            ExprKind::Call(call) => {
+                if cat.is_component(&call.name) && !cat.declares(&call.name, "s") {
+                    for (k, v) in call.keywords() {
+                        match (&v.kind, k) {
+                            (ExprKind::Variable(name), "s") if !self.classes.contains_key(name) => {
+                                return Err(invalid(format!(
+                                    "s={name} names no style class; define it first with style({name}, \"…\"), or write s=\"words\"."
+                                )));
+                            }
+                            (ExprKind::String(words), "s") => {
+                                decode_words(words, &self.classes)?;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                call.args.iter().try_for_each(|a| self.check_uses(&a.value, cat))
+            }
+            ExprKind::List(items) => items.iter().try_for_each(|i| self.check_uses(i, cat)),
+            ExprKind::Map(entries) => entries.iter().try_for_each(|m| self.check_uses(&m.value, cat)),
+            _ => Ok(()),
+        }
     }
 
     fn define_class(&mut self, call: &Call) -> Result<(), CompileError> {
@@ -253,135 +280,146 @@ impl Desugarer {
                 "style class '{name}' reads as a shorthand word; name it something else."
             )));
         }
+        if self.classes.contains_key(&name) {
+            return Err(invalid(format!(
+                "style class '{name}' is defined twice in the block; a class is defined once, before its first use."
+            )));
+        }
         // Check the words now, so a bad class fails where it is written.
-        self.decode(words)?;
+        decode_words(words, &self.classes)?;
         self.classes.insert(name, words.clone());
         Ok(())
     }
 
-    fn decode(&self, words: &str) -> Result<Map<String, Value>, CompileError> {
-        let mut out = Map::new();
-        let classes = &self.classes;
-        style::decode_into(words, &mut out, &|w| classes.get(w).cloned(), 0).map_err(|e| {
-            invalid(format!("{e}. Style words: col, row, g12, p16, px-md, bg-card, fg-mutedForeground, r-lg, sh-sm, w100%, items-center, justify-between, hover:bg-accent, …"))
-        })?;
-        Ok(out)
-    }
-
-    fn expr(&self, e: &mut Expr, ext: &Express, cat: &dyn Components) -> Result<(), CompileError> {
-        match &mut e.kind {
-            ExprKind::Call(call) => {
-                for arg in &mut call.args {
-                    self.expr(&mut arg.value, ext, cat)?;
-                }
-                if call.name.starts_with('@') || !cat.is_component(&call.name) {
-                    return Ok(());
-                }
-                self.component(call, e.span, ext, cat)
-            }
-            ExprKind::List(items) => items.iter_mut().try_for_each(|i| self.expr(i, ext, cat)),
-            ExprKind::Map(entries) => entries.iter_mut().try_for_each(|m| self.expr(&mut m.value, ext, cat)),
-            ExprKind::Check { args, .. } => args.iter_mut().try_for_each(|a| self.expr(a, ext, cat)),
-            _ => Ok(()),
-        }
-    }
-
-    fn component(&self, call: &mut Call, span: Span, ext: &Express, cat: &dyn Components) -> Result<(), CompileError> {
-        let name = call.name.clone();
-        let sugar = |k: &str| !cat.declares(&name, k);
-        if name == "Motion" {
-            motion::expand_motion(call, span, ext, &|k| !cat.declares("Motion", k))?;
-        }
-        let mut words: Option<Map<String, Value>> = None;
-        let mut motion_keys: Vec<(&'static str, Value)> = Vec::new();
-        let mut kept = Vec::with_capacity(call.args.len());
-        for arg in std::mem::take(&mut call.args) {
-            let key = arg.name.as_ref().map(|(k, _)| k.as_str());
-            match key {
-                Some("s") if sugar("s") => {
-                    let text = match &arg.value.kind {
-                        ExprKind::String(s) => s.clone(),
-                        ExprKind::Variable(v) => {
-                            if !self.classes.contains_key(v) {
-                                return Err(invalid(format!(
-                                    "s={v} names no style class; define it first with style({v}, \"…\"), or write s=\"words\"."
-                                )));
-                            }
-                            v.clone()
-                        }
-                        _ => return Err(invalid("s= takes style words in a string, or a class name.")),
-                    };
-                    let decoded = self.decode(&text)?;
-                    let into = words.get_or_insert_with(Map::new);
-                    for (k, v) in decoded {
-                        into.insert(k, v);
-                    }
-                }
-                Some(k @ ("enter" | "exit" | "stagger" | "delay")) if sugar(k) => {
-                    motion_keys.push(motion::sugar_key(k, &arg.value)?);
-                }
-                _ => kept.push(arg),
-            }
-        }
-        call.args = kept;
-        if words.is_none() && motion_keys.is_empty() {
-            return Ok(());
-        }
-        let mut style = words.unwrap_or_default();
-        // An explicit style= map wins over the words.
-        let explicit = call
-            .args
-            .iter()
-            .position(|a| a.name.as_ref().is_some_and(|(k, _)| k == "style"));
-        if let Some(i) = explicit {
-            let arg = call.args.remove(i);
-            let ExprKind::Map(entries) = arg.value.kind else {
-                return Err(invalid("style= must be a map literal when s=, enter= or exit= is also given."));
-            };
-            let mut map_expr: Vec<MapEntry> = style
-                .iter()
-                .filter(|(k, _)| !entries.iter().any(|e| e.key == **k))
-                .map(|(k, v)| MapEntry {
-                    key: k.clone(),
-                    key_span: span,
-                    value: json_to_expr(v, span),
-                })
-                .collect();
-            map_expr.extend(entries);
-            for (k, v) in &motion_keys {
-                map_expr.retain(|e| e.key != *k);
-                map_expr.push(MapEntry {
-                    key: (*k).to_owned(),
-                    key_span: span,
-                    value: json_to_expr(v, span),
-                });
-            }
-            call.args.push(Arg {
-                name: Some(("style".into(), span)),
-                value: Expr {
-                    kind: ExprKind::Map(map_expr),
-                    span,
-                },
-            });
-            return Ok(());
-        }
-        for (k, v) in motion_keys {
-            style.insert(k.to_owned(), v);
-        }
-        call.args.push(Arg {
-            name: Some(("style".into(), span)),
-            value: json_to_expr(&Value::Object(style), span),
-        });
-        Ok(())
-    }
 }
 
-/// Desugars a whole program.
+/// The extension's keywords of one component, as `(prop, expr)` pairs
+/// the compile pass reads: `s=`, `enter=`, `exit=`, `stagger=`, `delay=`
+/// (merged into `style`), Motion `ref=` (the registry entry's props) and
+/// `kf=` (`layers`). A keyword the component declares itself is left
+/// alone. `pairs` loses what is replaced; the pairs returned are added.
+pub(crate) fn component_pairs(
+    name: &str,
+    pairs: &mut Vec<(&str, &Expr)>,
+    ext: &Express,
+    classes: &HashMap<String, String>,
+    declares: &dyn Fn(&str) -> bool,
+    span: Span,
+) -> Result<Vec<(String, Expr)>, CompileError> {
+    let sugar = |k: &str| !declares(k);
+    let given = |pairs: &Vec<(&str, &Expr)>, k: &str| {
+        pairs.iter().any(|(p, e)| *p == k && !matches!(e.kind, ExprKind::Skipped))
+    };
+    let take = |pairs: &mut Vec<(&str, &Expr)>, k: &str| -> Option<Expr> {
+        let i = pairs.iter().position(|(p, _)| *p == k)?;
+        Some(pairs.remove(i).1.clone())
+    };
+    let mut out: Vec<(String, Expr)> = Vec::new();
+
+    if name == "Motion" {
+        if sugar("ref") {
+            if let Some(r) = take(pairs, "ref") {
+                let ExprKind::String(reference) = &r.kind else {
+                    return Err(invalid("Motion ref= is the name of a registered animation, a string."));
+                };
+                let Some(Value::Object(props)) = ext.motions.get(reference) else {
+                    let mut names: Vec<&str> = ext.motions.keys().map(String::as_str).collect();
+                    names.sort_unstable();
+                    return Err(invalid(format!(
+                        "Motion ref=\"{reference}\" is not a registered animation. Registered: {}.",
+                        if names.is_empty() { "none".to_owned() } else { names.join(", ") }
+                    )));
+                };
+                for (k, v) in props {
+                    if !given(pairs, k) {
+                        take(pairs, k);
+                        out.push((k.clone(), json_to_expr(v, span)));
+                    }
+                }
+            }
+        }
+        if sugar("kf") {
+            if let Some(k) = take(pairs, "kf") {
+                let ExprKind::String(text) = &k.kind else {
+                    return Err(invalid("Motion kf= is keyframe text in a string."));
+                };
+                if given(pairs, "layers") || out.iter().any(|(p, _)| p == "layers") {
+                    return Err(invalid("Motion takes kf= or layers=, not both."));
+                }
+                take(pairs, "layers");
+                let layers = motion::kf_layers(text).map_err(|e| invalid(format!("Motion kf=: {e}")))?;
+                out.push(("layers".into(), json_to_expr(&layers, span)));
+            }
+        }
+    }
+
+    let mut style: Option<Map<String, Value>> = None;
+    if sugar("s") {
+        if let Some(s) = take(pairs, "s") {
+            let text = match &s.kind {
+                ExprKind::String(text) => text.clone(),
+                ExprKind::Variable(v) => {
+                    if !classes.contains_key(v) {
+                        return Err(invalid(format!(
+                            "s={v} names no style class; define it first with style({v}, \"…\"), or write s=\"words\"."
+                        )));
+                    }
+                    v.clone()
+                }
+                _ => return Err(invalid("s= takes style words in a string, or a class name.")),
+            };
+            style = Some(decode_words(&text, classes)?);
+        }
+    }
+    let mut motion_keys = Vec::new();
+    for (kw, _) in motion::KEYS {
+        if sugar(kw) {
+            if let Some(v) = take(pairs, kw) {
+                motion_keys.push(motion::sugar_key(kw, &v)?);
+            }
+        }
+    }
+    if style.is_none() && motion_keys.is_empty() {
+        return Ok(out);
+    }
+    let style = style.unwrap_or_default();
+    let mut entries: Vec<MapEntry> = style
+        .iter()
+        .map(|(k, v)| MapEntry { key: k.clone(), key_span: span, value: json_to_expr(v, span) })
+        .collect();
+    // An explicit style= map wins over the words.
+    if let Some(explicit) = take(pairs, "style") {
+        match explicit.kind {
+            ExprKind::Skipped => {}
+            ExprKind::Map(more) => {
+                entries.retain(|e| !more.iter().any(|m| m.key == e.key));
+                entries.extend(more);
+            }
+            _ => return Err(invalid("style= must be a map literal when s=, enter=, exit=, stagger= or delay= is also given.")),
+        }
+    }
+    for (k, v) in motion_keys {
+        entries.retain(|e| e.key != k);
+        entries.push(MapEntry { key: k.to_owned(), key_span: span, value: json_to_expr(&v, span) });
+    }
+    out.push(("style".into(), Expr { kind: ExprKind::Map(entries), span }));
+    Ok(out)
+}
+
+fn decode_words(words: &str, classes: &HashMap<String, String>) -> Result<Map<String, Value>, CompileError> {
+    let mut out = Map::new();
+    style::decode_into(words, &mut out, &|w| classes.get(w).cloned(), 0).map_err(|e| {
+        invalid(format!("{e}. Style words: col, row, g12, p16, px-md, bg-card, fg-mutedForeground, r-lg, sh-sm, w100%, items-center, justify-between, hover:bg-accent, …"))
+    })?;
+    Ok(out)
+}
+
+/// Desugars a whole program: its statements, and the classes it defines.
 pub fn desugar(
     statements: &[Statement],
     ext: &Express,
     cat: &dyn Components,
-) -> Result<Vec<Statement>, CompileError> {
+) -> Result<(Vec<Statement>, HashMap<String, String>), CompileError> {
     let mut d = Desugarer::default();
     let mut out = Vec::with_capacity(statements.len());
     for s in statements {
@@ -389,5 +427,5 @@ pub fn desugar(
             out.push(s);
         }
     }
-    Ok(out)
+    Ok((out, d.classes))
 }

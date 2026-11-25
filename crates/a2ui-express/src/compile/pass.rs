@@ -40,6 +40,8 @@ pub(crate) struct Ctx {
     bound_paths: HashMap<String, Value>,
     /// Variables whose values are being compiled.
     resolving: HashSet<String>,
+    /// The extension's style classes (`style(name, "…")`) of the block.
+    pub classes: std::sync::Arc<HashMap<String, String>>,
 }
 
 impl Ctx {
@@ -54,6 +56,7 @@ impl Ctx {
             referenced: Vec::new(),
             bound_paths: HashMap::new(),
             resolving: HashSet::new(),
+            classes: Default::default(),
         }
     }
 }
@@ -344,6 +347,17 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
                 prop.to_owned()
             }
         };
+
+        // The extension's keywords (s=, enter=, Motion ref=/kf=) become the
+        // props they stand for.
+        let sugared = match self.c.extension() {
+            Some(ext) => {
+                let declares = |p: &str| properties.iter().any(|q| q == p);
+                crate::ext::component_pairs(name, &mut pairs, ext, &self.ctx.classes, &declares, call.name_span)?
+            }
+            None => Vec::new(),
+        };
+        pairs.extend(sugared.iter().map(|(k, v)| (k.as_str(), v)));
 
         let mut seen: HashSet<&str> = HashSet::new();
         let mut bound = HashMap::new();

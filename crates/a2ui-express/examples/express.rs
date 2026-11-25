@@ -3,6 +3,7 @@
 //! ```sh
 //! cargo run -q -p a2ui-express --example express -- prompt <catalog.json> [--compact]
 //! cargo run -q -p a2ui-express --example express -- compile <catalog.json> < block.a2ui
+//! cargo run -q -p a2ui-express --example express -- decompile <catalog.json> < messages.json
 //! ```
 //!
 //! `prompt` prints the Express prompt section for the catalog. `compile`
@@ -14,6 +15,7 @@ use std::io::Read;
 use std::process::ExitCode;
 
 use a2ui_express::compile::Compiler;
+use a2ui_express::decompile::{DecompileOptions, Order, decompile};
 use a2ui_express::prompt::{PromptOptions, PromptStyle, generate_prompt};
 use a2ui_express::schema::{Catalog, CatalogSet};
 
@@ -61,8 +63,25 @@ fn main() -> ExitCode {
                 }
             }
         }
+        ["decompile", catalog] => {
+            let mut source = String::new();
+            std::io::stdin().read_to_string(&mut source).expect("stdin");
+            let messages: Vec<serde_json::Value> = serde_json::from_str(&source).expect("a JSON array of messages");
+            let catalogs = CatalogSet::new(vec![load(catalog)]).expect("catalog set");
+            let options = DecompileOptions { order: Order::TopDown, ..Default::default() };
+            match decompile(&catalogs, &messages, &options) {
+                Ok(text) => {
+                    println!("{text}");
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         _ => {
-            eprintln!("usage: express prompt <catalog.json> [--compact] | compile <catalog.json>");
+            eprintln!("usage: express prompt <catalog.json> [--compact] | compile <catalog.json> | decompile <catalog.json>");
             ExitCode::from(2)
         }
     }

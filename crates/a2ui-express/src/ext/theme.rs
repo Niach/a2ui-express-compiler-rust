@@ -556,12 +556,21 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
         border: color_arg(&args, "border")?,
         charts,
     };
-    let derived = derive(&seeds, other);
+    let base_colors = mode_colors(base, &seeds, true);
+    // The other mode's charts come from the base mode's (contrast-checked)
+    // charts, so the seeds read back from the base mode reach both.
+    let mut carried = seeds.clone();
+    if !carried.charts.is_empty() {
+        carried.charts = (1..=8)
+            .filter_map(|i| base_colors[&format!("chart{i}")].as_str().and_then(Rgba::parse))
+            .collect();
+    }
+    let derived = derive(&carried, other);
 
     let mut modes = Map::new();
     for mode in MODES {
         let colors = if mode == base {
-            mode_colors(mode, &seeds, true)
+            base_colors.clone()
         } else {
             mode_colors(mode, &derived, false)
         };
@@ -835,15 +844,20 @@ fn try_base(theme: &Value, base: &str) -> Option<Map<String, Value>> {
             _ => return None,
         }
     }
-    // Drop every seed the expansion does not need, in a fixed order.
-    let full = expand(&seeds).ok()?;
+    // Drop each seed the theme does not need, in a fixed order: one whose
+    // removal leaves the expansion no further from the theme.
+    let distance = |seeds: &Map<String, Value>| expand(seeds).map(|e| leaves_differing(&e, theme));
+    let mut current = distance(&seeds).ok()?;
     for seed in [
         "card", "secondary", "muted", "accent", "border", "charts", "fg", "display", "font", "shadow",
         "button", "stroke", "density", "scale", "radius", "primary", "bg",
     ] {
         if let Some(v) = seeds.remove(seed) {
-            if expand(&seeds).ok().as_ref() != Some(&full) {
-                insert_ordered(&mut seeds, seed, v);
+            match distance(&seeds) {
+                Ok(d) if d <= current => current = d,
+                _ => {
+                    seeds.insert(seed.to_owned(), v);
+                }
             }
         }
     }
@@ -875,24 +889,54 @@ fn try_base(theme: &Value, base: &str) -> Option<Map<String, Value>> {
     for (k, v) in extra {
         seeds.insert(k, v);
     }
+    let seeds = sorted(seeds);
     (expand(&seeds).ok()? == *theme).then_some(seeds)
 }
 
-fn insert_ordered(seeds: &mut Map<String, Value>, key: &str, value: Value) {
-    let mut out = Map::new();
-    let rank = |k: &str| SEEDS.iter().position(|s| *s == k).unwrap_or(SEEDS.len());
-    let mut placed = false;
-    for (k, v) in std::mem::take(seeds) {
-        if !placed && rank(&k) > rank(key) {
-            out.insert(key.to_owned(), value.clone());
-            placed = true;
+/// Seeds first (in [`SEEDS`] order), then the identity, then colour tokens
+/// and the override maps.
+fn sorted(seeds: Map<String, Value>) -> Map<String, Value> {
+    let rank = |k: &str| {
+        SEEDS
+            .iter()
+            .position(|s| *s == k)
+            .or_else(|| ["id", "name", "extends"].iter().position(|s| *s == k).map(|i| 100 + i))
+            .or_else(|| ALL_COLORS.iter().position(|s| *s == k).map(|i| 200 + i))
+            .or_else(|| ["light", "dark", "tokens", "fonts", "recipes"].iter().position(|s| *s == k).map(|i| 300 + i))
+            .unwrap_or(400)
+    };
+    let mut entries: Vec<(String, Value)> = seeds.into_iter().collect();
+    entries.sort_by_key(|(k, _)| rank(k));
+    entries.into_iter().collect()
+}
+
+/// How many leaves of `a` and `b` differ (a leaf only one side has counts).
+fn leaves_differing(a: &Value, b: &Value) -> usize {
+    match (a, b) {
+        (Value::Object(x), Value::Object(y)) => {
+            let mut n = 0;
+            for (k, v) in x {
+                n += match y.get(k) {
+                    Some(w) => leaves_differing(v, w),
+                    None => leaf_count(v),
+                };
+            }
+            for (k, w) in y {
+                if !x.contains_key(k) {
+                    n += leaf_count(w);
+                }
+            }
+            n
         }
-        out.insert(k, v);
+        (x, y) => usize::from(x != y),
     }
-    if !placed {
-        out.insert(key.to_owned(), value);
+}
+
+fn leaf_count(v: &Value) -> usize {
+    match v {
+        Value::Object(m) => m.values().map(leaf_count).sum(),
+        _ => 1,
     }
-    *seeds = out;
 }
 
 /// The theme arguments that [`expand`] maps to exactly `theme`, shortest

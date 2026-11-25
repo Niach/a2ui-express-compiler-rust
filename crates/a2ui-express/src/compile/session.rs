@@ -316,6 +316,9 @@ impl ScopeSession {
         }
         let mut ctx = Ctx::new();
         ctx.allow_pending = !is_final;
+        if compiler.extension().is_some() {
+            ctx.classes = std::sync::Arc::new(desugarer.classes().clone());
+        }
         let mut active: HashSet<String> = existing.clone();
         let mut out = Vec::new();
         for (idx, unit) in units.iter().enumerate() {
@@ -442,9 +445,13 @@ impl ScopeSession {
                 }
                 if !components.is_empty() || !data.is_empty() || scope.theme.is_some() {
                     let mut out = self.theme_delta(compiler, idx, scope, ctx, undo)?;
-                    out.extend(self.updates(
-                        compiler, idx, scope, components, data, true, false, false, undo,
-                    )?);
+                    let theme_only = components.is_empty() && data.is_empty() && scope.theme.is_some();
+                    let emitted = &self.scopes[&idx];
+                    if !(theme_only && emitted.emitted_components.is_empty() && emitted.emitted_data.is_empty()) {
+                        out.extend(self.updates(
+                            compiler, idx, scope, components, data, true, false, false, undo,
+                        )?);
+                    }
                     return Ok(out);
                 }
                 return Err(CompileError::undefined_root("root"));
@@ -454,6 +461,11 @@ impl ScopeSession {
             );
         }
         let mut out = self.theme_delta(compiler, idx, scope, ctx, undo)?;
+        let theme_only = components.is_empty() && data.is_empty() && scope.theme.is_some();
+        let emitted = &self.scopes[&idx];
+        if theme_only && emitted.emitted_components.is_empty() && emitted.emitted_data.is_empty() {
+            return Ok(out);
+        }
         out.extend(self.updates(
             compiler,
             idx,

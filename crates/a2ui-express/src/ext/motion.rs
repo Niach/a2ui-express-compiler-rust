@@ -39,9 +39,9 @@
 
 use serde_json::{Map, Value, json};
 
-use super::{Express, invalid, json_to_expr, literal_json};
+use super::{Express, invalid, literal_json};
 use crate::compile::CompileError;
-use crate::syntax::{Arg, Call, Expr, ExprKind, Span};
+use crate::syntax::{Expr, ExprKind};
 
 /// The enter animations (`style.animation`).
 pub const ENTER: &[&str] = &[
@@ -91,74 +91,22 @@ pub fn sugar_key(keyword: &str, value: &Expr) -> Result<(&'static str, Value), C
     }
 }
 
-/// Expands `ref=` and `kf=` on a Motion call.
-pub fn expand_motion(
-    call: &mut Call,
-    span: Span,
-    ext: &Express,
-    sugar: &dyn Fn(&str) -> bool,
-) -> Result<(), CompileError> {
-    let has = |call: &Call, k: &str| call.args.iter().any(|a| a.name.as_ref().is_some_and(|(n, _)| n == k));
-    if sugar("ref") {
-        if let Some(i) = call.args.iter().position(|a| a.name.as_ref().is_some_and(|(n, _)| n == "ref")) {
-            let arg = call.args.remove(i);
-            let ExprKind::String(name) = &arg.value.kind else {
-                return Err(invalid("Motion ref= is the name of a registered animation, a string."));
-            };
-            let Some(Value::Object(props)) = ext.motions.get(name) else {
-                let mut names: Vec<&str> = ext.motions.keys().map(String::as_str).collect();
-                names.sort_unstable();
-                return Err(invalid(format!(
-                    "Motion ref=\"{name}\" is not a registered animation. Registered: {}.",
-                    if names.is_empty() { "none".to_owned() } else { names.join(", ") }
-                )));
-            };
-            for (k, v) in props {
-                if !has(call, k) {
-                    call.args.push(Arg {
-                        name: Some((k.clone(), span)),
-                        value: json_to_expr(v, span),
-                    });
-                }
-            }
-        }
-    }
-    if sugar("kf") {
-        if let Some(i) = call.args.iter().position(|a| a.name.as_ref().is_some_and(|(n, _)| n == "kf")) {
-            let arg = call.args.remove(i);
-            let ExprKind::String(text) = &arg.value.kind else {
-                return Err(invalid("Motion kf= is keyframe text in a string."));
-            };
-            if has(call, "layers") {
-                return Err(invalid("Motion takes kf= or layers=, not both."));
-            }
-            let layers = kf_layers(text).map_err(|e| invalid(format!("Motion kf=: {e}")))?;
-            call.args.push(Arg {
-                name: Some(("layers".into(), span)),
-                value: json_to_expr(&layers, span),
-            });
-        }
-    }
-    Ok(())
-}
-
-/// The registry entry `props` (a Motion component's props) are, if any:
-/// every entry prop matches and the component has no Motion prop the entry
-/// lacks, apart from `keep` (envelope and placement props).
-pub fn registry_match<'a>(ext: &'a Express, comp: &Map<String, Value>, keep: &dyn Fn(&str) -> bool) -> Option<&'a str> {
-    const MOTION_PROPS: &[&str] = &[
-        "layers", "size", "duration", "fps", "assets", "markers", "lottie", "src", "autoplay", "loop", "plays",
-        "direction", "speed", "segment", "marker", "poster", "fit", "stateMachine",
-    ];
+/// The registry entry a Motion component's props are written as: the
+/// entry whose `layers` (its drawing) the component has, and whose other
+/// props the component has too (a differing one stays written beside
+/// `ref=`). The props the entry supplies unchanged are returned, to be left
+/// out.
+pub fn registry_match<'a>(ext: &'a Express, comp: &Map<String, Value>) -> Option<(&'a str, Vec<String>)> {
     let mut names: Vec<&String> = ext.motions.keys().collect();
     names.sort();
     names.into_iter().find_map(|name| {
         let props = ext.motions[name].as_object()?;
-        let all_match = props.iter().all(|(k, v)| comp.get(k) == Some(v));
-        let none_extra = MOTION_PROPS
-            .iter()
-            .all(|p| props.contains_key(*p) || !comp.contains_key(*p) || keep(p));
-        (all_match && none_extra && !props.is_empty()).then_some(name.as_str())
+        let layers = props.get("layers")?;
+        if comp.get("layers") != Some(layers) || !props.keys().all(|k| comp.contains_key(k)) {
+            return None;
+        }
+        let same: Vec<String> = props.iter().filter(|(k, v)| comp.get(*k) == Some(v)).map(|(k, _)| k.clone()).collect();
+        Some((name.as_str(), same))
     })
 }
 
