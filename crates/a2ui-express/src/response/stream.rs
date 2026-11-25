@@ -380,7 +380,10 @@ impl ResponseStream {
         } else {
             0
         };
-        let (tail, _) = split_complete_statements(&payload[resume..]);
+        let (tail, _) = split_complete_statements(
+            &payload[resume..],
+            self.inner.compiler.extension().is_some(),
+        );
         let complete_len = resume + tail.len();
         let (complete, fragment) = payload.split_at(complete_len);
         let mut messages = Vec::new();

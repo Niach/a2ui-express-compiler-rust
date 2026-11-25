@@ -28,8 +28,8 @@
 
 use super::ast::*;
 use super::error::{ParseError, ParseErrorKind};
-use super::lexer::{Lexed, Token, TokenSet, TokenType, escape_display, lex};
-use super::normalize::normalize_with;
+use super::lexer::{Lexed, Token, TokenSet, TokenType, escape_display, lex_with};
+use super::normalize::normalize_dialect;
 use std::collections::HashSet;
 
 use TokenType as T;
@@ -50,6 +50,8 @@ const EXPR_START: TokenSet = TokenSet::of(&[
     T::Boolean,
     T::Identifier,
     T::SystemIdentifier,
+    // Only the extension's dialect lexes one; never printed in a set.
+    T::Color,
 ]);
 const STRINGS: TokenSet = TokenSet::of(&[
     T::RawTripleString,
@@ -104,8 +106,34 @@ pub fn parse(source: &str) -> ParseOutput {
 /// `known` holds names assigned earlier in the block (see
 /// [`super::normalize::normalize_with`]).
 pub fn parse_at(source: &str, origin: Pos, known: &HashSet<String>) -> ParseOutput {
-    let normalized = normalize_with(source, known);
-    parse_tokens(lex(&normalized, origin))
+    parse_dialect(source, origin, known, Dialect::UPSTREAM)
+}
+
+/// [`parse_at`] in a [`Dialect`].
+pub fn parse_dialect(
+    source: &str,
+    origin: Pos,
+    known: &HashSet<String>,
+    dialect: Dialect,
+) -> ParseOutput {
+    let normalized = normalize_dialect(source, known, dialect.hex_colors);
+    parse_tokens(lex_with(&normalized, origin, dialect.hex_colors))
+}
+
+/// What the parser reads on top of upstream Express.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+pub struct Dialect {
+    /// `#rrggbb` / `#rrggbbaa` colour literals ([`ExprKind::Color`]) instead
+    /// of `#` comments where one stands (the `at_exponential_express`
+    /// extension).
+    pub hex_colors: bool,
+}
+
+impl Dialect {
+    /// Upstream Express, as `Express.g4` reads it.
+    pub const UPSTREAM: Dialect = Dialect { hex_colors: false };
+    /// The `at_exponential_express` extension's dialect.
+    pub const EXTENDED: Dialect = Dialect { hex_colors: true };
 }
 
 /// Parses already-lexed tokens, without source repairs.
@@ -645,6 +673,7 @@ impl Parser {
                     ExprKind::Null
                 }
             },
+            T::Color => ExprKind::Color(t.text.to_ascii_lowercase()),
             _ => ExprKind::String(string_value(&t)),
         };
         Ok(Expr { kind, span: t.span })

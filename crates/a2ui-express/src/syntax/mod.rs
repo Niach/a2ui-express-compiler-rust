@@ -20,5 +20,5 @@ mod xid;
 pub use ast::*;
 pub use error::{ParseError, ParseErrorKind};
 pub use lexer::is_identifier;
-pub use parser::{ParseOutput, parse, parse_at};
+pub use parser::{Dialect, ParseOutput, parse, parse_at, parse_dialect};
 pub use stream::{LineParser, StreamItem};

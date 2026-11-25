@@ -64,6 +64,10 @@ pub enum TokenType {
     Identifier = 20,
     /// `@name`
     SystemIdentifier = 21,
+    /// `#rrggbb` or `#rrggbbaa`: only lexed in the
+    /// [`Dialect::hex_colors`](super::Dialect) dialect of the
+    /// `at_exponential_express` extension, never in upstream Express.
+    Color = 22,
 }
 
 impl TokenType {
@@ -93,10 +97,11 @@ impl TokenType {
             Boolean => "BOOLEAN",
             Identifier => "IDENTIFIER",
             SystemIdentifier => "SYSTEM_IDENTIFIER",
+            Color => "COLOR",
         }
     }
 
-    const ALL: [TokenType; 22] = {
+    const ALL: [TokenType; 23] = {
         use TokenType::*;
         [
             Eof,
@@ -121,6 +126,7 @@ impl TokenType {
             Boolean,
             Identifier,
             SystemIdentifier,
+            Color,
         ]
     };
 }
@@ -154,9 +160,11 @@ impl TokenSet {
 
 impl std::fmt::Display for TokenSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // `COLOR` exists only in the extension's dialect, and never shows in
+        // an expected-token set, so upstream's error text stays the same.
         let names: Vec<&str> = TokenType::ALL
             .iter()
-            .filter(|t| self.contains(**t))
+            .filter(|t| **t != TokenType::Color && self.contains(**t))
             .map(|t| t.display_name())
             .collect();
         if names.len() == 1 {
@@ -495,7 +503,7 @@ impl Lexer<'_> {
                 }
                 T::Identifier => self.ident_rule(s, None),
                 T::SystemIdentifier => self.ident_rule(s, Some('@')),
-                T::Eof => RuleMatch::dead(),
+                T::Eof | T::Color => RuleMatch::dead(),
             },
             Rule::Comment => {
                 let start = match (self.at(s), self.at(s + 1)) {
@@ -590,8 +598,29 @@ pub(crate) fn escape_display(s: &str) -> String {
         .replace('\t', "\\t")
 }
 
+/// The length of the `#rrggbb` / `#rrggbbaa` colour literal at byte `i`:
+/// `#`, exactly six or eight hex digits, then the end or a character that
+/// cannot continue a word. Every scanner of the extension's dialect asks
+/// this one question, so they agree on what is a colour and what a `#`
+/// comment.
+pub fn hex_color_at(s: &[u8], i: usize) -> Option<usize> {
+    if s.get(i) != Some(&b'#') {
+        return None;
+    }
+    let digits = s[i + 1..].iter().take_while(|b| b.is_ascii_hexdigit()).count();
+    let next = s.get(i + 1 + digits);
+    let ends = next.is_none_or(|b| !(b.is_ascii_alphanumeric() || *b == b'_'));
+    (matches!(digits, 6 | 8) && ends).then_some(1 + digits)
+}
+
 /// Lexes `src`, whose first character sits at `origin`.
 pub fn lex(src: &str, origin: Pos) -> Lexed {
+    lex_with(src, origin, false)
+}
+
+/// [`lex`], reading `#rrggbb[aa]` as a [`TokenType::Color`] instead of a
+/// comment when `hex_colors` is set.
+pub fn lex_with(src: &str, origin: Pos, hex_colors: bool) -> Lexed {
     let chars: Vec<char> = src.chars().collect();
     let mut offsets: Vec<usize> = src.char_indices().map(|(i, _)| i).collect();
     offsets.push(src.len());
@@ -628,6 +657,23 @@ pub fn lex(src: &str, origin: Pos) -> Lexed {
     let mut line_initial = true;
     let mut s = 0;
     while s < lx.n() {
+        if hex_colors && lx.chars[s] == '#' {
+            if let Some(len) = hex_color_at(lx.src.as_bytes(), lx.offsets[s]) {
+                let e = s + len;
+                tokens.push(Token {
+                    ty: TokenType::Color,
+                    text: lx.src[lx.offsets[s]..lx.offsets[e]].to_string(),
+                    span: Span {
+                        start: positions[s],
+                        end: positions[e],
+                    },
+                    line_initial,
+                });
+                line_initial = false;
+                s = e;
+                continue;
+            }
+        }
         let mut best: Option<(usize, Rule)> = None;
         let mut alive = 0;
         for rule in RULES {

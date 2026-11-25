@@ -594,6 +594,11 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
             }
             ExprKind::Check { name, args } => self.check_call(name, args, at.action, false)?.0,
             ExprKind::Call(call) => return self.call_value(call, at.action, at.inline),
+            ExprKind::Color(hex) => {
+                return Err(CompileError::validation(format!(
+                    "The colour literal {hex} is only valid inside theme(...); a style colour is a $color token such as \"$color.primary\"."
+                )));
+            }
         })
     }
 
@@ -1187,6 +1192,7 @@ fn describe(e: &Expr) -> String {
         ExprKind::Bool(b) => format!("the boolean {b}"),
         ExprKind::Number(n) => format!("the number {}", js_string(&Value::Number(n.to_json()))),
         ExprKind::String(s) => format!("the string {}", Value::String(s.clone())),
+        ExprKind::Color(hex) => format!("the colour {hex}"),
     }
 }
 
@@ -1205,7 +1211,7 @@ fn ast_json(e: &Expr) -> Value {
         ExprKind::Null => Value::Null,
         ExprKind::Bool(b) => Value::Bool(*b),
         ExprKind::Number(n) => Value::Number(n.to_json()),
-        ExprKind::String(s) => Value::String(s.clone()),
+        ExprKind::String(s) | ExprKind::Color(s) => Value::String(s.clone()),
         ExprKind::Path(p) => json!({"kind": "path", "path": p}),
         ExprKind::Variable(name) => json!({"kind": "variable", "name": name}),
         ExprKind::Skipped => json!({"kind": "skipped"}),

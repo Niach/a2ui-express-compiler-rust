@@ -64,8 +64,11 @@ pub(crate) use sentinel::strip_sentinel_tags;
 pub(crate) mod session;
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use serde_json::{Map, Value, json};
+
+use crate::ext::{self, Express};
 
 use crate::schema::{Catalog, CatalogError, CatalogSet, CatalogVersion, SymbolKind};
 use crate::syntax::{self, Call, Expr, ExprKind, Program, Statement, StatementForm, Target};
@@ -85,6 +88,8 @@ pub const DEFAULT_SURFACE_ID: &str = "default_surface";
 pub struct Compiler {
     set: CatalogSet,
     version: CatalogVersion,
+    /// The `at_exponential_express` extension, when a catalog declares it.
+    ext: Option<Arc<Express>>,
 }
 
 impl Compiler {
@@ -96,7 +101,40 @@ impl Compiler {
     ) -> Result<Compiler, CatalogError> {
         let set = CatalogSet::new(catalogs)?;
         let version = version.unwrap_or_else(|| set.version());
-        Ok(Compiler { set, version })
+        let ext = Express::from_catalogs(&set).map(Arc::new);
+        Ok(Compiler { set, version, ext })
+    }
+
+    /// The `at_exponential_express` extension, when one of the catalogs
+    /// declares it (see [`crate::ext`]).
+    pub fn extension(&self) -> Option<&Express> {
+        self.ext.as_deref()
+    }
+
+    /// The dialect blocks are read in: upstream Express, or the extension's.
+    pub fn dialect(&self) -> syntax::Dialect {
+        if self.ext.is_some() {
+            syntax::Dialect::EXTENDED
+        } else {
+            syntax::Dialect::UPSTREAM
+        }
+    }
+
+    /// Parses a block (without sentinel tags) in [`Compiler::dialect`].
+    pub fn parse_block(&self, body: &str) -> syntax::ParseOutput {
+        syntax::parse_dialect(body, syntax::Pos::START, &HashSet::new(), self.dialect())
+    }
+
+    /// The statements with the extension's sugar expanded (as they are,
+    /// without the extension).
+    pub(crate) fn desugar<'s>(
+        &self,
+        statements: &'s [Statement],
+    ) -> Result<std::borrow::Cow<'s, [Statement]>, CompileError> {
+        match &self.ext {
+            None => Ok(std::borrow::Cow::Borrowed(statements)),
+            Some(e) => Ok(std::borrow::Cow::Owned(ext::desugar(statements, e, self)?)),
+        }
     }
 
     /// The active catalogs.
@@ -117,7 +155,7 @@ impl Compiler {
     /// messages are checked with [`validate`] before they are returned.
     pub fn compile(&self, source: &str, surface_id: &str) -> Result<Vec<Value>, CompileError> {
         let body = sentinel::strip_sentinel_tags(source);
-        let program = syntax::parse(&body).into_result()?;
+        let program = self.parse_block(&body).into_result()?;
         self.compile_program(&program, surface_id)
     }
 
@@ -127,7 +165,8 @@ impl Compiler {
         program: &Program,
         surface_id: &str,
     ) -> Result<Vec<Value>, CompileError> {
-        let (scopes, units) = self.build_units(&program.statements, surface_id)?;
+        let statements = self.desugar(&program.statements)?;
+        let (scopes, units) = self.build_units(statements.iter(), surface_id)?;
         if units.is_empty() {
             return Err(CompileError::undefined_root("root"));
         }
@@ -261,6 +300,19 @@ impl Compiler {
                 }
                 StatementForm::DeleteSurface(call) => {
                     units.push(Unit::Delete(parse_delete_surface_id(call)?));
+                }
+                StatementForm::Call(call) if self.ext.is_some() && call.name == "theme" => {
+                    let i = *current.get_or_insert_with(|| {
+                        scopes.push(Scope::new(surface_id.to_owned()));
+                        units.push(Unit::Scope(scopes.len() - 1));
+                        scopes.len() - 1
+                    });
+                    scopes[i].theme = Some(ext::theme_value(call)?);
+                }
+                StatementForm::Call(call) if self.ext.is_some() && call.name == "del" => {
+                    return Err(CompileError::validation(
+                        "del(id) removes a component in a patch (compile_patch), not in a block.",
+                    ));
                 }
                 StatementForm::Call(call) => units.push(Unit::Call(call, current)),
                 StatementForm::Other(_) => {}
@@ -425,7 +477,12 @@ impl Compiler {
                     "surface() extensions require a surface-creating scope with a root component.",
                 ));
             }
-            return self.compile_update_scope(scope, components, &mut pass);
+            let mut out = Vec::new();
+            if let Some(theme) = &scope.theme {
+                out.push(self.theme_call(&scope.surface_id, theme, pass.ctx)?);
+            }
+            out.extend(self.compile_update_scope(scope, components, &mut pass)?);
+            return Ok(out);
         }
 
         let mut data_model = Map::new();
@@ -433,13 +490,67 @@ impl Compiler {
             let value = pass.plain_value(ast)?;
             set_nested_path(&mut data_model, path, value)?;
         }
-        let metadata = match scope.raw_extensions {
-            Some(raw) => Some(json!({
-                "extensions": pass.extensions_map(raw, &format!("surface '{}'", scope.surface_id))?
-            })),
+        let extensions = match scope.raw_extensions {
+            Some(raw) => Some(pass.extensions_map(raw, &format!("surface '{}'", scope.surface_id))?),
             None => None,
         };
+        let metadata = self.surface_metadata(scope, extensions)?;
         Ok(self.create_messages(scope, components, data_model, metadata))
+    }
+
+    /// A new surface's `metadata`: its `extensions=` and its theme.
+    pub(crate) fn surface_metadata(
+        &self,
+        scope: &Scope<'_>,
+        mut extensions: Option<Map<String, Value>>,
+    ) -> Result<Option<Value>, CompileError> {
+        if let Some(theme) = &scope.theme {
+            let ext = extensions.get_or_insert_with(Map::new);
+            if ext.contains_key(ext::THEME_EXTENSION) {
+                return Err(CompileError::validation(format!(
+                    "Surface '{}' sets its theme twice: by theme(...) and in extensions.{}.",
+                    scope.surface_id,
+                    ext::THEME_EXTENSION
+                )));
+            }
+            ext.insert(ext::THEME_EXTENSION.into(), theme.clone());
+        }
+        Ok(extensions.map(|e| json!({ "extensions": e })))
+    }
+
+    /// The `callRendererFunction` that changes a live surface's theme.
+    pub(crate) fn theme_call(
+        &self,
+        surface_id: &str,
+        theme: &Value,
+        ctx: &mut Ctx,
+    ) -> Result<Value, CompileError> {
+        let ext = self.ext.as_deref().expect("theme() needs the extension");
+        let function = &ext.theme_function;
+        if !self.defines_function(function, None) {
+            return Err(CompileError::validation(format!(
+                "theme(...) on surface '{surface_id}', which already exists, compiles to a call of the renderer function '{function}', which no active catalog declares. Write theme(...) before root, so it goes into createSurface."
+            )));
+        }
+        ctx.call_counter += 1;
+        let catalog_id = self
+            .set
+            .catalogs_defining(SymbolKind::Function, function)
+            .first()
+            .map(|c| (*c).to_owned())
+            .unwrap_or_else(|| ext.catalog_id.clone());
+        Ok(json!({
+            "version": self.version.wire(),
+            "callRendererFunction": {
+                "surfaceId": surface_id,
+                "functionCallId": format!("call_{}", ctx.call_counter),
+                "callFunction": {
+                    "catalogId": catalog_id,
+                    "call": function,
+                    "args": {"theme": theme},
+                },
+            },
+        }))
     }
 
     fn compile_update_scope(
@@ -601,6 +712,8 @@ pub(crate) struct Scope<'a> {
     pub(crate) send_data_model: Option<bool>,
     pub(crate) update: bool,
     pub(crate) raw_extensions: Option<&'a Expr>,
+    /// The `theme(...)` of the scope (extension), expanded.
+    pub(crate) theme: Option<Value>,
     pub(crate) syms: Symbols<'a>,
     /// Data path assignments; a reassignment moves the path to the end.
     pub(crate) data: Vec<(String, &'a Expr)>,
@@ -614,6 +727,7 @@ impl<'a> Scope<'a> {
             send_data_model: None,
             update: false,
             raw_extensions: None,
+            theme: None,
             syms: Symbols::default(),
             data: Vec::new(),
         }
@@ -673,3 +787,16 @@ fn literal_value(e: &Expr) -> Value {
 }
 
 pub(crate) use syntax::uax31::is_uax31_identifier;
+
+impl ext::Components for Compiler {
+    fn is_component(&self, name: &str) -> bool {
+        self.defines_component(name, None)
+    }
+
+    fn declares(&self, name: &str, prop: &str) -> bool {
+        self.set
+            .catalogs()
+            .iter()
+            .any(|c| c.has_component(name) && c.component_properties(name).iter().any(|p| p == prop))
+    }
+}

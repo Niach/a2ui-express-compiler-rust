@@ -308,8 +308,11 @@ fn scan_quoted(s: &[u8], quote: usize, raw: bool) -> Option<usize> {
 
 /// `_step_string_or_comment`: past a string or comment at `i`, and whether
 /// a string closed there.
-fn step_string_or_comment(s: &[u8], i: usize) -> (usize, bool) {
+fn step_string_or_comment(s: &[u8], i: usize, hex_colors: bool) -> (usize, bool) {
     let n = s.len();
+    if hex_colors && crate::syntax::lexer::hex_color_at(s, i).is_some() {
+        return (i, false);
+    }
     let quoted = |q: usize, raw: bool| match scan_quoted(s, q, raw) {
         Some(end) if !(end == n && end - q == 2) => (end, true),
         _ => (n, false),
@@ -337,14 +340,15 @@ fn step_string_or_comment(s: &[u8], i: usize) -> (usize, bool) {
 
 /// Splits `source` into the statements that are complete and the fragment
 /// after them. A statement is complete once its brackets close and a line
-/// break or `;` follows its value.
-pub(crate) fn split_complete_statements(source: &str) -> (&str, &str) {
+/// break or `;` follows its value. With `hex_colors` (the extension's
+/// dialect) a `#rrggbb[aa]` colour is part of its statement, not a comment.
+pub(crate) fn split_complete_statements(source: &str, hex_colors: bool) -> (&str, &str) {
     let s = source.as_bytes();
     let n = s.len();
     let mut cur = Cursor::default();
     let mut i = 0;
     while i < n {
-        let (next, closed_string) = step_string_or_comment(s, i);
+        let (next, closed_string) = step_string_or_comment(s, i, hex_colors);
         if next > i {
             if closed_string && cur.depth == 0 && cur.saw_equals {
                 cur.has_rhs = true;
@@ -622,11 +626,11 @@ mod tests {
     #[test]
     fn complete_statements_end_at_a_line_break_after_their_value() {
         assert_eq!(
-            split_complete_statements("a = Text(\"x\")\nb = Text(\"y"),
+            split_complete_statements("a = Text(\"x\")\nb = Text(\"y", false),
             ("a = Text(\"x\")\n", "b = Text(\"y")
         );
         assert_eq!(
-            split_complete_statements("root = Card(\n"),
+            split_complete_statements("root = Card(\n", false),
             ("", "root = Card(\n")
         );
     }
