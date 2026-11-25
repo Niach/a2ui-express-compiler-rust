@@ -3,10 +3,8 @@ so it cannot drift from the crate.
 
 Every compile, decompile, parse_response, parse_chunk (also fed one
 character at a time) and generate_prompt_snippet case runs as written (v1.0),
-except those `conformance/bindings_skip.txt` lists; the npm package's test
-(`packages/npm/test`) runs the same cases. The crate's own harness
-(`cargo test -p a2ui-express --test conformance`) runs everything, lowered
-to v0.9 as well.
+except those `conformance/bindings_skip.txt` and `conformance/out_of_scope.txt`
+list; the npm package's test (`packages/npm/test`) runs the same cases.
 """
 
 from __future__ import annotations
@@ -39,7 +37,11 @@ CASES = load_cases()
 
 
 def skipped() -> list[str]:
-    lines = (ROOT / "conformance/bindings_skip.txt").read_text().splitlines()
+    lines = [
+        line
+        for name in ("bindings_skip", "out_of_scope")
+        for line in (ROOT / f"conformance/{name}.txt").read_text().splitlines()
+    ]
     return [n for n in (line.split("#")[0].strip() for line in lines) if n]
 
 
@@ -272,7 +274,7 @@ RUNNERS = {
 
 def test_skip_list_names_existing_cases() -> None:
     missing = [n for n in SKIPPED if n not in CASES]
-    assert not missing, f"conformance/bindings_skip.txt names unknown cases: {missing}"
+    assert not missing, f"the conformance skip lists name unknown cases: {missing}"
 
 
 def test_runs_enough_cases() -> None:

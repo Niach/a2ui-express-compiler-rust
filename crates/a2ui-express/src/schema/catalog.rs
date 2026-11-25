@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 
 use super::common::{common_types, system_function_schemas};
 use super::refs::{
-    ENVELOPE_MIXIN_NAMES, common_def_name, common_def_of, envelope_key, is_supported_v1_ref,
+    ENVELOPE_MIXIN_NAMES, common_def_name, common_def_of, envelope_key, is_supported_ref,
     local_def_name, local_ref,
 };
 use super::resolve::{Schemas, Segment, SlotKind};
@@ -21,12 +21,9 @@ const STANDARD_METADATA_DESCRIPTION: &str =
 /// Options for [`Catalog::load`].
 #[derive(Debug, Clone, Default)]
 pub struct LoadOptions {
-    /// Read the catalog with this version instead of the `protocolVersion` it
-    /// declares (or v0.9 when it declares none).
-    pub protocol_version: Option<CatalogVersion>,
     /// Use this catalog ID instead of the one the document declares.
     pub catalog_id: Option<String>,
-    /// Use this `common_types.json` instead of the vendored one of the version.
+    /// Use this `common_types.json` instead of the vendored one.
     pub common_types: Option<Value>,
 }
 
@@ -141,7 +138,7 @@ impl Component {
     }
 
     /// The schema of a property, with local `$ref`s dereferenced. `checks`
-    /// also finds a v1.0 `@checks`.
+    /// also finds `@checks`.
     pub fn property_schema(&self, property: &str) -> Option<&Value> {
         self.property_schemas.get(property).or_else(|| {
             (property == "checks")
@@ -284,7 +281,7 @@ impl Catalog {
         Catalog::load(doc, LoadOptions::default())
     }
 
-    /// Loads a catalog document (v0.9, v0.9.1 or v1.0).
+    /// Loads a v1.0 catalog document.
     pub fn load(doc: Value, options: LoadOptions) -> Result<Catalog, CatalogError> {
         let Some(map) = doc.as_object() else {
             return Err(CatalogError::NotAnObject);
@@ -300,18 +297,13 @@ impl Catalog {
             })
             .filter(|id| !id.is_empty())
             .ok_or(CatalogError::MissingId)?;
-        let version = match options.protocol_version {
-            Some(v) => v,
-            None => match map.get("protocolVersion") {
-                None | Some(Value::Null) => CatalogVersion::DEFAULT,
-                Some(Value::String(raw)) => CatalogVersion::parse(raw)
-                    .ok_or_else(|| CatalogError::UnsupportedVersion(raw.clone()))?,
-                Some(other) => return Err(CatalogError::UnsupportedVersion(other.to_string())),
-            },
+        let version = match map.get("protocolVersion") {
+            None | Some(Value::Null) => return Err(CatalogError::MissingVersion),
+            Some(Value::String(raw)) => CatalogVersion::parse(raw)
+                .ok_or_else(|| CatalogError::UnsupportedVersion(raw.clone()))?,
+            Some(other) => return Err(CatalogError::UnsupportedVersion(other.to_string())),
         };
-        if version.at_least_v1() {
-            check_v1_refs(&doc, &mut String::new())?;
-        }
+        check_refs(&doc, &mut String::new())?;
         let common = options
             .common_types
             .unwrap_or_else(|| common_types(version).clone());
@@ -333,14 +325,12 @@ impl Catalog {
             let permitted_components = permitted_names(map, "anyComponent", "#/components/");
             let permitted_functions = permitted_names(map, "anyFunction", "#/functions/");
 
-            if version.at_least_v1() {
-                check_metadata(map.get("metadata"), "catalog")?;
-            }
+            check_metadata(map.get("metadata"), "catalog")?;
             let mut components = Vec::new();
             if let Some(Value::Object(raw)) = map.get("components") {
                 for (name, schema) in raw {
-                    if version.at_least_v1() && schema.is_object() {
-                        check_v1_component(name, schema)?;
+                    if schema.is_object() {
+                        check_component(name, schema)?;
                     }
                     if permitted_components
                         .as_ref()
@@ -359,11 +349,8 @@ impl Catalog {
                     return Ok(());
                 }
                 let function = read_function(&schemas, name, schema, false)?;
-                if version.at_least_v1() {
-                    check_v1_function(&function)?;
-                }
-                if version.at_least_v1()
-                    && function.requires_user_activation
+                check_function(&function)?;
+                if function.requires_user_activation
                     && function.allowed_callers != AllowedCallers::RendererOnly
                 {
                     return Err(CatalogError::UserActivationCallers {
@@ -385,13 +372,7 @@ impl Catalog {
                         add_function(name, schema)?;
                     }
                 }
-                Some(Value::Array(raw)) => {
-                    for schema in raw {
-                        if let Some(name) = schema.get("name").and_then(Value::as_str) {
-                            add_function(name, schema)?;
-                        }
-                    }
-                }
+                Some(Value::Array(_)) => return Err(CatalogError::FunctionsNotAnObject),
                 _ => {}
             }
 
@@ -437,22 +418,14 @@ impl Catalog {
         &self.common
     }
 
-    /// The wire key of a data binding: `@path` on v1.0, `path` below.
+    /// The wire key of a data binding: `@path`.
     pub fn path_key(&self) -> &'static str {
-        if self.version.at_least_v1() {
-            "@path"
-        } else {
-            "path"
-        }
+        "@path"
     }
 
-    /// The wire key of a function call: `@call` on v1.0, `call` below.
+    /// The wire key of a function call: `@call`.
     pub fn call_key(&self) -> &'static str {
-        if self.version.at_least_v1() {
-            "@call"
-        } else {
-            "call"
-        }
+        "@call"
     }
 
     // ---- components ------------------------------------------------------
@@ -493,12 +466,12 @@ impl Catalog {
     }
 
     /// The wire key a component's check rules are written under: the
-    /// envelope key (`@checks` on v1.0, `checks` below) for the standard
+    /// envelope key (`@checks`) for the standard
     /// `checks`, else the custom check-rule property's own name.
     pub fn check_rule_wire_key(&self, name: &str) -> Option<String> {
         let prop = self.check_rule_property(name)?;
         Some(if prop == "checks" {
-            envelope_key("checks", self.version.at_least_v1())
+            envelope_key("checks")
         } else {
             prop.to_owned()
         })
@@ -585,7 +558,7 @@ impl Catalog {
         &self.functions
     }
 
-    /// The protocol's system functions (such as v1.0's `@index`).
+    /// The protocol's system functions (such as `@index`).
     pub fn system_functions(&self) -> &[Function] {
         &self.system_functions
     }
@@ -614,11 +587,8 @@ impl Catalog {
     }
 
     /// The names of the catalog functions the agent may call directly, in
-    /// catalog order. Always empty below v1.0.
+    /// catalog order.
     pub fn agent_callable_functions(&self) -> Vec<&str> {
-        if !self.version.at_least_v1() {
-            return Vec::new();
-        }
         self.functions
             .iter()
             .filter(|f| f.is_agent_callable())
@@ -690,9 +660,9 @@ impl Catalog {
     }
 }
 
-/// From v1.0 a component's name and the properties it declares are UAX #31
+/// A component's name and the properties it declares are UAX #31
 /// identifiers, and its static `metadata` holds only `extensions`.
-fn check_v1_component(name: &str, schema: &Value) -> Result<(), CatalogError> {
+fn check_component(name: &str, schema: &Value) -> Result<(), CatalogError> {
     if !is_uax31_identifier(name) {
         return Err(CatalogError::InvalidIdentifier {
             kind: "component",
@@ -701,7 +671,7 @@ fn check_v1_component(name: &str, schema: &Value) -> Result<(), CatalogError> {
         });
     }
     if let Some(Value::Object(properties)) = schema.get("properties") {
-        // The standard mixins are spelled with a leading `@` from v1.0.
+        // The standard mixins are spelled with a leading `@`.
         let invalid = properties.keys().find(|p| {
             !is_uax31_identifier(p)
                 && !p
@@ -719,8 +689,8 @@ fn check_v1_component(name: &str, schema: &Value) -> Result<(), CatalogError> {
     check_metadata(schema.get("metadata"), &format!("component '{name}'"))
 }
 
-/// From v1.0 a function's name and its arguments are UAX #31 identifiers.
-fn check_v1_function(function: &Function) -> Result<(), CatalogError> {
+/// A function's name and its arguments are UAX #31 identifiers.
+fn check_function(function: &Function) -> Result<(), CatalogError> {
     let name = function.name();
     if !is_uax31_identifier(name) {
         return Err(CatalogError::InvalidIdentifier {
@@ -816,15 +786,15 @@ fn escape_pointer_token(token: &str) -> String {
     token.replace('~', "~0").replace('/', "~1")
 }
 
-/// Rejects a v1.0 `$ref` into any document other than the catalog itself or
+/// Rejects a `$ref` into any document other than the catalog itself or
 /// `common_types.json`.
-fn check_v1_refs(node: &Value, pointer: &mut String) -> Result<(), CatalogError> {
+fn check_refs(node: &Value, pointer: &mut String) -> Result<(), CatalogError> {
     let len = pointer.len();
     match node {
         Value::Array(items) => {
             for (i, item) in items.iter().enumerate() {
                 pointer.push_str(&format!("/{i}"));
-                check_v1_refs(item, pointer)?;
+                check_refs(item, pointer)?;
                 pointer.truncate(len);
             }
         }
@@ -833,14 +803,14 @@ fn check_v1_refs(node: &Value, pointer: &mut String) -> Result<(), CatalogError>
                 pointer.push('/');
                 pointer.push_str(&escape_pointer_token(k));
                 if let (true, Value::String(r)) = (k == "$ref", v) {
-                    if !is_supported_v1_ref(r) {
+                    if !is_supported_ref(r) {
                         return Err(CatalogError::ExternalRef {
                             reference: r.clone(),
                             pointer: pointer.clone(),
                         });
                     }
                 }
-                check_v1_refs(v, pointer)?;
+                check_refs(v, pointer)?;
                 pointer.truncate(len);
             }
         }

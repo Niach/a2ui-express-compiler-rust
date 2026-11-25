@@ -31,8 +31,7 @@ use serde_json::Value;
 ///
 /// `document` is the catalog JSON with the defaults upstream's Python harness
 /// applies: `protocolVersion` is `"1.0"` and `catalogId` the file's basename
-/// (or `"inline"`) when the document leaves them out. In a `v0.9-lowered` run
-/// it is the lowered document.
+/// (or `"inline"`) when the document leaves them out.
 #[derive(Debug, Clone)]
 pub struct Catalog {
     pub document: Value,

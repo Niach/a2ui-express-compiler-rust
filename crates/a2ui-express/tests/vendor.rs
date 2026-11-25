@@ -60,6 +60,12 @@ fn express_suites_load_and_their_test_data_exists() {
         "response_streaming",
         "scaling",
     ];
+    let out_of_scope =
+        fs::read_to_string(vendor().join("../conformance/out_of_scope.txt")).unwrap();
+    let mut out_of_scope: Vec<&str> = out_of_scope
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect();
     let mut total = 0;
     for suite in suites {
         let path = conformance.join(format!("agent/express/{suite}.yaml"));
@@ -68,6 +74,10 @@ fn express_suites_load_and_their_test_data_exists() {
         for case in &cases {
             let name = case.get("name").and_then(Yaml::as_str);
             assert!(name.is_some(), "{suite}.yaml: case without a name");
+            if let Some(at) = out_of_scope.iter().position(|o| Some(*o) == name) {
+                out_of_scope.remove(at);
+                continue;
+            }
             let mut refs = Vec::new();
             collect_test_data_refs(case, &mut refs);
             for r in refs {
@@ -77,6 +87,10 @@ fn express_suites_load_and_their_test_data_exists() {
         }
         total += cases.len();
     }
+    assert!(
+        out_of_scope.is_empty(),
+        "conformance/out_of_scope.txt names cases that do not exist: {out_of_scope:?}"
+    );
     assert!(
         total >= 287,
         "expected at least 287 Express cases, found {total}"
@@ -103,8 +117,6 @@ fn test_catalogs_are_json() {
 fn schemas_catalog_and_grammar_are_present() {
     let a2ui = vendor().join("a2ui");
     for schema in [
-        "specification/v0_9/json/common_types.json",
-        "specification/v0_9/json/server_to_client.json",
         "specification/v1_0/json/common_types.json",
         "specification/v1_0/json/agent_to_renderer.json",
         "catalogs/basic/v1/catalog.json",

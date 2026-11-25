@@ -1,9 +1,8 @@
-//! Several active catalogs: version agreement, lookup by name, and the
-//! `catalogId` override (v1.0 only).
+//! Several active catalogs: lookup by name, and the `catalogId` override.
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
-use super::{Catalog, CatalogError, CatalogVersion};
+use super::{Catalog, CatalogError, CatalogVersion, ENVELOPE_MIXIN_NAMES};
 use crate::Error;
 
 /// Whether a name is looked up among components or functions.
@@ -43,9 +42,8 @@ pub struct Resolved<'c> {
 
 /// The active catalogs of an Express block, in priority order.
 ///
-/// All share one release line (v0.9 and v0.9.1 do; v0.9 and v1.0 don't),
-/// IDs are unique, and more than one catalog needs v1.0, where components
-/// and function calls carry their own `catalogId`.
+/// IDs are unique; components and function calls carry their own
+/// `catalogId` when more than one catalog is active.
 #[derive(Debug, Clone)]
 pub struct CatalogSet {
     catalogs: Vec<Catalog>,
@@ -54,26 +52,14 @@ pub struct CatalogSet {
 impl CatalogSet {
     /// Checks and wraps the active catalogs.
     pub fn new(catalogs: Vec<Catalog>) -> Result<CatalogSet, CatalogError> {
-        let first = catalogs.first().ok_or(CatalogError::NoCatalogs)?;
-        let line = first.version().line();
+        if catalogs.is_empty() {
+            return Err(CatalogError::NoCatalogs);
+        }
         let mut seen = std::collections::HashSet::new();
         for catalog in &catalogs {
             if !seen.insert(catalog.id()) {
                 return Err(CatalogError::DuplicateId(catalog.id().to_owned()));
             }
-            if catalog.version().line() != line {
-                return Err(CatalogError::MixedVersions {
-                    first: first.id().to_owned(),
-                    first_version: first.version().wire().to_owned(),
-                    other: catalog.id().to_owned(),
-                    other_version: catalog.version().wire().to_owned(),
-                });
-            }
-        }
-        if catalogs.len() > 1 && !first.version().at_least_v1() {
-            return Err(CatalogError::SeveralBelowV1(
-                first.version().wire().to_owned(),
-            ));
         }
         Ok(CatalogSet { catalogs })
     }
@@ -83,26 +69,9 @@ impl CatalogSet {
         &self.catalogs
     }
 
-    /// The first catalog's version, which messages are emitted for.
+    /// The catalogs' version, which messages are emitted for.
     pub fn version(&self) -> CatalogVersion {
         self.catalogs[0].version()
-    }
-
-    /// The version to emit: `requested` when it is on the catalogs' release
-    /// line, else an error; the catalogs' version when none is requested.
-    pub fn resolve_version(
-        &self,
-        requested: Option<CatalogVersion>,
-    ) -> Result<CatalogVersion, CatalogError> {
-        let version = self.version();
-        match requested {
-            None => Ok(version),
-            Some(r) if r.line() == version.line() => Ok(r),
-            Some(r) => Err(CatalogError::RequestedVersionMismatch {
-                requested: r.wire().to_owned(),
-                catalogs: version.wire().to_owned(),
-            }),
-        }
     }
 
     /// A catalog by ID.
@@ -117,6 +86,44 @@ impl CatalogSet {
             [only] => Some(only.id()),
             _ => None,
         }
+    }
+
+    /// Refuses a component that carries an envelope mixin under its bare
+    /// pre-1.0 key (`checks` for `@checks`), unless its schema declares a
+    /// property of that name of its own.
+    ///
+    /// The schema is that of the catalog the component names (`@catalogId`,
+    /// else `surface_catalog_id`); without either, any active catalog that
+    /// defines the component and declares the property allows it.
+    pub(crate) fn refuse_legacy_envelope(
+        &self,
+        component: &Map<String, Value>,
+        surface_catalog_id: Option<&str>,
+    ) -> Result<(), Error> {
+        let Some(name) = component.get("component").and_then(Value::as_str) else {
+            return Ok(());
+        };
+        let named = component
+            .get("@catalogId")
+            .and_then(Value::as_str)
+            .or(surface_catalog_id);
+        for mixin in ENVELOPE_MIXIN_NAMES {
+            if !component.contains_key(mixin) {
+                continue;
+            }
+            let declared = self
+                .catalogs
+                .iter()
+                .filter(|c| named.is_none_or(|id| c.id() == id))
+                .filter_map(|c| c.component(name))
+                .any(|c| c.custom_envelope_properties().iter().any(|p| p == mixin));
+            if !declared {
+                return Err(Error::Validation(format!(
+                    "Component '{name}' carries '{mixin}', which its schema does not declare; the envelope key is '@{mixin}'."
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// The IDs, in catalog order, of the catalogs that define `name`.
@@ -134,7 +141,7 @@ impl CatalogSet {
     /// Resolves a component or function name to the catalog that defines it.
     ///
     /// `explicit_catalog_id` is the `catalogId` argument the Express call
-    /// gave, if any (v1.0 only). Without one, the name must be defined in
+    /// gave, if any. Without one, the name must be defined in
     /// exactly one active catalog.
     pub fn resolve(
         &self,
@@ -144,12 +151,6 @@ impl CatalogSet {
     ) -> Result<Resolved<'_>, Error> {
         let label = kind.label();
         if let Some(explicit) = explicit_catalog_id {
-            if !self.version().at_least_v1() {
-                return Err(Error::Validation(
-                    "catalogId on a component or function call is only supported in A2UI v1.0 or later."
-                        .into(),
-                ));
-            }
             let Some(cid) = explicit.as_str().filter(|s| !s.is_empty()) else {
                 return Err(Error::Validation(format!(
                     "catalogId on {} '{name}' must be a non-empty string.",

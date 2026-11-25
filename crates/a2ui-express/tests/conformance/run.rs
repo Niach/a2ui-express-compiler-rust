@@ -7,38 +7,14 @@ use serde_json::{Value, json};
 
 use crate::cases::{Case, read_json, resolve_catalogs};
 use crate::check::*;
-use crate::lowering::{default_catalog_id, lift_messages, lower_messages};
 use crate::sdk::{self, AfterRejectedBlock, ParserConfig, Part, PromptConfig};
 
 pub const SURFACE_ID: &str = "default_surface";
-
-/// A suite run: as written, or lowered to v0.9 and lifted back.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Version {
-    V1_0,
-    V0_9Lowered,
-}
-
-impl Version {
-    pub const ALL: [Version; 2] = [Version::V1_0, Version::V0_9Lowered];
-
-    pub fn key(self) -> &'static str {
-        match self {
-            Version::V1_0 => "v1.0",
-            Version::V0_9Lowered => "v0.9-lowered",
-        }
-    }
-
-    fn lowered(self) -> bool {
-        self == Version::V0_9Lowered
-    }
-}
 
 type Outcome = Result<(), String>;
 
 struct Run<'a> {
     case: &'a Case,
-    lowered: bool,
 }
 
 impl Run<'_> {
@@ -66,32 +42,14 @@ impl Run<'_> {
                     .collect()
             });
         Ok(ParserConfig {
-            catalogs: resolve_catalogs(&self.case.args, self.lowered)?,
+            catalogs: resolve_catalogs(&self.case.args)?,
             surface_id: SURFACE_ID.to_owned(),
             progressive_keys,
         })
     }
 
-    /// v0.9 messages back to v1.0 in a lowered run, folding the split
-    /// `createSurface` back together as Express emits it.
-    fn lift(&self, messages: Vec<Value>) -> Vec<Value> {
-        if self.lowered {
-            lift_messages(&messages, true)
-        } else {
-            messages
-        }
-    }
-
     fn parts_to_json(&self, parts: &[Part]) -> Vec<Value> {
-        parts
-            .iter()
-            .map(|p| match p {
-                Part::A2ui(messages) if self.lowered => {
-                    json!({"a2ui": lift_messages(messages, true)})
-                }
-                other => part_to_json(other),
-            })
-            .collect()
+        parts.iter().map(part_to_json).collect()
     }
 
     fn compile(&self) -> Outcome {
@@ -101,7 +59,7 @@ impl Run<'_> {
         if let Some(expected) = self.get("expect_error") {
             return expect_failure(result, expected).map(drop);
         }
-        let mut compiled = Value::Array(self.lift(ok("compile", result)?));
+        let mut compiled = Value::Array(ok("compile", result)?);
         for pointer in self
             .get("expect_present")
             .and_then(Value::as_array)
@@ -132,12 +90,7 @@ impl Run<'_> {
             .get("messages")
             .and_then(Value::as_array)
             .ok_or("case has no messages")?;
-        let messages = if self.lowered {
-            lower_messages(original, default_catalog_id(&self.case.args).as_deref())
-        } else {
-            original.clone()
-        };
-        let result = sdk::decompile(&parser, &messages);
+        let result = sdk::decompile(&parser, original);
         if let Some(expected) = self.get("expect_error") {
             return expect_failure(result, expected).map(drop);
         }
@@ -150,7 +103,7 @@ impl Run<'_> {
         let recompile = || -> Result<Value, String> {
             let messages = ok("recompile", sdk::compile_checked(&parser, &notation))
                 .map_err(|e| format!("{e}\n--- notation\n{notation}"))?;
-            Ok(Value::Array(self.lift(messages)))
+            Ok(Value::Array(messages))
         };
         if self.get("expect_round_trip") == Some(&json!(true)) {
             expect_json("round trip", &recompile()?, &Value::Array(original.clone()))?;
@@ -314,12 +267,7 @@ impl Run<'_> {
     }
 
     fn generate_prompt_snippet(&self) -> Outcome {
-        let catalogs = resolve_catalogs_for_prompt(&self.case.args, self.lowered)?;
-        let example_catalog_id = catalogs
-            .first()
-            .and_then(|c| c.document.get("catalogId"))
-            .and_then(Value::as_str)
-            .map(str::to_owned);
+        let catalogs = resolve_catalogs_for_prompt(&self.case.args)?;
         let mut examples = Vec::new();
         for path in self
             .arg("examples")
@@ -332,11 +280,7 @@ impl Run<'_> {
                 Value::Array(items) => items,
                 single => vec![single],
             };
-            examples.push(if self.lowered {
-                lower_messages(&messages, example_catalog_id.as_deref())
-            } else {
-                messages
-            });
+            examples.push(messages);
         }
         let allowed_messages = self
             .arg("allowed_messages")
@@ -445,11 +389,11 @@ impl Run<'_> {
 
 /// A prompt case lists `args.catalogs`; one without any registers none, which
 /// the format has to reject (`CatalogError`).
-fn resolve_catalogs_for_prompt(args: &Value, lower: bool) -> Result<Vec<sdk::Catalog>, String> {
+fn resolve_catalogs_for_prompt(args: &Value) -> Result<Vec<sdk::Catalog>, String> {
     if args.get("catalogs").is_none() && args.get("catalog").is_none() {
         return Ok(Vec::new());
     }
-    resolve_catalogs(args, lower)
+    resolve_catalogs(args)
 }
 
 /// Writes a `PayloadTemplate` out at size `n`: strings as they are, and each
@@ -476,12 +420,9 @@ pub fn write_payload(template: &Value, n: usize) -> Result<String, String> {
     Ok(out)
 }
 
-/// Runs one case in one version.
-pub fn run_case(case: &Case, version: Version) -> Outcome {
-    let run = Run {
-        case,
-        lowered: version.lowered(),
-    };
+/// Runs one case.
+pub fn run_case(case: &Case) -> Outcome {
+    let run = Run { case };
     match case.action.as_str() {
         "compile" => run.compile(),
         "decompile" => run.decompile(),

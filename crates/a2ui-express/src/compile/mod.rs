@@ -8,12 +8,11 @@
 //! - Statements are grouped into *units*: a surface scope (opened by
 //!   `surface(...)`, or implicitly by the first assignment), a
 //!   `deleteSurface(...)`, or a standalone function call.
-//! - A scope whose components include `root` becomes `createSurface` (on
-//!   v0.9, `createSurface` + `updateComponents` + `updateDataModel`) with its
+//! - A scope whose components include `root` becomes `createSurface` with its
 //!   data assignments folded into one data model. A scope with
 //!   `update=true`, or without `root`, becomes `updateComponents` and one
 //!   `updateDataModel` per assigned path.
-//! - A standalone call becomes `callRendererFunction` (v1.0 only).
+//! - A standalone call becomes `callRendererFunction`.
 //! - The messages are checked with [`validate`] (a standalone call must
 //!   name a function the agent may call, and so on) before they are
 //!   returned, as upstream validates what it compiled.
@@ -68,11 +67,11 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::{Map, Value, json};
 
-use crate::schema::{Catalog, CatalogError, CatalogSet, CatalogVersion, LoadOptions, SymbolKind};
+use crate::schema::{Catalog, CatalogError, CatalogSet, CatalogVersion, SymbolKind};
 use crate::syntax::{self, Call, Expr, ExprKind, Program, Statement, StatementForm, Target};
 
 pub use error::{Category, CompileError, CompileErrorKind};
-pub use validate::{MAX_CALL_DEPTH, MAX_DEPTH, validate};
+pub use validate::{MAX_DEPTH, validate};
 
 use data::{set_nested_path, to_json_pointer};
 use pass::{CallArgs, Ctx, Pass};
@@ -89,38 +88,14 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    /// A compiler for `catalogs`, emitting `version` (the catalogs' own
-    /// version when `None`).
-    ///
-    /// The catalogs must share a release line, have unique ids, and be v1.0
-    /// when there are several; a requested version must be on their line
-    /// (`0.9` and `0.9.1` are). A catalog read with another version than the
-    /// requested one is reloaded with it, with the vendored common types.
+    /// A compiler for `catalogs`, which must have unique ids, emitting
+    /// `version` (v1.0, the only one, also when `None`).
     pub fn new(
         catalogs: Vec<Catalog>,
         version: Option<CatalogVersion>,
     ) -> Result<Compiler, CatalogError> {
         let set = CatalogSet::new(catalogs)?;
-        let version = set.resolve_version(version)?;
-        let set = if set.catalogs().iter().all(|c| c.version() == version) {
-            set
-        } else {
-            let reloaded = set
-                .catalogs()
-                .iter()
-                .map(|c| {
-                    Catalog::load(
-                        c.document().clone(),
-                        LoadOptions {
-                            protocol_version: Some(version),
-                            catalog_id: Some(c.id().to_owned()),
-                            common_types: None,
-                        },
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            CatalogSet::new(reloaded)?
-        };
+        let version = version.unwrap_or_else(|| set.version());
         Ok(Compiler { set, version })
     }
 
@@ -156,7 +131,7 @@ impl Compiler {
         if units.is_empty() {
             return Err(CompileError::undefined_root("root"));
         }
-        let mut ctx = Ctx::new(self.version);
+        let mut ctx = Ctx::new();
         let mut out = Vec::new();
         for unit in units {
             match unit {
@@ -352,11 +327,6 @@ impl Compiler {
                     scope.update = b;
                 }
                 "extensions" => {
-                    if !self.version.at_least_v1() {
-                        return Err(v(
-                            "extensions on surface() is only supported in A2UI v1.0 or later.",
-                        ));
-                    }
                     scope.raw_extensions = Some(value);
                 }
                 other => {
@@ -408,7 +378,7 @@ impl Compiler {
         Ok(ids)
     }
 
-    /// Checks an `id=` argument: a non-empty string, and from v1.0 a UAX #31
+    /// Checks an `id=` argument: a non-empty string and a UAX #31
     /// identifier.
     pub(crate) fn explicit_id<'e>(
         &self,
@@ -423,7 +393,7 @@ impl Compiler {
                 "id on component '{component}' must be a non-empty string."
             )));
         };
-        if self.version.at_least_v1() && !is_uax31_identifier(id) {
+        if !is_uax31_identifier(id) {
             return Err(CompileError::validation(format!(
                 "Component id '{id}' on '{component}' is not a valid UAX 31 identifier."
             )));
@@ -530,37 +500,14 @@ impl Compiler {
         if let Some(send) = scope.send_data_model {
             create.insert("sendDataModel".into(), send.into());
         }
-        if self.version.at_least_v1() {
-            create.insert("components".into(), components.into());
-            if !data_model.is_empty() {
-                create.insert("dataModel".into(), data_model.into());
-            }
-            if let Some(metadata) = metadata {
-                create.insert("metadata".into(), metadata);
-            }
-            return vec![json!({"version": version, "createSurface": create})];
-        }
-        let mut out = vec![
-            json!({"version": version, "createSurface": create}),
-            json!({
-                "version": version,
-                "updateComponents": {
-                    "surfaceId": scope.surface_id,
-                    "components": components,
-                },
-            }),
-        ];
+        create.insert("components".into(), components.into());
         if !data_model.is_empty() {
-            out.push(json!({
-                "version": version,
-                "updateDataModel": {
-                    "surfaceId": scope.surface_id,
-                    "path": "/",
-                    "value": data_model,
-                },
-            }));
+            create.insert("dataModel".into(), data_model.into());
         }
-        out
+        if let Some(metadata) = metadata {
+            create.insert("metadata".into(), metadata);
+        }
+        vec![json!({"version": version, "createSurface": create})]
     }
 
     pub(crate) fn compile_standalone_call(
@@ -569,11 +516,6 @@ impl Compiler {
         scope: Option<&Scope<'_>>,
         ctx: &mut Ctx,
     ) -> Result<Value, CompileError> {
-        if !self.version.at_least_v1() {
-            return Err(CompileError::validation(
-                "Standalone function calls are not supported in A2UI v0.9",
-            ));
-        }
         ctx.call_counter += 1;
         let empty = Symbols::default();
         let ids = CompIds::default();

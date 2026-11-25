@@ -2,7 +2,7 @@
 //!
 //! A Rust port of the Express inference format from Google's A2UI agent SDK.
 //! Express is a compact notation an agent writes instead of A2UI JSON; this
-//! crate compiles it to A2UI v1.0 (and v0.9) messages, emitted as
+//! crate compiles it to A2UI v1.0 messages, emitted as
 //! [`serde_json::Value`].
 //!
 //! - [`compile`]: one block to messages.
@@ -24,22 +24,10 @@ pub mod schema;
 pub mod state;
 pub mod syntax;
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// A2UI messages are emitted as plain JSON values (insertion-ordered).
 pub use serde_json::Value;
-
-/// The A2UI protocol version a block is compiled against.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ProtocolVersion {
-    /// A2UI v0.9.
-    #[serde(rename = "0.9")]
-    V0_9,
-    /// A2UI v1.0.
-    #[serde(rename = "1.0")]
-    V1_0,
-}
 
 /// Errors produced by the Express toolchain.
 ///
@@ -62,16 +50,6 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn protocol_version_serializes_as_the_wire_string() {
-        assert_eq!(
-            serde_json::to_value(ProtocolVersion::V1_0).unwrap(),
-            Value::from("1.0")
-        );
-        let v: ProtocolVersion = serde_json::from_value(Value::from("0.9")).unwrap();
-        assert_eq!(v, ProtocolVersion::V0_9);
-    }
 
     #[test]
     fn errors_display_their_category() {

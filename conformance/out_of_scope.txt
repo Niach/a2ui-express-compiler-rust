@@ -1,0 +1,19 @@
+# Upstream Express conformance cases this compiler does not run, because it
+# reads and writes A2UI 1.0 only. Every harness (the crate's, Python's, npm's)
+# leaves them out; `tests/vendor.rs` checks that the names exist.
+
+# The case registers a v0.9 catalog, which is refused at load. Those catalogs
+# are not vendored (scripts/sync-upstream.sh).
+test_compile_express_unreferenced_variable_holding_a_system_function_before_v1_0_is_a_validation_error
+test_compile_express_index_system_function_before_v1_0_is_a_validation_error
+test_compile_express_event_user_message_before_v1_is_a_validation_error
+test_decompile_express_non_identifier_id_before_v1_0_derives_a_variable
+test_express_snippet_omits_event_user_message_before_v1_0
+test_express_snippet_omits_system_functions_before_v1_0
+
+# The case decompiles a bare pre-1.0 envelope key on a v1.0 component, which
+# upstream still reads during its transition. Here it is a ValidationError
+# (`legacy_envelope_keys_are_refused` in `tests/compile.rs`).
+test_decompile_express_legacy_bare_metadata_on_v1_0
+test_decompile_express_legacy_bare_checks_on_v1_0
+test_decompile_express_legacy_bare_catalog_id_on_v1_0

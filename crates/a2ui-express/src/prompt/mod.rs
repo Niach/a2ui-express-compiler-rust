@@ -122,7 +122,7 @@ pub fn generate_prompt(catalogs: &CatalogSet, options: &PromptOptions) -> Result
 }
 
 /// The functions the agent may call standalone (`callRendererFunction`),
-/// across the catalogs, each once. Empty below v1.0.
+/// across the catalogs, each once.
 pub fn agent_callable_functions(catalogs: &CatalogSet) -> Vec<String> {
     catalogs
         .agent_callable_functions()
@@ -167,16 +167,11 @@ impl Generator<'_> {
 
     /// The output contract and grammar rules.
     fn base_rules(&self) -> String {
-        let at_least_v1 = self.catalogs.version().at_least_v1();
-        let mut rules = rules::rules(at_least_v1);
+        let mut rules = rules::rules();
         let mut wants_components_or_data = true;
         let mut wants_components = true;
         let mut writes_data = true;
-        let callable = if at_least_v1 {
-            agent_callable_functions(self.catalogs)
-        } else {
-            Vec::new()
-        };
+        let callable = agent_callable_functions(self.catalogs);
         let call_renderer_allowed =
             self.allows(&["callRendererFunction", "CallRendererFunctionMessage"]);
 

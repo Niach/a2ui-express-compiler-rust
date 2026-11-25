@@ -1,8 +1,9 @@
-//! The compiler's typed errors and version targets, beyond what the
+//! The compiler's typed errors and the v1.0-only contract, beyond what the
 //! conformance suite pins.
 
-use a2ui_express::compile::{Category, CompileErrorKind, Compiler};
-use a2ui_express::schema::{Catalog, CatalogVersion};
+use a2ui_express::compile::{Category, CompileErrorKind, Compiler, validate};
+use a2ui_express::decompile::{DecompileOptions, decompile};
+use a2ui_express::schema::{Catalog, CatalogSet, CatalogVersion};
 use serde_json::{Value, json};
 
 fn catalog(version: &str) -> Catalog {
@@ -108,48 +109,132 @@ fn errors_are_typed() {
 }
 
 #[test]
-fn v0_9_splits_create_surface() {
-    let messages = compile(
-        "0.9",
-        "root = Column([t], gap=4)\nt = Text($/name)\n$/name = \"Ada\"",
-    )
+fn the_version_is_1_0() {
+    let compiler = Compiler::new(vec![catalog("1.0")], Some(CatalogVersion::V1_0)).unwrap();
+    let messages = compiler.compile("root = Text(\"a\")", "main").unwrap();
+    assert_eq!(messages[0]["version"], "1.0");
+}
+
+/// The envelope keys a catalog component may redeclare for itself.
+fn envelope_catalog() -> CatalogSet {
+    let common = "common_types.json#/$defs";
+    let catalog = Catalog::from_json(json!({
+        "catalogId": "demo",
+        "protocolVersion": "1.0",
+        "components": {
+            "Plain": {
+                "allOf": [{"$ref": format!("{common}/Checkable")}],
+                "properties": {"component": {"const": "Plain"}, "text": {"type": "string"}}
+            },
+            "Own": {"properties": {
+                "component": {"const": "Own"},
+                "catalogId": {"type": "string"},
+                "metadata": {"type": "string"},
+                "accessibility": {"type": "string"},
+                "checks": {"type": "string"}
+            }}
+        }
+    }))
     .unwrap();
-    assert_eq!(
-        messages,
-        vec![
-            json!({"version": "v0.9", "createSurface": {"surfaceId": "main", "catalogId": "demo"}}),
-            json!({"version": "v0.9", "updateComponents": {"surfaceId": "main", "components": [
-                {"id": "root", "component": "Column", "children": ["t"], "gap": 4},
-                {"id": "t", "component": "Text", "text": {"path": "/name"}}
-            ]}}),
-            json!({"version": "v0.9", "updateDataModel": {"surfaceId": "main", "path": "/", "value": {"name": "Ada"}}}),
-        ]
-    );
+    CatalogSet::new(vec![catalog]).unwrap()
+}
+
+fn surface(component: Value) -> Vec<Value> {
+    vec![json!({"version": "1.0", "createSurface": {
+        "surfaceId": "s", "catalogId": "demo", "components": [component]
+    }})]
 }
 
 #[test]
-fn v1_only_features_are_rejected_on_v0_9() {
-    for source in [
-        "root = Text(\"a\")\nupper(\"x\")",
-        "root = Column(on=Event(\"e\", userMessage=\"hi\"))",
-        "surface(\"s\", extensions={a: 1})\nroot = Text(\"a\")",
-    ] {
-        let e = compile("0.9", source).unwrap_err();
-        assert_eq!(
-            e.category(),
-            Category::Validation,
-            "{source}: {}",
-            e.message
-        );
+fn legacy_envelope_keys_are_refused() {
+    let set = envelope_catalog();
+    for key in ["catalogId", "metadata", "accessibility", "checks"] {
+        let legacy = surface(json!({"id": "root", "component": "Plain", key: "x"}));
+        let e = decompile(&set, &legacy, &DecompileOptions::default()).unwrap_err();
+        assert!(e.to_string().contains(&format!("'@{key}'")), "{e}");
+        let e = validate(&set, &legacy).unwrap_err();
+        assert!(e.message.contains(&format!("'@{key}'")), "{}", e.message);
+
+        let own = surface(json!({"id": "root", "component": "Own", key: "x"}));
+        validate(&set, &own).unwrap();
+        let express = decompile(&set, &own, &DecompileOptions::default()).unwrap();
+        let again = Compiler::new(set.catalogs().to_vec(), None)
+            .unwrap()
+            .compile(&express, "s")
+            .unwrap();
+        assert_eq!(again, own, "{express}");
     }
 }
 
 #[test]
-fn a_requested_patch_version_is_emitted() {
-    let compiler = Compiler::new(vec![catalog("0.9")], Some(CatalogVersion::V0_9_1)).unwrap();
-    let messages = compiler.compile("t = Text(\"a\")", "main").unwrap();
-    assert_eq!(messages[0]["version"], "v0.9.1");
-    assert!(Compiler::new(vec![catalog("0.9")], Some(CatalogVersion::V1_0)).is_err());
+fn decompile_refuses_other_versions() {
+    let set = envelope_catalog();
+    for version in [
+        json!("v0.9"),
+        json!("0.9"),
+        json!("v1.0"),
+        json!(1.0),
+        Value::Null,
+    ] {
+        let mut messages = surface(json!({"id": "root", "component": "Plain"}));
+        messages[0]["version"] = version.clone();
+        let e = decompile(&set, &messages, &DecompileOptions::default()).unwrap_err();
+        assert!(e.to_string().contains("expected \"1.0\""), "{version}: {e}");
+    }
+    let mut messages = surface(json!({"id": "root", "component": "Plain"}));
+    messages[0].as_object_mut().unwrap().remove("version");
+    assert!(decompile(&set, &messages, &DecompileOptions::default()).is_err());
+}
+
+/// Upstream #4336: the calls nested in a `callRendererFunction` are the
+/// agent's too.
+#[test]
+fn calls_nested_in_an_agent_call_stay_within_the_agents_boundary() {
+    let function = |name: &str, callers: &str, activation: bool| {
+        json!({
+            "allowedCallers": callers, "requiresUserActivation": activation,
+            "properties": {"@call": {"const": name}, "args": {"type": "object", "properties": {
+                "value": {"$ref": "common_types.json#/$defs/DynamicString"}
+            }}}
+        })
+    };
+    let catalog = Catalog::from_json(json!({
+        "catalogId": "demo", "protocolVersion": "1.0", "components": {},
+        "functions": {
+            "notify": function("notify", "agentOnly", false),
+            "peek": function("peek", "rendererOrAgent", false),
+            "secret": function("secret", "rendererOnly", false)
+        }
+    }))
+    .unwrap();
+    let compile = |source: &str| {
+        Compiler::new(vec![catalog.clone()], None)
+            .unwrap()
+            .compile(source, "main")
+    };
+    compile("notify(peek(\"x\"))").unwrap();
+    compile("peek(notify(\"x\"))").unwrap();
+    for (source, want) in [
+        ("notify(secret(\"x\"))", "cannot be called by agent"),
+        ("notify(peek(secret(\"x\")))", "cannot be called by agent"),
+        ("notify(@index())", "outside any list template"),
+    ] {
+        let e = compile(source).unwrap_err();
+        assert!(e.message.contains(want), "{source}: {}", e.message);
+    }
+}
+
+/// Upstream #4296: function calls have no nesting limit of their own.
+#[test]
+fn calls_nest_up_to_the_global_depth() {
+    let nest = |n: usize| format!("root = Text({}\"x\"{})", "upper(".repeat(n), ")".repeat(n));
+    compile("1.0", &nest(10)).unwrap();
+    let e = compile("1.0", &nest(30)).unwrap_err();
+    assert!(
+        e.message.contains("Global recursion limit"),
+        "{}",
+        e.message
+    );
 }
 
 #[test]
@@ -355,15 +440,11 @@ fn validate_checks_messages_from_elsewhere() {
         )),
         "Invalid path syntax: '/a~'"
     );
-    let mut nested = json!({"@path": "/v"});
-    for _ in 0..6 {
-        nested = json!({"@call": "notify", "args": {"value": nested}});
-    }
+    let mut old = create(json!([]));
+    old[0]["version"] = json!("v0.9");
     assert_eq!(
-        message(&create(
-            json!([{"id": "root", "component": "Text", "text": nested}])
-        )),
-        "Recursion limit exceeded: functionCall depth > 5"
+        message(&old),
+        "A message states version \"v0.9\", expected \"1.0\"."
     );
     assert_eq!(
         message(&[json!({"version": "1.0", "callRendererFunction": {

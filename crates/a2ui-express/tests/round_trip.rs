@@ -26,8 +26,6 @@
 mod cases;
 #[path = "conformance/check.rs"]
 mod check;
-#[path = "conformance/lowering.rs"]
-mod lowering;
 #[path = "conformance/sdk.rs"]
 mod sdk;
 
@@ -174,7 +172,7 @@ fn conformance_messages_round_trip() {
             let Some(messages) = case.get(key).and_then(Value::as_array) else {
                 continue;
             };
-            let catalogs = resolve_catalogs(&case.args, false).unwrap();
+            let catalogs = resolve_catalogs(&case.args).unwrap();
             let compiler =
                 sdk::compiler(&catalogs).unwrap_or_else(|e| panic!("{}: {}", case.name, e.message));
             let result = round_trip_all(&compiler, SURFACE_ID, messages);

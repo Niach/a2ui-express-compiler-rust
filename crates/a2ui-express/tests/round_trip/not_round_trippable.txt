@@ -12,10 +12,6 @@
 test_compile_express_check_without_a_message_still_carries_one -- the expect omits the default check message, which expect_present checks and deletes
 # Several messages the decompiler joins into one surface block.
 test_decompile_express_merges_messages_for_same_surface -- split messages of one surface recompile as one createSurface
-# Legacy bare mixin keys on v1.0, which recompile under their `@` key.
-test_decompile_express_legacy_bare_metadata_on_v1_0 -- bare `metadata` recompiles as `@metadata`
-test_decompile_express_legacy_bare_checks_on_v1_0 -- bare `checks` recompiles as `@checks`
-test_decompile_express_legacy_bare_catalog_id_on_v1_0 -- bare `catalogId` recompiles as `@catalogId`
 
 # An Express block opens a surface with its root: a createSurface without
 # components (and so without a root) has no Express form.

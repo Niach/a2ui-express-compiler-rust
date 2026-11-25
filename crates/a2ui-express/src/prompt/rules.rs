@@ -1,15 +1,11 @@
 //! The rules text: the Express output contract every snippet opens with.
 
-/// Rule 8 from v1.0, where an event carries `userMessage`.
-const EVENT_RULE_V1_0: &str = r#"8. Action events: represent server-side actions using the Event helper, `Event(name, context?, userMessage=...)`:
+/// Rule 8: action events.
+const EVENT_RULE: &str = r#"8. Action events: represent server-side actions using the Event helper, `Event(name, context?, userMessage=...)`:
    Event("save_deal", {rep: $/form/rep})
    Event("reply", userMessage="Replying now")
    Event("save_deal", {rep: $/form/rep}, userMessage=$/form/summary)
    The context map is optional. Pass `userMessage=` as a keyword argument (a string, `$path` binding, or function call) to set the message shown on the user's behalf when the event fires."#;
-
-/// Rule 8 below v1.0.
-const EVENT_RULE_PRE_V1_0: &str = r#"8. Action events: represent server-side actions using the Event helper:
-   Event("save_deal", {rep: $/form/rep})"#;
 
 const RULES_PREFIX: &str = r#"# A2UI Express DSL Output Contract
 
@@ -85,14 +81,9 @@ pub(super) const SURFACE_RULE: &str = "\n\n15. Surface targeting: Output `surfac
 /// Where the renderer-call rule is inserted.
 pub(super) const STATIC_RULE_HEAD: &str = "\n\n13. Static properties:";
 
-/// The full rules text of a version.
-pub(super) fn rules(at_least_v1: bool) -> String {
-    let event = if at_least_v1 {
-        EVENT_RULE_V1_0
-    } else {
-        EVENT_RULE_PRE_V1_0
-    };
-    format!("{RULES_PREFIX}\n\n{event}\n\n{RULES_SUFFIX}")
+/// The full rules text.
+pub(super) fn rules() -> String {
+    format!("{RULES_PREFIX}\n\n{EVENT_RULE}\n\n{RULES_SUFFIX}")
 }
 
 /// Numbers the rules 1, 2, 3, … again after some were removed or inserted.

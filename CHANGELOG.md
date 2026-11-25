@@ -4,6 +4,37 @@ All crates and bindings of this workspace share one version.
 
 ## Unreleased
 
+A2UI 1.0 only (#AXC-19, #VAPP-289).
+
+### Breaking
+
+- v0.9 and v0.9.1 are gone. A catalog must declare `protocolVersion` 1.0:
+  another one is `CatalogError::UnsupportedVersion`, none (which upstream reads
+  as 0.9) `CatalogError::MissingVersion`, and a `functions` list
+  `CatalogError::FunctionsNotAnObject`.
+- `decompile` and `compile::validate` refuse a message whose `version` is not
+  `"1.0"`.
+- `decompile` and `compile::validate` refuse a component's bare `catalogId`,
+  `metadata`, `accessibility` or `checks` (1.0 writes `@catalogId`, …) unless
+  its schema declares a property of that name. The decompiler also no longer
+  reads `call`, `path` and a top-level `callFunction`.
+- `version` options (Rust, FFI, JavaScript, Python) stay and accept only 1.0.
+- Removed: `ProtocolVersion`, `CatalogVersion::{V0_9, V0_9_1, DEFAULT, line,
+  at_least_v1}` (the enum is now `#[non_exhaustive]`),
+  `CatalogSet::resolve_version`, `LoadOptions::protocol_version`,
+  `schema::envelope_read_key`, `CatalogError::{MixedVersions, SeveralBelowV1,
+  RequestedVersionMismatch}`, `compile::MAX_CALL_DEPTH`.
+  `schema::{envelope_key, envelope_value}` lose their version and
+  custom-property parameters.
+
+### Changed
+
+- Pinned to upstream `main` a23b19c4. Ported: function calls have no nesting
+  limit of their own (a2ui#4296), and calls nested in a
+  `callRendererFunction`'s arguments must be ones the agent may make
+  (a2ui#4336).
+- The crate no longer depends on `serde` directly.
+
 ### Fixed
 
 - v1.0 identifiers (component ids, catalog names, extension keys) follow

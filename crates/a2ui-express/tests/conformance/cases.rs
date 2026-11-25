@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::lowering::lower_catalog_document;
 use crate::sdk::{Catalog, Transformer};
 
 /// The catalog a case uses when it names none.
@@ -42,6 +41,18 @@ impl Case {
     }
 }
 
+/// The cases `conformance/out_of_scope.txt` leaves out: the pre-1.0 ones.
+pub fn out_of_scope() -> Result<Vec<String>, String> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/out_of_scope.txt");
+    let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(text
+        .lines()
+        .map(|l| l.split('#').next().unwrap_or_default().trim().to_owned())
+        .filter(|l| !l.is_empty())
+        .collect())
+}
+
+/// The cases of a suite, less the [`out_of_scope`] ones.
 pub fn load_suite(suite: &'static str) -> Result<Vec<Case>, String> {
     let path = conformance_root().join(format!("agent/express/{suite}.yaml"));
     let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -51,8 +62,13 @@ pub fn load_suite(suite: &'static str) -> Result<Vec<Case>, String> {
     let Value::Array(items) = doc else {
         return Err(format!("{}: expected a list of cases", path.display()));
     };
+    let left_out = out_of_scope()?;
     items
         .into_iter()
+        .filter(|raw| {
+            let name = raw.get("name").and_then(Value::as_str);
+            !name.is_some_and(|n| left_out.iter().any(|o| o == n))
+        })
         .map(|raw| {
             let field = |k: &str| raw.get(k).and_then(Value::as_str).map(str::to_owned);
             let name = field("name").ok_or_else(|| format!("{suite}: case without a name"))?;
@@ -95,27 +111,10 @@ pub fn raw_catalog_doc(entry: &Value) -> Result<(Value, String), String> {
     }
 }
 
-/// The `catalogId` of the first catalog a case registers.
-pub fn first_catalog_id(args: &Value) -> Option<String> {
-    let default = json!(DEFAULT_CATALOG);
-    let entry = args
-        .get("catalog")
-        .or_else(|| args.get("catalogs").and_then(|c| c.get(0)))
-        .unwrap_or(&default);
-    let (doc, default_id) = raw_catalog_doc(entry).ok()?;
-    Some(
-        doc.get("catalogId")
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-            .unwrap_or(default_id),
-    )
-}
-
 /// Resolves one catalog entry, the way upstream's Python harness does
 /// (`catalog_config_from_document`): a document without `protocolVersion` is
-/// v1.0 and one without `catalogId` takes the default id. A lowered run lowers
-/// the document first, which sets the same default id.
-pub fn resolve_catalog(entry: &Value, lower: bool) -> Result<Catalog, String> {
+/// v1.0 and one without `catalogId` takes the default id.
+pub fn resolve_catalog(entry: &Value) -> Result<Catalog, String> {
     let mut transformers = Vec::new();
     if let Some(specs) = entry.get("transformers").and_then(Value::as_array) {
         for spec in specs {
@@ -136,11 +135,7 @@ pub fn resolve_catalog(entry: &Value, lower: bool) -> Result<Catalog, String> {
         }
     }
     let (doc, default_id) = raw_catalog_doc(entry)?;
-    let mut document = if lower {
-        lower_catalog_document(&doc, Some(&default_id))
-    } else {
-        doc
-    };
+    let mut document = doc;
     if let Some(map) = document.as_object_mut() {
         if !map.contains_key("protocolVersion") {
             map.insert("protocolVersion".into(), json!("1.0"));
@@ -157,13 +152,11 @@ pub fn resolve_catalog(entry: &Value, lower: bool) -> Result<Catalog, String> {
 
 /// The catalogs a case registers: `args.catalogs`, `args.catalog`, or the
 /// default catalog.
-pub fn resolve_catalogs(args: &Value, lower: bool) -> Result<Vec<Catalog>, String> {
+pub fn resolve_catalogs(args: &Value) -> Result<Vec<Catalog>, String> {
     match (args.get("catalogs"), args.get("catalog")) {
-        (Some(Value::Array(entries)), _) => {
-            entries.iter().map(|e| resolve_catalog(e, lower)).collect()
-        }
-        (_, Some(entry)) => Ok(vec![resolve_catalog(entry, lower)?]),
-        _ => Ok(vec![resolve_catalog(&json!(DEFAULT_CATALOG), lower)?]),
+        (Some(Value::Array(entries)), _) => entries.iter().map(resolve_catalog).collect(),
+        (_, Some(entry)) => Ok(vec![resolve_catalog(entry)?]),
+        _ => Ok(vec![resolve_catalog(&json!(DEFAULT_CATALOG))?]),
     }
 }
 

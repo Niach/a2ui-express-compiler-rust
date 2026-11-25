@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 
 use crate::Result;
 use crate::decompile::{DecompileOptions, decompile};
-use crate::schema::{Catalog, CatalogSet, envelope_value};
+use crate::schema::{Catalog, CatalogSet};
 
 /// The message types an example may hold to be rewritten as Express.
 const TRANSLATABLE: [&str; 6] = [
@@ -51,10 +51,7 @@ fn default_catalog_on_calls(value: &Value, catalog_id: &str) -> Value {
                 .iter()
                 .map(|(k, v)| (k.clone(), default_catalog_on_calls(v, catalog_id)))
                 .collect();
-            let call = copy
-                .get("@call")
-                .and_then(Value::as_str)
-                .or_else(|| copy.get("call").and_then(Value::as_str));
+            let call = copy.get("@call").and_then(Value::as_str);
             let is_catalog_call = call.is_some_and(|c| !c.starts_with('@'));
             if is_catalog_call && !truthy(copy.get("catalogId")) {
                 copy.insert("catalogId".into(), catalog_id.into());
@@ -65,21 +62,13 @@ fn default_catalog_on_calls(value: &Value, catalog_id: &str) -> Value {
     }
 }
 
-fn default_catalog_on_component(component: &Value, catalog: &Catalog, v1: bool) -> Value {
+fn default_catalog_on_component(component: &Value, catalog: &Catalog) -> Value {
     let mut transformed = default_catalog_on_calls(component, catalog.id());
     let Some(map) = transformed.as_object_mut() else {
         return transformed;
     };
-    let Some(name) = map.get("component").and_then(Value::as_str) else {
-        return transformed;
-    };
-    let custom = catalog
-        .component(name)
-        .map(|c| c.custom_envelope_properties().to_vec())
-        .unwrap_or_default();
-    if envelope_value(map, "catalogId", v1, &custom).is_none() {
-        let key = if v1 { "@catalogId" } else { "catalogId" };
-        map.insert(key.into(), catalog.id().into());
+    if map.get("component").is_some_and(Value::is_string) && !map.contains_key("@catalogId") {
+        map.insert("@catalogId".into(), catalog.id().into());
     }
     transformed
 }
@@ -93,7 +82,7 @@ fn with_catalog_id(op: &Map<String, Value>, catalog_id: &str) -> Value {
 /// Stamps the example's catalog on the messages that belong to a catalog but
 /// leave it out, so the decompiler can resolve them with several catalogs
 /// active.
-pub(super) fn with_default_catalog(messages: &[Value], catalog: &Catalog, v1: bool) -> Vec<Value> {
+pub(super) fn with_default_catalog(messages: &[Value], catalog: &Catalog) -> Vec<Value> {
     let id = catalog.id();
     let mut created: HashSet<String> = HashSet::new();
     messages
@@ -117,7 +106,7 @@ pub(super) fn with_default_catalog(messages: &[Value], catalog: &Catalog, v1: bo
                     let mut uc = uc.clone();
                     let stamped = components
                         .iter()
-                        .map(|c| default_catalog_on_component(c, catalog, v1))
+                        .map(|c| default_catalog_on_component(c, catalog))
                         .collect();
                     uc.insert("components".into(), Value::Array(stamped));
                     copy.insert("updateComponents".into(), Value::Object(uc));
@@ -129,10 +118,6 @@ pub(super) fn with_default_catalog(messages: &[Value], catalog: &Catalog, v1: bo
                         crf.insert("callFunction".into(), with_catalog_id(cf, id));
                         copy.insert("callRendererFunction".into(), Value::Object(crf));
                     }
-                }
-            } else if let Some(Value::Object(cf)) = msg.get("callFunction") {
-                if !truthy(cf.get("catalogId")) {
-                    copy.insert("callFunction".into(), with_catalog_id(cf, id));
                 }
             }
             Value::Object(copy)
@@ -151,8 +136,7 @@ pub(super) fn decompile_turn(
     catalog: &Catalog,
     messages: &[Value],
 ) -> Result<String> {
-    let v1 = catalogs.version().at_least_v1();
-    let normalized = with_default_catalog(messages, catalog, v1);
+    let normalized = with_default_catalog(messages, catalog);
     decompile(catalogs, &normalized, &DecompileOptions::default())
 }
 

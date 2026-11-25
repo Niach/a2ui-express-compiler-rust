@@ -60,7 +60,7 @@ use std::collections::HashMap;
 
 use serde_json::{Map, Value};
 
-use crate::schema::{Catalog, CatalogSet, SymbolKind, envelope_value};
+use crate::schema::{Catalog, CatalogSet, SymbolKind, check_message_version, envelope_value};
 use crate::{Error, Result};
 
 pub use literal::{assign_variable_names, derive_variable_name, is_uax31_identifier};
@@ -77,9 +77,11 @@ pub struct DecompileOptions {
 
 /// Writes A2UI messages as one Express block (without the `<a2ui>` tags).
 ///
-/// The messages must be of the catalogs' protocol version. A component id
-/// that is not a UAX #31 identifier is a [`Error::Validation`] from v1.0; so
-/// is a component, function or catalog the active catalogs do not define.
+/// The messages must be A2UI v1.0 (`"version": "1.0"`); any other version is
+/// an [`Error::Validation`]. So are a component id that is not a UAX #31
+/// identifier, a component, function or catalog the active catalogs do not
+/// define, and an envelope key in its bare pre-1.0 spelling (`checks` for
+/// `@checks`) that the component's schema does not declare.
 pub fn decompile(
     catalogs: &CatalogSet,
     messages: &[Value],
@@ -161,7 +163,6 @@ fn reference(component_id: &str, var_names: &VarNames) -> String {
 struct Decompiler<'c> {
     catalogs: &'c CatalogSet,
     sole_catalog_id: Option<&'c str>,
-    is_v1: bool,
     options: DecompileOptions,
 }
 
@@ -170,7 +171,6 @@ impl<'c> Decompiler<'c> {
         Decompiler {
             catalogs,
             sole_catalog_id: catalogs.surface_catalog_id(),
-            is_v1: catalogs.version().at_least_v1(),
             options,
         }
     }
@@ -203,7 +203,6 @@ impl<'c> Decompiler<'c> {
             if msg
                 .get("callRendererFunction")
                 .is_some_and(Value::is_object)
-                || msg.get("callFunction").is_some_and(Value::is_object)
             {
                 open.clear();
                 result.push(msg.clone());
@@ -250,6 +249,11 @@ impl<'c> Decompiler<'c> {
     }
 
     fn decompile(&self, messages: &[Value]) -> Result<String> {
+        for message in messages.iter().filter_map(Value::as_object) {
+            if !message.is_empty() {
+                check_message_version(message)?;
+            }
+        }
         let coalesced = self.coalesce(messages);
         let mut surface_catalogs: HashMap<String, String> = HashMap::new();
         let mut blocks: Vec<String> = Vec::new();
@@ -271,10 +275,9 @@ impl<'c> Decompiler<'c> {
             let crf = envelope
                 .get("callRendererFunction")
                 .and_then(Value::as_object);
-            let func_op = match crf {
-                Some(crf) => crf.get("callFunction").and_then(Value::as_object),
-                None => envelope.get("callFunction").and_then(Value::as_object),
-            };
+            let func_op = crf
+                .and_then(|c| c.get("callFunction"))
+                .and_then(Value::as_object);
             if let Some(func_op) = func_op {
                 call_index += 1;
                 let call_id = crf
@@ -418,14 +421,11 @@ impl<'c> Decompiler<'c> {
         let (surface_catalog_id, catalog) = self.surface_context(&surface_id, surface_catalogs);
 
         let send_data_model = cs.get("sendDataModel").and_then(Value::as_bool);
-        let extensions = if self.is_v1 {
-            cs.get("metadata")
-                .and_then(Value::as_object)
-                .and_then(|m| m.get("extensions"))
-                .filter(|e| e.is_object())
-        } else {
-            None
-        };
+        let extensions = cs
+            .get("metadata")
+            .and_then(Value::as_object)
+            .and_then(|m| m.get("extensions"))
+            .filter(|e| e.is_object());
         let mut lines = Vec::new();
         if !(is_first
             && surface_id == "default_surface"
@@ -489,7 +489,7 @@ impl<'c> Decompiler<'c> {
             self.resolve(
                 SymbolKind::Component,
                 name,
-                self.component_catalog_id(c, surface_catalog_id),
+                c.get("@catalogId"),
                 surface_catalog_id,
             )
             .ok()
@@ -506,12 +506,10 @@ impl<'c> Decompiler<'c> {
             .iter()
             .filter_map(|c| c.get("id").and_then(Value::as_str))
             .collect();
-        if self.is_v1 {
-            if let Some(bad) = ids.iter().find(|id| !is_uax31_identifier(id)) {
-                return Err(validation(format!(
-                    "Component id '{bad}' must be a valid UAX #31 identifier"
-                )));
-            }
+        if let Some(bad) = ids.iter().find(|id| !is_uax31_identifier(id)) {
+            return Err(validation(format!(
+                "Component id '{bad}' must be a valid UAX #31 identifier"
+            )));
         }
         Ok(assign_variable_names(ids.iter().copied()))
     }
@@ -575,52 +573,6 @@ impl<'c> Decompiler<'c> {
         Ok(catalog)
     }
 
-    /// The catalog override of a component: `@catalogId` from v1.0, or a
-    /// legacy bare `catalogId` unless the component declares `catalogId` as
-    /// its own property.
-    fn component_catalog_id<'v>(
-        &self,
-        comp: &'v Obj,
-        surface_catalog_id: Option<&str>,
-    ) -> Option<&'v Value> {
-        if !self.is_v1 {
-            return comp.get("catalogId");
-        }
-        if let Some(v) = comp.get("@catalogId") {
-            return Some(v);
-        }
-        let legacy = comp.get("catalogId")?;
-        let declares = |c: &Catalog, name: &str| {
-            c.component(name).is_some_and(|comp| {
-                comp.custom_envelope_properties()
-                    .iter()
-                    .any(|p| p == "catalogId")
-            })
-        };
-        if let Some(name) = comp.get("component").and_then(Value::as_str) {
-            let home = surface_catalog_id.and_then(|id| self.catalogs.get(id));
-            match home {
-                Some(home) if home.has_component(name) => {
-                    if declares(home, name) {
-                        return None;
-                    }
-                }
-                _ => {
-                    let declaring: Vec<&Catalog> = self
-                        .catalogs
-                        .catalogs()
-                        .iter()
-                        .filter(|c| c.has_component(name))
-                        .collect();
-                    if !declaring.is_empty() && declaring.iter().all(|c| declares(c, name)) {
-                        return None;
-                    }
-                }
-            }
-        }
-        Some(legacy)
-    }
-
     // ---- components ------------------------------------------------------
 
     fn component(
@@ -636,10 +588,12 @@ impl<'c> Decompiler<'c> {
             .unwrap_or(comp_id);
         let comp_name = comp.get("component").and_then(Value::as_str).unwrap_or("");
 
+        self.catalogs
+            .refuse_legacy_envelope(comp, surface_catalog_id)?;
         let (catalog, emit_catalog_id) = self.resolve(
             SymbolKind::Component,
             comp_name,
-            self.component_catalog_id(comp, surface_catalog_id),
+            comp.get("@catalogId"),
             surface_catalog_id,
         )?;
 
@@ -649,14 +603,10 @@ impl<'c> Decompiler<'c> {
             .map_or(&[], |c| c.custom_envelope_properties());
         let is_custom = |p: &str| custom.iter().any(|c| c == p);
         let check_prop = catalog.check_rule_property(comp_name);
-        let extensions = if self.is_v1 {
-            envelope_value(comp, "metadata", true, custom)
-                .and_then(Value::as_object)
-                .and_then(|m| m.get("extensions"))
-                .filter(|e| e.is_object())
-        } else {
-            None
-        };
+        let extensions = envelope_value(comp, "metadata")
+            .and_then(Value::as_object)
+            .and_then(|m| m.get("extensions"))
+            .filter(|e| e.is_object());
         let keyword_args = self.options.keyword_args;
         let positional_until = if keyword_args && comp.contains_key("catalogId") {
             properties.iter().position(|p| p == "catalogId")
@@ -676,7 +626,7 @@ impl<'c> Decompiler<'c> {
             let arg = match check_prop {
                 Some(cp) if cp == prop && !is_custom(cp) => {
                     let checks = if cp == "checks" {
-                        envelope_value(comp, "checks", self.is_v1, custom)
+                        envelope_value(comp, "checks")
                     } else {
                         comp.get(cp)
                     };
@@ -726,7 +676,7 @@ impl<'c> Decompiler<'c> {
         trim_placeholders(&mut args);
 
         if check_prop == Some("checks") && is_custom("checks") {
-            let checks = envelope_value(comp, "checks", self.is_v1, custom);
+            let checks = envelope_value(comp, "checks");
             let arg = match checks {
                 Some(rules) if self.needs_long_form(rules) => Some(format!(
                     "checks={}",
@@ -805,8 +755,8 @@ impl<'c> Decompiler<'c> {
                 .get("condition")
                 .and_then(Value::as_object)
                 .unwrap_or(rule);
-            !present(condition.get("@call"))
-                .or_else(|| condition.get("call"))
+            !condition
+                .get("@call")
                 .and_then(Value::as_str)
                 .is_some_and(|name| !name.is_empty())
         })
@@ -827,8 +777,8 @@ impl<'c> Decompiler<'c> {
         };
         let condition = condition.unwrap_or(rule);
 
-        let func_name = present(condition.get("@call"))
-            .or_else(|| condition.get("call"))
+        let func_name = condition
+            .get("@call")
             .and_then(Value::as_str)
             .filter(|s| !s.is_empty())
             .unwrap_or("None");
@@ -852,12 +802,8 @@ impl<'c> Decompiler<'c> {
         let check_props: &[String] = catalog.map_or(&[], |c| c.function_arguments(func_name));
         let catalog = catalog.unwrap_or_else(|| self.first());
 
-        let path_of = |v: Option<&Value>| -> Option<Value> {
-            let obj = v?.as_object()?;
-            present(obj.get("@path"))
-                .or_else(|| obj.get("path"))
-                .cloned()
-        };
+        let path_of =
+            |v: Option<&Value>| -> Option<Value> { v?.as_object()?.get("@path").cloned() };
         let comp_path = path_of(component.get("value"));
         let check_path = path_of(check_args.get("value"));
         let start = usize::from(
@@ -908,10 +854,7 @@ impl<'c> Decompiler<'c> {
         surface_catalog_id: Option<&str>,
         extra_kwargs: &[String],
     ) -> Result<String> {
-        let func_name = present(call.get("@call"))
-            .or_else(|| call.get("call"))
-            .and_then(Value::as_str)
-            .unwrap_or("");
+        let func_name = call.get("@call").and_then(Value::as_str).unwrap_or("");
         let list_args = call.get("args").and_then(Value::as_array);
         let dict_args = match list_args {
             Some(_) => Obj::new(),
@@ -987,7 +930,7 @@ impl<'c> Decompiler<'c> {
             Value::Object(obj) => obj,
         };
 
-        // A template keeps the plain `path` key in every version.
+        // A template keeps the plain `path` key.
         if let (Some(Value::String(path)), Some(Value::String(component_id))) =
             (obj.get("path"), obj.get("componentId"))
         {
@@ -1021,40 +964,36 @@ impl<'c> Decompiler<'c> {
             });
         }
 
-        // Before v1.0 an event has no userMessage, and the compiler rejects
-        // `userMessage=`, so such an object is written as a map literal.
         if let Some(evt) = obj.get("event").and_then(Value::as_object) {
-            if self.is_v1 || !evt.contains_key("userMessage") {
-                let name = evt.get("name").and_then(Value::as_str).unwrap_or("");
-                let mut args = vec![literal::string(name)];
-                if present(evt.get("context")).is_some() {
-                    let ctx =
-                        optional_object(evt.get("context"), &format!("Event '{name}'"), "context")?;
-                    let mut entries = Vec::new();
-                    for (k, v) in &ctx {
-                        entries.push(format!(
-                            "{}: {}",
-                            literal::key(k),
-                            self.value(v, var_names, false, catalog, surface_catalog_id)?
-                        ));
-                    }
-                    args.push(format!("{{{}}}", entries.join(", ")));
-                }
-                if let Some(message) = present(evt.get("userMessage")) {
-                    args.push(format!(
-                        "userMessage={}",
-                        self.value(message, var_names, false, catalog, surface_catalog_id)?
+            let name = evt.get("name").and_then(Value::as_str).unwrap_or("");
+            let mut args = vec![literal::string(name)];
+            if present(evt.get("context")).is_some() {
+                let ctx =
+                    optional_object(evt.get("context"), &format!("Event '{name}'"), "context")?;
+                let mut entries = Vec::new();
+                for (k, v) in &ctx {
+                    entries.push(format!(
+                        "{}: {}",
+                        literal::key(k),
+                        self.value(v, var_names, false, catalog, surface_catalog_id)?
                     ));
                 }
-                return Ok(format!("Event({})", args.join(", ")));
+                args.push(format!("{{{}}}", entries.join(", ")));
             }
+            if let Some(message) = present(evt.get("userMessage")) {
+                args.push(format!(
+                    "userMessage={}",
+                    self.value(message, var_names, false, catalog, surface_catalog_id)?
+                ));
+            }
+            return Ok(format!("Event({})", args.join(", ")));
         }
 
         if let Some(call) = obj.get("functionCall").and_then(Value::as_object) {
             return self.function_call(call, var_names, surface_catalog_id, &[]);
         }
 
-        // Only the version's call key names a call; a plain `call` in v1.0 is data.
+        // Only `@call` names a call; a plain `call` is data.
         if obj.get(catalog.call_key()).is_some_and(Value::is_string) {
             return self.function_call(obj, var_names, surface_catalog_id, &[]);
         }
