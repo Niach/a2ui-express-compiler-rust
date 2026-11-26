@@ -1,6 +1,6 @@
 [package]
 name = "a2ui-express-wasm"
-description = "WebAssembly bindings for the A2UI Express compiler (the @niach/a2ui-express npm package)"
+description = "WebAssembly bindings for the A2UI Express compiler (the @mrniach/a2ui-express npm package)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

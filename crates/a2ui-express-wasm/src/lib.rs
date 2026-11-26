@@ -2,7 +2,7 @@
 //!
 //! Built with `wasm-pack build --target web` (or `cargo build --target
 //! wasm32-unknown-unknown` + `wasm-bindgen --target web`); packaged as
-//! `@niach/a2ui-express` from `packages/npm`. Every call goes through
+//! `@mrniach/a2ui-express` from `packages/npm`. Every call goes through
 //! `a2ui-express-ffi`, which the Python binding shares, so both accept and
 //! return the same JSON.
 //!
