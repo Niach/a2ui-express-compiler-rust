@@ -2,9 +2,7 @@
 
 All crates and bindings of this workspace share one version.
 
-## 0.3.0
-
-A2UI 1.0 only (#AXC-19, #VAPP-289).
+## Unreleased
 
 ### Added: the `at_exponential_express` extension (genUI round 4)
 
@@ -30,6 +28,10 @@ upstream Express is unchanged (282/282). See `docs/express-extensions.md`.
   `normalize::normalize_dialect`; `ExprKind::Color`.
 - Fixtures `conformance/extensions/*.json`, replayed by Rust, wasm and Python.
 
+## 0.3.0
+
+A2UI 1.0 only (#AXC-19, #VAPP-289).
+
 ### Breaking
 
 - v0.9 and v0.9.1 are gone. A catalog must declare `protocolVersion` 1.0:
@@ -53,6 +55,7 @@ upstream Express is unchanged (282/282). See `docs/express-extensions.md`.
 
 ### Changed
 
+- The npm package is `@mrniach/a2ui-express` (#29).
 - Pinned to upstream `main` a23b19c4. Ported: function calls have no nesting
   limit of their own (a2ui#4296), and calls nested in a
   `callRendererFunction`'s arguments must be ones the agent may make
