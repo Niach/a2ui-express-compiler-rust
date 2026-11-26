@@ -111,11 +111,13 @@ wasm32-unknown-unknown --release` + `wasm-bindgen --target web` +
 
 | build | entry | calls | wasm, gzip -9 | brotli |
 |---|---|---|---|---|
-| full (default features) | `@niach/a2ui-express` | all | 228 KB | 187 KB |
-| renderer (`--no-default-features`) | `@niach/a2ui-express/renderer` | compile, stream, parse, unwrap/wrap | 180 KB | 149 KB |
+| full (default features) | `@niach/a2ui-express` | all | 314 KB | 255 KB |
+| renderer (`--no-default-features`) | `@niach/a2ui-express/renderer` | compile, stream, parse, unwrap/wrap | 216 KB | 179 KB |
 
-The web renderers load the renderer build; CI fails it at 200 KB gzipped
-(the decompiler and prompt generator are agent-side and add ~48 KB). eui's
+The web renderers load the renderer build; CI fails it at 225 KB gzipped
+(raised from 200 KB for the `at_exponential_express` extension, which
+renderers compile too and which adds ~33 KB; the decompiler, prompt
+generator and patches are agent-side and add ~98 KB). eui's
 catalog is a runtime input, not bundled (741 KB JSON, 62 KB gzipped).
 wasm32 builds are optimised for size (`.cargo/config.toml`: `opt-level=z`,
 fat LTO, wasm-opt `-Oz`), which makes them about 2.5× slower than native
