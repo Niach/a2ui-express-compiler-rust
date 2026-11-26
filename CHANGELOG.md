@@ -2,7 +2,7 @@
 
 All crates and bindings of this workspace share one version.
 
-## Unreleased
+## 0.3.0
 
 A2UI 1.0 only (#AXC-19, #VAPP-289).
 

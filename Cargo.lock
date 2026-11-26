@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "a2ui-express"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "regex",
  "serde_json",
@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "a2ui-express-ffi"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "a2ui-express",
  "serde_json",
@@ -22,7 +22,7 @@ dependencies = [
 
 [[package]]
 name = "a2ui-express-py"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "a2ui-express-ffi",
  "pyo3",
@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "a2ui-express-wasm"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "a2ui-express-ffi",
  "js-sys",
