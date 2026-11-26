@@ -7,7 +7,7 @@ and to ship as wasm for the web.
 
 Crate: [`a2ui-express`](crates/a2ui-express). Runtime dependencies are limited
 to `serde_json` (`preserve_order`) and `thiserror`. The same compiler
-ships to JavaScript (wasm, `@niach/a2ui-express`) and Python (`a2ui-express`);
+ships to JavaScript (wasm, `@mrniach/a2ui-express`) and Python (`a2ui-express`);
 see [Bindings](#bindings).
 
 ## Streaming
@@ -76,7 +76,7 @@ four that check harness-only behaviour), so neither can drift from the crate.
 ### JavaScript / wasm: [`packages/npm`](packages/npm)
 
 ```js
-import init, { compile, StreamCompiler, parseResponse, decompile, generatePrompt } from "@niach/a2ui-express";
+import init, { compile, StreamCompiler, parseResponse, decompile, generatePrompt } from "@mrniach/a2ui-express";
 await init(); // or initSync({ module: wasmBytes })
 
 const stream = new StreamCompiler(catalog, { surfaceId: "main" });
@@ -111,8 +111,8 @@ wasm32-unknown-unknown --release` + `wasm-bindgen --target web` +
 
 | build | entry | calls | wasm, gzip -9 | brotli |
 |---|---|---|---|---|
-| full (default features) | `@niach/a2ui-express` | all | 314 KB | 255 KB |
-| renderer (`--no-default-features`) | `@niach/a2ui-express/renderer` | compile, stream, parse, unwrap/wrap | 216 KB | 179 KB |
+| full (default features) | `@mrniach/a2ui-express` | all | 314 KB | 255 KB |
+| renderer (`--no-default-features`) | `@mrniach/a2ui-express/renderer` | compile, stream, parse, unwrap/wrap | 216 KB | 179 KB |
 
 The web renderers load the renderer build; CI fails it at 225 KB gzipped
 (raised from 200 KB for the `at_exponential_express` extension, which

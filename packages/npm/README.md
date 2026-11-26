@@ -1,4 +1,4 @@
-# @niach/a2ui-express
+# @mrniach/a2ui-express
 
 The [A2UI Express compiler](https://github.com/Niach/a2ui-express-compiler-rust)
 for JavaScript: the Rust compiler as WebAssembly, so the web renders exactly
@@ -7,7 +7,7 @@ validates. ES module, `--target web` glue; works in browsers, bundlers, Node,
 Deno and Bun.
 
 ```js
-import init, { Catalogs } from "@niach/a2ui-express/renderer"; // or "@niach/a2ui-express" for every call
+import init, { Catalogs } from "@mrniach/a2ui-express/renderer"; // or "@mrniach/a2ui-express" for every call
 await init(); // fetches a2ui_express_bg.wasm next to the module; or initSync({ module: bytes })
 
 const catalogs = new Catalogs(catalogDocument, { surfaceId: "main" }); // load once
@@ -44,8 +44,8 @@ the failure, to show as well).
 
 | entry | wasm gzip -9 | brotli |
 |---|---|---|
-| `@niach/a2ui-express/renderer` (compile, stream, parse) | 180 KB | 149 KB |
-| `@niach/a2ui-express` (also decompile, generatePrompt) | 228 KB | 187 KB |
+| `@mrniach/a2ui-express/renderer` (compile, stream, parse) | 180 KB | 149 KB |
+| `@mrniach/a2ui-express` (also decompile, generatePrompt) | 228 KB | 187 KB |
 
 Built from `crates/a2ui-express-wasm` with `scripts/build-npm.sh`
 (`wasm-pack build --target web`, wasm-opt `-Oz`); `npm test` runs the
