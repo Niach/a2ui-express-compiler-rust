@@ -46,6 +46,16 @@ text and raw blocks and back.
 Samples meant for streaming should be written top-down (`root` first):
 `decompile` with `Order::TopDown`.
 
+## Extensions
+
+A catalog that declares `metadata.extensions.at_exponential_express` turns on
+one DSL for theme, layout and motion, plus patches: `theme(base="dark",
+primary=#eef800, …)`, `s="col g12 p16 bg-card r-lg"` and `style(name, "…")`
+classes, `enter=` / `exit=` / `stagger=`, `Motion(ref=…)` / `Motion(kf=…)`,
+and `compile_patch(screen, patch)`. It all compiles to plain A2UI 1.0; on
+model-written eUI screens it halves the tokens of dense layouts.
+[`docs/express-extensions.md`](docs/express-extensions.md) is the reference.
+
 ## Bindings
 
 One implementation everywhere: both bindings are thin shells over

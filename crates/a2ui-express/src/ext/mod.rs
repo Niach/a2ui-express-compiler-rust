@@ -91,6 +91,35 @@ impl Express {
     }
 }
 
+// ---- the prompt ----------------------------------------------------------------
+
+/// The shorthand words the prompt lists (a unit test reads each back).
+pub const PROMPT_WORDS: &str = "flex grid block d-none row col wrap justify-start|center|end|between|around|evenly items-start|center|end|stretch|baseline self-center grow shrink0 g12 gx8 gy8 w100% h48 minw0 maxw640 aspect1.5 relative absolute top0 left0 inset0 p16 px12 py8 pt4 pr4 pb4 pl4 m8 mx-auto mt-8 bg-card fg-mutedForeground b1 bt1 bc-border solid dashed r-lg r8 r-full op0.5 sh-sm fs-sm fs14 fw600 lh-sm ls1 text-center uppercase italic underline tabular-nums ff-mono overflow-hidden cursor-pointer events-none select-none tr-fast dur-slow";
+
+/// The prompt section that teaches the extension (after the grammar
+/// rules), built from the same tables the compiler reads.
+pub fn prompt_section(ext: &Express) -> String {
+    let mut motions: Vec<&str> = ext.motions.keys().map(String::as_str).collect();
+    motions.sort_unstable();
+    let registry = if motions.is_empty() {
+        String::new()
+    } else {
+        format!(" Registered: {}.", motions.join(", "))
+    };
+    format!(
+        r##"## Express Extensions
+
+1. Theme: one `theme(...)` line before `root`, seeds only: `theme(base="dark", primary=#eef800, bg=#0e0e0e, card=#161616, radius=0, font="Inter", density="compact", shadow="none", button="pill")`. Seeds: {seeds}. Colours are bare `#rrggbb` literals, valid only inside `theme(...)`; every other colour is a `$color.<token>`. Any colour token may be set too (`cardForeground=#111111`, `dark={{ring: #ff00ff}}`). `theme("orange")` picks a built-in theme.
+2. Style: `s="col g12 p16 bg-card r-lg sh-sm"` on any component instead of `style={{…}}`. A word is a bare word, or a prefix and a value: a number (`p16`, `mt-8`, `op0.5`, `w50%`, `p16px`), `-auto`, or `-<token>` from the key's token group (`bg-card` = `$color.card`, `r-lg`, `fs-sm`; another group: `h-control.input`). `hover:`, `focus:`, `pressed:` prefix a word for that state. Later words win; `style={{…}}` beside `s=` holds what words cannot say (gradients, transforms, grid templates). Shared styles: `style(card, "col g12 p16 bg-card r-lg")` before first use, then `s=card` or `s="card hover:bg-accent"`. Words: {words}.
+3. Motion: `enter="slide-in-up"` ({enter}), `exit="fade-out"` ({exit}), `stagger=60` (ms between a container's children), `delay=120` (ms) on any component. `Motion(ref="pulse-dot")` plays a registered animation.{registry} `Motion(kf="circle 12 12 6 $color.primary | scale 0:100 600:140 1200:100 ease-in-out", size=[24, 24], duration=1200)` draws a small one: layers split by `;`, a shape (`circle CX CY R COLOR`, `ring CX CY R WIDTH COLOR`, `rect CX CY W H RADIUS COLOR`, `star CX CY POINTS OUTER INNER COLOR`) then `|` tracks `scale|opacity|rotate T:V …` or `move T:DX,DY …`, an optional ease last.
+4. Patches (when asked to change a screen you sent): write only what changes. Reassign a variable to replace that component, `$/path = value` for data, `del(name)` to remove a component, a new `theme(...)` line to change the theme. Untouched lines stay as they are."##,
+        seeds = theme::SEEDS.join(", "),
+        words = PROMPT_WORDS,
+        enter = motion::ENTER.join(", "),
+        exit = motion::EXIT.join(", "),
+    )
+}
+
 // ---- values -------------------------------------------------------------------
 
 /// A JSON value as an Express literal.
@@ -503,4 +532,22 @@ pub fn desugar(
         }
     }
     Ok((out, d.classes))
+}
+
+#[cfg(test)]
+mod prompt_tests {
+    #[test]
+    fn every_prompt_word_reads() {
+        for w in super::PROMPT_WORDS.split_whitespace() {
+            for one in w.split('|').enumerate().map(|(i, part)| {
+                if i == 0 {
+                    part.to_owned()
+                } else {
+                    format!("{}-{part}", w.split('-').next().unwrap())
+                }
+            }) {
+                assert!(super::style::decode_word(&one).is_ok(), "{one}");
+            }
+        }
+    }
 }

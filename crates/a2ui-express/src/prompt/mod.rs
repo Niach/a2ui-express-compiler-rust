@@ -151,7 +151,10 @@ impl Generator<'_> {
         } else {
             format!("{EXAMPLES_HEADING}{examples}")
         };
-        Ok([self.base_rules(), instructions, examples]
+        let extension = crate::ext::Express::from_catalogs(self.catalogs)
+            .map(|e| crate::ext::prompt_section(&e))
+            .unwrap_or_default();
+        Ok([self.base_rules(), extension, instructions, examples]
             .into_iter()
             .filter(|s| !s.is_empty())
             .collect::<Vec<_>>()
