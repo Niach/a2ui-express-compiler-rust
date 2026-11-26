@@ -1,12 +1,11 @@
-# Publishes packages/npm as @niach/a2ui-express. DISABLED: it runs only by
+# Publishes packages/npm as @mrniach/a2ui-express. DISABLED: it runs only by
 # hand (Actions → publish-npm → Run workflow), and only as a dry run unless
 # `dry_run` is unchecked. Before the first real publish:
 #
-# 1. Create the `@niach` scope on npmjs.com (or rename the package).
-# 2. Add an automation token as the `NPM_TOKEN` repository secret (or set up
+# 1. Add an automation token as the `NPM_TOKEN` repository secret (or set up
 #    npm trusted publishing for this workflow and drop the token).
-# 3. Bump `version` in packages/npm/package.json (and the workspace).
-# 4. To publish on tags, uncomment the `push: tags` trigger below.
+# 2. Bump `version` in packages/npm/package.json (and the workspace).
+# 3. To publish on tags, uncomment the `push: tags` trigger below.
 name: publish-npm
 
 on:

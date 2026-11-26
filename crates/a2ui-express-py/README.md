@@ -1,7 +1,7 @@
 # a2ui-express (Python)
 
 Python bindings for the [A2UI Express compiler](https://github.com/Niach/a2ui-express-compiler-rust):
-the same Rust compiler that ships to web clients (as the `@niach/a2ui-express`
+the same Rust compiler that ships to web clients (as the `@mrniach/a2ui-express`
 npm package), so training data validated and converted here behaves exactly
 like it will on a client.
 
