@@ -57,9 +57,18 @@ enum Key {
 
 fn key_of(stmt: &Statement) -> Result<Key, CompileError> {
     Ok(match &stmt.kind {
-        StatementKind::Assign { target: Target::Variable { name, .. }, .. } => Key::Var(name.clone()),
-        StatementKind::Assign { target: Target::Path { path, .. }, .. } => Key::Path(path.clone()),
-        StatementKind::Expr(Expr { kind: ExprKind::Call(call), .. }) => match call.name.as_str() {
+        StatementKind::Assign {
+            target: Target::Variable { name, .. },
+            ..
+        } => Key::Var(name.clone()),
+        StatementKind::Assign {
+            target: Target::Path { path, .. },
+            ..
+        } => Key::Path(path.clone()),
+        StatementKind::Expr(Expr {
+            kind: ExprKind::Call(call),
+            ..
+        }) => match call.name.as_str() {
             "theme" => Key::Theme,
             "surface" => Key::Surface,
             "style" => match call.positional().next().map(|e| &e.kind) {
@@ -72,7 +81,11 @@ fn key_of(stmt: &Statement) -> Result<Key, CompileError> {
                 )));
             }
         },
-        StatementKind::Expr(_) => return Err(invalid("A patch holds assignments, style(), theme() and del().")),
+        StatementKind::Expr(_) => {
+            return Err(invalid(
+                "A patch holds assignments, style(), theme() and del().",
+            ));
+        }
     })
 }
 
@@ -87,9 +100,13 @@ impl Block {
         let body = strip_sentinel_tags(source);
         let hex = compiler.dialect().hex_colors;
         let text = syntax::normalize::normalize_dialect(&body, &Default::default(), hex);
-        let parsed = syntax::parser::parse_tokens(syntax::lexer::lex_with(&text, syntax::Pos::START, hex));
+        let parsed =
+            syntax::parser::parse_tokens(syntax::lexer::lex_with(&text, syntax::Pos::START, hex));
         let program = parsed.into_result()?;
-        Ok(Block { text, statements: program.statements })
+        Ok(Block {
+            text,
+            statements: program.statements,
+        })
     }
 
     fn source(&self, stmt: &Statement) -> String {
@@ -116,9 +133,16 @@ fn list_items(e: &Expr, name: &str, ranges: &mut Vec<(usize, usize)>, elsewhere:
             }
         }
         ExprKind::Variable(v) if v == name => *elsewhere = true,
-        ExprKind::Map(entries) => entries.iter().for_each(|m| list_items(&m.value, name, ranges, elsewhere)),
-        ExprKind::Check { args, .. } => args.iter().for_each(|a| list_items(a, name, ranges, elsewhere)),
-        ExprKind::Call(call) => call.args.iter().for_each(|a| list_items(&a.value, name, ranges, elsewhere)),
+        ExprKind::Map(entries) => entries
+            .iter()
+            .for_each(|m| list_items(&m.value, name, ranges, elsewhere)),
+        ExprKind::Check { args, .. } => args
+            .iter()
+            .for_each(|a| list_items(a, name, ranges, elsewhere)),
+        ExprKind::Call(call) => call
+            .args
+            .iter()
+            .for_each(|a| list_items(&a.value, name, ranges, elsewhere)),
         _ => {}
     }
 }
@@ -156,18 +180,30 @@ pub fn apply(compiler: &Compiler, screen: &str, patch: &str) -> Result<String, C
     for s in &old.statements {
         let key = key_of(s).map_err(|e| invalid(format!("The screen: {}", e.message)))?;
         if key == Key::Surface && lines.iter().any(|l| l.key == Key::Surface) {
-            return Err(invalid("compile_patch takes the screen of one surface; this one has two surface(...) lines."));
+            return Err(invalid(
+                "compile_patch takes the screen of one surface; this one has two surface(...) lines.",
+            ));
         }
-        lines.push(Line { key, text: old.source(s), stmt: Some((s.clone(), s.span.start.offset)) });
+        lines.push(Line {
+            key,
+            text: old.source(s),
+            stmt: Some((s.clone(), s.span.start.offset)),
+        });
     }
     for s in &new.statements {
-        if let StatementKind::Expr(Expr { kind: ExprKind::Call(call), .. }) = &s.kind {
+        if let StatementKind::Expr(Expr {
+            kind: ExprKind::Call(call),
+            ..
+        }) = &s.kind
+        {
             if call.name == "del" {
                 delete(&mut lines, call)?;
                 continue;
             }
             if call.name == "surface" {
-                return Err(invalid("A patch changes the surface its screen creates; leave out surface(...)."));
+                return Err(invalid(
+                    "A patch changes the surface its screen creates; leave out surface(...).",
+                ));
             }
         }
         let key = key_of(s)?;
@@ -186,15 +222,27 @@ pub fn apply(compiler: &Compiler, screen: &str, patch: &str) -> Result<String, C
                         .unwrap_or(lines.len()),
                     _ => lines.len(),
                 };
-                lines.insert(at, Line { key, text, stmt: None });
+                lines.insert(
+                    at,
+                    Line {
+                        key,
+                        text,
+                        stmt: None,
+                    },
+                );
             }
         }
     }
-    Ok(lines.into_iter().map(|l| l.text).collect::<Vec<_>>().join("\n"))
+    Ok(lines
+        .into_iter()
+        .map(|l| l.text)
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 fn delete(lines: &mut Vec<Line>, call: &syntax::Call) -> Result<(), CompileError> {
-    let usage = || invalid("del() takes the component to remove, del(name), or a data path, del($/path).");
+    let usage =
+        || invalid("del() takes the component to remove, del(name), or a data path, del($/path).");
     let mut pos = call.positional();
     let (Some(target), None) = (pos.next(), pos.next()) else {
         return Err(usage());
@@ -241,22 +289,39 @@ fn delete(lines: &mut Vec<Line>, call: &syntax::Call) -> Result<(), CompileError
                         syntax::Pos::START,
                         true,
                     ));
-                    line.stmt = reparsed.program.statements.into_iter().next().map(|s| (s, 0));
+                    line.stmt = reparsed
+                        .program
+                        .statements
+                        .into_iter()
+                        .next()
+                        .map(|s| (s, 0));
                 }
             }
             None => {
                 // A statement the patch wrote: it must not name what it deletes.
-                if line.text.split(|c: char| !(c.is_alphanumeric() || c == '_')).any(|w| w == name) {
-                    let probe = syntax::parser::parse_tokens(syntax::lexer::lex_with(&line.text, syntax::Pos::START, true));
+                if line
+                    .text
+                    .split(|c: char| !(c.is_alphanumeric() || c == '_'))
+                    .any(|w| w == name)
+                {
+                    let probe = syntax::parser::parse_tokens(syntax::lexer::lex_with(
+                        &line.text,
+                        syntax::Pos::START,
+                        true,
+                    ));
                     for s in &probe.program.statements {
                         let value = match &s.kind {
-                            StatementKind::Assign { value, .. } | StatementKind::Expr(value) => value,
+                            StatementKind::Assign { value, .. } | StatementKind::Expr(value) => {
+                                value
+                            }
                         };
                         let mut r = Vec::new();
                         let mut e = false;
                         list_items(value, &name, &mut r, &mut e);
                         if e || !r.is_empty() {
-                            return Err(invalid(format!("del({name}): the patch still names {name}.")));
+                            return Err(invalid(format!(
+                                "del({name}): the patch still names {name}."
+                            )));
                         }
                     }
                 }
@@ -273,8 +338,15 @@ fn created(messages: &[Value], which: &str) -> Result<Map<String, Value>, Compil
             .get("createSurface")
             .and_then(Value::as_object)
             .cloned()
-            .ok_or_else(|| invalid(format!("The {which} screen must create one surface (assign root)."))),
-        _ => Err(invalid(format!("The {which} screen must compile to one createSurface, not {} messages.", messages.len()))),
+            .ok_or_else(|| {
+                invalid(format!(
+                    "The {which} screen must create one surface (assign root)."
+                ))
+            }),
+        _ => Err(invalid(format!(
+            "The {which} screen must compile to one createSurface, not {} messages.",
+            messages.len()
+        ))),
     }
 }
 
@@ -293,7 +365,10 @@ fn data_delta(old: &Value, new: &Value, path: String, out: &mut Vec<(String, Val
             }
             for k in a.keys() {
                 if !b.contains_key(k) {
-                    out.push((format!("{path}/{}", k.replace('~', "~0").replace('/', "~1")), Value::Null));
+                    out.push((
+                        format!("{path}/{}", k.replace('~', "~0").replace('/', "~1")),
+                        Value::Null,
+                    ));
                 }
             }
         }
@@ -306,7 +381,12 @@ fn theme_of(cs: &Map<String, Value>) -> Option<&Value> {
 }
 
 /// Compiles `patch` against `screen` (see the module docs).
-pub fn compile_patch(compiler: &Compiler, screen: &str, patch: &str, surface_id: &str) -> Result<Patch, CompileError> {
+pub fn compile_patch(
+    compiler: &Compiler,
+    screen: &str,
+    patch: &str,
+    surface_id: &str,
+) -> Result<Patch, CompileError> {
     if compiler.extension().is_none() {
         return Err(invalid(format!(
             "compile_patch needs a catalog that declares the {} extension.",
@@ -317,15 +397,22 @@ pub fn compile_patch(compiler: &Compiler, screen: &str, patch: &str, surface_id:
     let before = created(&compiler.compile(screen, surface_id)?, "old")?;
     let after_messages = compiler.compile(&new_screen, surface_id)?;
     let after = created(&after_messages, "new")?;
-    let sid = after.get("surfaceId").cloned().unwrap_or_else(|| surface_id.into());
+    let sid = after
+        .get("surfaceId")
+        .cloned()
+        .unwrap_or_else(|| surface_id.into());
     if before.get("surfaceId") != after.get("surfaceId") {
-        return Err(invalid("A patch cannot move the screen to another surface."));
+        return Err(invalid(
+            "A patch cannot move the screen to another surface.",
+        ));
     }
     let version = compiler.version().wire();
     let mut messages = Vec::new();
 
     if theme_of(&before) != theme_of(&after) {
-        let theme = theme_of(&after).cloned().unwrap_or_else(|| Value::String("neutral".into()));
+        let theme = theme_of(&after)
+            .cloned()
+            .unwrap_or_else(|| Value::String("neutral".into()));
         let mut ctx = crate::compile::pass_ctx();
         messages.push(compiler.theme_call(sid.as_str().unwrap_or(surface_id), &theme, &mut ctx)?);
     }
@@ -358,5 +445,8 @@ pub fn compile_patch(compiler: &Compiler, screen: &str, patch: &str, surface_id:
         messages.push(json!({"version": version, "updateDataModel": {"surfaceId": sid, "path": path, "value": value}}));
     }
     crate::compile::validate(compiler.catalogs(), &messages)?;
-    Ok(Patch { messages, screen: new_screen })
+    Ok(Patch {
+        messages,
+        screen: new_screen,
+    })
 }

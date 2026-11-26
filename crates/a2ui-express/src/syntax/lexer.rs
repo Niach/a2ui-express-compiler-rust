@@ -607,7 +607,10 @@ pub fn hex_color_at(s: &[u8], i: usize) -> Option<usize> {
     if s.get(i) != Some(&b'#') {
         return None;
     }
-    let digits = s[i + 1..].iter().take_while(|b| b.is_ascii_hexdigit()).count();
+    let digits = s[i + 1..]
+        .iter()
+        .take_while(|b| b.is_ascii_hexdigit())
+        .count();
     let next = s.get(i + 1 + digits);
     let ends = next.is_none_or(|b| !(b.is_ascii_alphanumeric() || *b == b'_'));
     (matches!(digits, 6 | 8) && ends).then_some(1 + digits)

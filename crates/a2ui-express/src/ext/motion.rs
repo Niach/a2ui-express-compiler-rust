@@ -37,9 +37,9 @@
 //! exactly what some keyframe text compiles to (checked by compiling the
 //! text it writes), so the decompiler's `kf=` is a fixed point.
 
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
-use super::{Express, invalid, literal_json};
+use super::{Express, arr, invalid, literal_json, obj, st};
 use crate::compile::CompileError;
 use crate::syntax::{Expr, ExprKind};
 
@@ -73,20 +73,31 @@ pub const KEYS: &[(&str, &str)] = &[
 
 /// The style key a motion keyword sets, and its value.
 pub fn sugar_key(keyword: &str, value: &Expr) -> Result<(&'static str, Value), CompileError> {
-    let key = KEYS.iter().find(|(k, _)| *k == keyword).map(|(_, s)| *s).expect("a motion keyword");
+    let key = KEYS
+        .iter()
+        .find(|(k, _)| *k == keyword)
+        .map(|(_, s)| *s)
+        .expect("a motion keyword");
     match keyword {
         "enter" | "exit" => {
             let names = if keyword == "enter" { ENTER } else { EXIT };
             match &value.kind {
-                ExprKind::String(s) if names.contains(&s.as_str()) => Ok((key, Value::String(s.clone()))),
-                _ => Err(invalid(format!("{keyword}= is one of {}.", names.join(", ")))),
+                ExprKind::String(s) if names.contains(&s.as_str()) => {
+                    Ok((key, Value::String(s.clone())))
+                }
+                _ => Err(invalid(format!(
+                    "{keyword}= is one of {}.",
+                    names.join(", ")
+                ))),
             }
         }
         _ => match &value.kind {
             ExprKind::Number(n) if n.to_json().as_f64().is_some_and(|v| v >= 0.0) => {
                 Ok((key, Value::Number(n.to_json())))
             }
-            _ => Err(invalid(format!("{keyword}= is a number of ms, at least 0."))),
+            _ => Err(invalid(format!(
+                "{keyword}= is a number of ms, at least 0."
+            ))),
         },
     }
 }
@@ -96,7 +107,10 @@ pub fn sugar_key(keyword: &str, value: &Expr) -> Result<(&'static str, Value), C
 /// props the component has too (a differing one stays written beside
 /// `ref=`). The props the entry supplies unchanged are returned, to be left
 /// out.
-pub fn registry_match<'a>(ext: &'a Express, comp: &Map<String, Value>) -> Option<(&'a str, Vec<String>)> {
+pub fn registry_match<'a>(
+    ext: &'a Express,
+    comp: &Map<String, Value>,
+) -> Option<(&'a str, Vec<String>)> {
     let mut names: Vec<&String> = ext.motions.keys().collect();
     names.sort();
     names.into_iter().find_map(|name| {
@@ -105,24 +119,41 @@ pub fn registry_match<'a>(ext: &'a Express, comp: &Map<String, Value>) -> Option
         if comp.get("layers") != Some(layers) || !props.keys().all(|k| comp.contains_key(k)) {
             return None;
         }
-        let same: Vec<String> = props.iter().filter(|(k, v)| comp.get(*k) == Some(v)).map(|(k, _)| k.clone()).collect();
+        let same: Vec<String> = props
+            .iter()
+            .filter(|(k, v)| comp.get(*k) == Some(v))
+            .map(|(k, _)| k.clone())
+            .collect();
         Some((name.as_str(), same))
     })
 }
 
 // ---- keyframes ---------------------------------------------------------------------
 
-const EASES: &[&str] = &["linear", "ease", "ease-in", "ease-out", "ease-in-out", "hold"];
+const EASES: &[&str] = &[
+    "linear",
+    "ease",
+    "ease-in",
+    "ease-out",
+    "ease-in-out",
+    "hold",
+];
 const TRACKS: &[&str] = &["scale", "opacity", "rotate", "move"];
 
 fn number(word: &str) -> Result<Value, String> {
-    let v = crate::syntax::parser::number_value(word).ok_or_else(|| format!("'{word}' is not a number"))?;
-    if !word.bytes().all(|b| b.is_ascii_digit() || b == b'.' || b == b'-') {
+    let v = crate::syntax::parser::number_value(word)
+        .ok_or_else(|| format!("'{word}' is not a number"))?;
+    if !word
+        .bytes()
+        .all(|b| b.is_ascii_digit() || b == b'.' || b == b'-')
+    {
         return Err(format!("'{word}' is not a plain number"));
     }
     Ok(match v {
-        crate::syntax::NumberValue::Int(i) => json!(i),
-        crate::syntax::NumberValue::Float(f) => json!(f),
+        crate::syntax::NumberValue::Int(i) => Value::Number(i.into()),
+        crate::syntax::NumberValue::Float(f) => {
+            serde_json::Number::from_f64(f).map_or(Value::Null, Value::Number)
+        }
     })
 }
 
@@ -132,19 +163,23 @@ fn f(v: &Value) -> f64 {
 
 fn n(x: f64) -> Value {
     if x.fract() == 0.0 && x.abs() < 1e15 {
-        json!(x as i64)
+        Value::Number((x as i64).into())
     } else {
-        json!(x)
+        serde_json::Number::from_f64(x).map_or(Value::Null, Value::Number)
     }
 }
 
 fn color(word: &str) -> Result<Value, String> {
-    let ok = word.strip_prefix("$color.").is_some_and(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric()))
+    let ok = word
+        .strip_prefix("$color.")
+        .is_some_and(|t| !t.is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric()))
         || super::color::Rgba::parse(word).is_some_and(|c| c.hex() == word);
     if ok {
         Ok(Value::String(word.to_owned()))
     } else {
-        Err(format!("'{word}' is not a colour ($color.<token> or lowercase #rrggbb[aa])"))
+        Err(format!(
+            "'{word}' is not a colour ($color.<token> or lowercase #rrggbb[aa])"
+        ))
     }
 }
 
@@ -163,37 +198,78 @@ fn shape(words: &[&str]) -> Result<(Value, Value, Vec<Value>), String> {
             expect(4)?;
             let v = nums(&args[..3])?;
             let d = n(f(&v[2]) * 2.0);
-            Ok((v[0].clone(), v[1].clone(), vec![
-                json!({"type": "ellipse", "position": [v[0], v[1]], "size": [d, d]}),
-                json!({"type": "fill", "color": color(args[3])?}),
-            ]))
+            Ok((
+                v[0].clone(),
+                v[1].clone(),
+                vec![
+                    obj([
+                        ("type", st("ellipse")),
+                        ("position", arr([v[0].clone(), v[1].clone()])),
+                        ("size", arr([d.clone(), d])),
+                    ]),
+                    obj([("type", st("fill")), ("color", color(args[3])?)]),
+                ],
+            ))
         }
         "ring" => {
             expect(5)?;
             let v = nums(&args[..4])?;
             let d = n(f(&v[2]) * 2.0);
-            Ok((v[0].clone(), v[1].clone(), vec![
-                json!({"type": "ellipse", "position": [v[0], v[1]], "size": [d, d]}),
-                json!({"type": "stroke", "color": color(args[4])?, "width": v[3]}),
-            ]))
+            Ok((
+                v[0].clone(),
+                v[1].clone(),
+                vec![
+                    obj([
+                        ("type", st("ellipse")),
+                        ("position", arr([v[0].clone(), v[1].clone()])),
+                        ("size", arr([d.clone(), d])),
+                    ]),
+                    obj([
+                        ("type", st("stroke")),
+                        ("color", color(args[4])?),
+                        ("width", v[3].clone()),
+                    ]),
+                ],
+            ))
         }
         "rect" => {
             expect(6)?;
             let v = nums(&args[..5])?;
-            Ok((v[0].clone(), v[1].clone(), vec![
-                json!({"type": "rect", "position": [v[0], v[1]], "size": [v[2], v[3]], "radius": v[4]}),
-                json!({"type": "fill", "color": color(args[5])?}),
-            ]))
+            Ok((
+                v[0].clone(),
+                v[1].clone(),
+                vec![
+                    obj([
+                        ("type", st("rect")),
+                        ("position", arr([v[0].clone(), v[1].clone()])),
+                        ("size", arr([v[2].clone(), v[3].clone()])),
+                        ("radius", v[4].clone()),
+                    ]),
+                    obj([("type", st("fill")), ("color", color(args[5])?)]),
+                ],
+            ))
         }
         "star" => {
             expect(6)?;
             let v = nums(&args[..5])?;
-            Ok((v[0].clone(), v[1].clone(), vec![
-                json!({"type": "star", "position": [v[0], v[1]], "points": v[2], "outerRadius": v[3], "innerRadius": v[4]}),
-                json!({"type": "fill", "color": color(args[5])?}),
-            ]))
+            Ok((
+                v[0].clone(),
+                v[1].clone(),
+                vec![
+                    obj([
+                        ("type", st("star")),
+                        ("position", arr([v[0].clone(), v[1].clone()])),
+                        ("points", v[2].clone()),
+                        ("outerRadius", v[3].clone()),
+                        ("innerRadius", v[4].clone()),
+                    ]),
+                    obj([("type", st("fill")), ("color", color(args[5])?)]),
+                ],
+            ))
         }
-        other => Err(format!("'{other}' is not a shape (circle, ring, rect, star)")),
+        other => Err(format!(
+            "'{other}' is not a shape (circle, ring, rect, star)"
+        )),
     }
 }
 
@@ -205,14 +281,16 @@ pub fn kf_layers(text: &str) -> Result<Value, String> {
         let words: Vec<&str> = parts.next().unwrap_or("").split_whitespace().collect();
         let (cx, cy, shapes) = shape(&words)?;
         let mut transform = Map::new();
-        transform.insert("anchor".into(), json!([cx, cy]));
-        transform.insert("position".into(), json!([cx, cy]));
+        transform.insert("anchor".into(), arr([cx.clone(), cy.clone()]));
+        transform.insert("position".into(), arr([cx.clone(), cy.clone()]));
         let mut seen = Vec::new();
         for part in parts {
             let words: Vec<&str> = part.split_whitespace().collect();
             let (prop, rest) = words.split_first().ok_or("an empty track")?;
             if !TRACKS.contains(prop) {
-                return Err(format!("'{prop}' is not a track (scale, opacity, rotate, move)"));
+                return Err(format!(
+                    "'{prop}' is not a track (scale, opacity, rotate, move)"
+                ));
             }
             if seen.contains(prop) {
                 return Err(format!("track '{prop}' is given twice"));
@@ -228,7 +306,9 @@ pub fn kf_layers(text: &str) -> Result<Value, String> {
             let mut out = Vec::new();
             let mut last_t = f64::NEG_INFINITY;
             for (i, key) in keys.iter().enumerate() {
-                let (t, v) = key.split_once(':').ok_or_else(|| format!("'{key}' is not a key T:V"))?;
+                let (t, v) = key
+                    .split_once(':')
+                    .ok_or_else(|| format!("'{key}' is not a key T:V"))?;
                 let t = number(t)?;
                 if f(&t) <= last_t || f(&t) < 0.0 {
                     return Err(format!("track '{prop}' keys must go forward in time"));
@@ -237,11 +317,13 @@ pub fn kf_layers(text: &str) -> Result<Value, String> {
                 let v = match *prop {
                     "scale" => {
                         let s = number(v)?;
-                        json!([s, s])
+                        arr([s.clone(), s])
                     }
                     "move" => {
-                        let (dx, dy) = v.split_once(',').ok_or_else(|| format!("move key '{key}' is T:DX,DY"))?;
-                        json!([n(f(&cx) + f(&number(dx)?)), n(f(&cy) + f(&number(dy)?))])
+                        let (dx, dy) = v
+                            .split_once(',')
+                            .ok_or_else(|| format!("move key '{key}' is T:DX,DY"))?;
+                        arr([n(f(&cx) + f(&number(dx)?)), n(f(&cy) + f(&number(dy)?))])
                     }
                     _ => number(v)?,
                 };
@@ -259,9 +341,13 @@ pub fn kf_layers(text: &str) -> Result<Value, String> {
                 "rotate" => "rotation",
                 _ => "position",
             };
-            transform.insert(target.into(), json!({"keys": out}));
+            transform.insert(target.into(), obj([("keys", Value::Array(out))]));
         }
-        layers.push(json!({"type": "shape", "transform": Value::Object(transform), "shapes": shapes}));
+        layers.push(obj([
+            ("type", st("shape")),
+            ("transform", Value::Object(transform)),
+            ("shapes", Value::Array(shapes)),
+        ]));
     }
     Ok(Value::Array(layers))
 }
@@ -288,7 +374,11 @@ fn layer_text(layer: &Value) -> Option<String> {
         }
         ("ellipse", "stroke") => {
             let r = f(geom.get("size")?.get(0)?) / 2.0;
-            format!("ring {cx} {cy} {} {} {col}", word(&n(r))?, word(style.get("width")?)?)
+            format!(
+                "ring {cx} {cy} {} {} {col}",
+                word(&n(r))?,
+                word(style.get("width")?)?
+            )
         }
         ("rect", "fill") => {
             let size = geom.get("size")?;
@@ -308,8 +398,17 @@ fn layer_text(layer: &Value) -> Option<String> {
         _ => return None,
     };
     let transform = layer.get("transform")?.as_object()?;
-    for (track, key) in [("scale", "scale"), ("opacity", "opacity"), ("rotate", "rotation"), ("move", "position")] {
-        let Some(keys) = transform.get(key).and_then(|v| v.get("keys")).and_then(Value::as_array) else {
+    for (track, key) in [
+        ("scale", "scale"),
+        ("opacity", "opacity"),
+        ("rotate", "rotation"),
+        ("move", "position"),
+    ] {
+        let Some(keys) = transform
+            .get(key)
+            .and_then(|v| v.get("keys"))
+            .and_then(Value::as_array)
+        else {
             continue;
         };
         let ease = keys.first()?.get("ease").and_then(Value::as_str);
@@ -339,7 +438,11 @@ fn layer_text(layer: &Value) -> Option<String> {
 
 /// The keyframe text `layers` compile from, when there is one.
 pub fn kf_text(layers: &Value) -> Option<String> {
-    let parts: Vec<String> = layers.as_array()?.iter().map(layer_text).collect::<Option<_>>()?;
+    let parts: Vec<String> = layers
+        .as_array()?
+        .iter()
+        .map(layer_text)
+        .collect::<Option<_>>()?;
     if parts.is_empty() {
         return None;
     }
@@ -355,14 +458,24 @@ pub fn prop_json(e: &Expr) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn keyframes_compile_and_write_back() {
         let text = "circle 12 12 6 $color.primary | scale 0:100 600:140 1200:100 ease-in-out | opacity 0:100 600:40 1200:100";
         let layers = kf_layers(text).unwrap();
-        assert_eq!(layers[0]["shapes"][0], json!({"type": "ellipse", "position": [12, 12], "size": [12, 12]}));
-        assert_eq!(layers[0]["transform"]["scale"]["keys"][0], json!({"t": 0, "v": [100, 100], "ease": "ease-in-out"}));
-        assert_eq!(layers[0]["transform"]["scale"]["keys"][2], json!({"t": 1200, "v": [100, 100]}));
+        assert_eq!(
+            layers[0]["shapes"][0],
+            json!({"type": "ellipse", "position": [12, 12], "size": [12, 12]})
+        );
+        assert_eq!(
+            layers[0]["transform"]["scale"]["keys"][0],
+            json!({"t": 0, "v": [100, 100], "ease": "ease-in-out"})
+        );
+        assert_eq!(
+            layers[0]["transform"]["scale"]["keys"][2],
+            json!({"t": 1200, "v": [100, 100]})
+        );
         assert_eq!(kf_text(&layers).as_deref(), Some(text));
 
         let two = "ring 20 20 16 3 #2563eb | rotate 0:0 1000:360; rect 20 20 8 8 2 $color.accent | move 0:0,0 500:0,-6 1000:0,0 ease";
@@ -372,8 +485,20 @@ mod tests {
     #[test]
     fn bad_keyframes_say_why() {
         assert!(kf_layers("blob 1 2").unwrap_err().contains("not a shape"));
-        assert!(kf_layers("circle 1 2 3 red").unwrap_err().contains("not a colour"));
-        assert!(kf_layers("circle 1 2 3 #ffffff | scale 0:1").unwrap_err().contains("two keys"));
-        assert!(kf_layers("circle 1 2 3 #ffffff | scale 5:1 1:2").unwrap_err().contains("forward"));
+        assert!(
+            kf_layers("circle 1 2 3 red")
+                .unwrap_err()
+                .contains("not a colour")
+        );
+        assert!(
+            kf_layers("circle 1 2 3 #ffffff | scale 0:1")
+                .unwrap_err()
+                .contains("two keys")
+        );
+        assert!(
+            kf_layers("circle 1 2 3 #ffffff | scale 5:1 1:2")
+                .unwrap_err()
+                .contains("forward")
+        );
     }
 }

@@ -388,7 +388,7 @@
           }
         }
       ],
-      "decompiled": "surface(\"main\")\nroot = Column([root_children_0], s=\"col\")\nroot_children_0 = Text(\"x\", s=\"p4\")"
+      "decompiled": "surface(\"main\")\nroot = Column([Text(\"x\", s=\"p4\")], s=\"col\")"
     },
     {
       "name": "style_unknown_word",

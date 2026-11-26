@@ -84,7 +84,12 @@ pub struct Key {
     pub group: Option<&'static str>,
 }
 
-const fn k(key: &'static str, prefix: &'static str, kind: Kind, group: Option<&'static str>) -> Key {
+const fn k(
+    key: &'static str,
+    prefix: &'static str,
+    kind: Kind,
+    group: Option<&'static str>,
+) -> Key {
     Key {
         key,
         prefix,
@@ -127,7 +132,12 @@ pub const KEYS: &[Key] = &[
     k(
         "display",
         "d",
-        Kind::Enum(&[b("flex", "flex"), b("grid", "grid"), b("block", "block"), v("none", "none")]),
+        Kind::Enum(&[
+            b("flex", "flex"),
+            b("grid", "grid"),
+            b("block", "block"),
+            v("none", "none"),
+        ]),
         None,
     ),
     k(
@@ -144,7 +154,11 @@ pub const KEYS: &[Key] = &[
     k(
         "flexWrap",
         "flexwrap",
-        Kind::Enum(&[b("wrap", "wrap"), b("nowrap", "nowrap"), b("wrap-reverse", "wrap-reverse")]),
+        Kind::Enum(&[
+            b("wrap", "wrap"),
+            b("nowrap", "nowrap"),
+            b("wrap-reverse", "wrap-reverse"),
+        ]),
         None,
     ),
     k("justifyContent", "justify", Kind::Enum(JUSTIFY), None),
@@ -158,7 +172,12 @@ pub const KEYS: &[Key] = &[
     k("gap", "g", Kind::Length, SP),
     k("rowGap", "gy", Kind::Length, SP),
     k("columnGap", "gx", Kind::Length, SP),
-    k("direction", "dir", Kind::Enum(&[v("ltr", "ltr"), v("rtl", "rtl")]), None),
+    k(
+        "direction",
+        "dir",
+        Kind::Enum(&[v("ltr", "ltr"), v("rtl", "rtl")]),
+        None,
+    ),
     k("overflow", "overflow", Kind::Enum(OVERFLOW), None),
     k("overflowX", "overflowx", Kind::Enum(OVERFLOW), None),
     k("overflowY", "overflowy", Kind::Enum(OVERFLOW), None),
@@ -172,7 +191,11 @@ pub const KEYS: &[Key] = &[
     k(
         "position",
         "pos",
-        Kind::Enum(&[b("relative", "relative"), b("absolute", "absolute"), b("sticky", "sticky")]),
+        Kind::Enum(&[
+            b("relative", "relative"),
+            b("absolute", "absolute"),
+            b("sticky", "sticky"),
+        ]),
         None,
     ),
     k("top", "top", Kind::Length, SP),
@@ -213,14 +236,28 @@ pub const KEYS: &[Key] = &[
     k(
         "borderStyle",
         "border",
-        Kind::Enum(&[b("solid", "solid"), b("dashed", "dashed"), b("dotted", "dotted")]),
+        Kind::Enum(&[
+            b("solid", "solid"),
+            b("dashed", "dashed"),
+            b("dotted", "dotted"),
+        ]),
         None,
     ),
     k("borderRadius", "r", Kind::Length, Some("radius")),
     k("borderTopLeftRadius", "rtl", Kind::Length, Some("radius")),
     k("borderTopRightRadius", "rtr", Kind::Length, Some("radius")),
-    k("borderBottomRightRadius", "rbr", Kind::Length, Some("radius")),
-    k("borderBottomLeftRadius", "rbl", Kind::Length, Some("radius")),
+    k(
+        "borderBottomRightRadius",
+        "rbr",
+        Kind::Length,
+        Some("radius"),
+    ),
+    k(
+        "borderBottomLeftRadius",
+        "rbl",
+        Kind::Length,
+        Some("radius"),
+    ),
     k("opacity", "op", Kind::Number, Some("opacity")),
     k("boxShadow", "sh", Kind::Token, Some("shadow")),
     k("fontSize", "fs", Kind::Length, Some("type.size")),
@@ -315,14 +352,20 @@ pub const KEYS: &[Key] = &[
     k(
         "tail",
         "tail",
-        Kind::Enum(&[v("none", "none"), v("start", "start"), v("end", "end"), v("down", "down")]),
+        Kind::Enum(&[
+            v("none", "none"),
+            v("start", "start"),
+            v("end", "end"),
+            v("down", "down"),
+        ]),
         None,
     ),
     k("animationDuration", "dur", Kind::Token, Some("motion")),
 ];
 
 /// Bare words that stand for a number: `grow` = `flexGrow: 1`.
-pub const BARE_NUMBERS: &[(&str, &str, i64)] = &[("grow", "flexGrow", 1), ("shrink", "flexShrink", 1)];
+pub const BARE_NUMBERS: &[(&str, &str, i64)] =
+    &[("grow", "flexGrow", 1), ("shrink", "flexShrink", 1)];
 
 /// The state prefixes and the nested map each writes into.
 pub const STATES: &[(&str, &str)] = &[
@@ -359,7 +402,9 @@ pub fn bare_words() -> impl Iterator<Item = (&'static str, &'static str, Value)>
 }
 
 fn bare(word: &str) -> Option<(&'static str, Value)> {
-    bare_words().find(|(w, _, _)| *w == word).map(|(_, k, v)| (k, v))
+    bare_words()
+        .find(|(w, _, _)| *w == word)
+        .map(|(_, k, v)| (k, v))
 }
 
 /// Whether `word` reads as a shorthand word on its own (so it cannot name a
@@ -437,7 +482,10 @@ pub fn decode_word(word: &str) -> Result<(&'static str, Value), String> {
                     return Ok((key.key, Value::String("auto".into())));
                 }
             }
-            let name = rest.strip_prefix('-').filter(|n| is_token_name(n)).ok_or_else(bad)?;
+            let name = rest
+                .strip_prefix('-')
+                .filter(|n| is_token_name(n))
+                .ok_or_else(bad)?;
             let token = match (name.contains('.'), key.group) {
                 (true, _) => format!("${name}"),
                 (false, Some(group)) => format!("${group}.{name}"),
@@ -467,7 +515,11 @@ pub fn decode_into(
         let (state, word) = match word.split_once(':') {
             Some((s, rest)) => match STATES.iter().find(|(name, _)| *name == s) {
                 Some((_, key)) => (Some(*key), rest),
-                None => return Err(format!("'{s}:' is not a style state (hover:, focus:, pressed:)")),
+                None => {
+                    return Err(format!(
+                        "'{s}:' is not a style state (hover:, focus:, pressed:)"
+                    ));
+                }
             },
             None => (None, word),
         };
@@ -518,7 +570,8 @@ pub fn encode_entry(name: &str, value: &Value) -> Option<String> {
         (_, Value::String(s)) => {
             if let Some(token) = s.strip_prefix('$') {
                 if let Some(group) = key.group {
-                    if let Some(name) = token.strip_prefix(group).and_then(|r| r.strip_prefix('.')) {
+                    if let Some(name) = token.strip_prefix(group).and_then(|r| r.strip_prefix('.'))
+                    {
                         candidates.push(format!("{}-{name}", key.prefix));
                     }
                 }
@@ -531,9 +584,10 @@ pub fn encode_entry(name: &str, value: &Value) -> Option<String> {
         }
         _ => {}
     }
-    candidates
-        .into_iter()
-        .find(|w| !w.contains(char::is_whitespace) && decode_word(w).is_ok_and(|(k, v)| k == name && v == *value))
+    candidates.into_iter().find(|w| {
+        !w.contains(char::is_whitespace)
+            && decode_word(w).is_ok_and(|(k, v)| k == name && v == *value)
+    })
 }
 
 /// A style map split into shorthand words and what the shorthand cannot
@@ -569,7 +623,10 @@ pub fn encode(style: &Map<String, Value>, skip: &[&str]) -> (Vec<String>, Map<St
             }
             continue;
         }
-        match (KEYS.iter().position(|k| k.key == name), encode_entry(name, value)) {
+        match (
+            KEYS.iter().position(|k| k.key == name),
+            encode_entry(name, value),
+        ) {
             (Some(order), Some(w)) => words.push((0, order, w)),
             _ => {
                 rest.insert(name.clone(), value.clone());
@@ -645,7 +702,9 @@ mod tests {
     #[test]
     fn reads_units_tokens_states_and_negatives() {
         assert_eq!(
-            read("w50% p16px mt-8 h-control.input maxw-auto op0.5 justify-between hover:bg-accent fw600 fs-sm grow"),
+            read(
+                "w50% p16px mt-8 h-control.input maxw-auto op0.5 justify-between hover:bg-accent fw600 fs-sm grow"
+            ),
             json!({"width": "50%", "padding": "16px", "marginTop": -8,
                    "height": "$control.input", "maxWidth": "auto", "opacity": 0.5,
                    "justifyContent": "space-between", ":hover": {"backgroundColor": "$color.accent"},
@@ -672,7 +731,8 @@ mod tests {
             if let Kind::Enum(values) = k.kind {
                 for v in values {
                     let value = Value::String(v.value.into());
-                    let w = encode_entry(k.key, &value).unwrap_or_else(|| panic!("{} {}", k.key, v.value));
+                    let w = encode_entry(k.key, &value)
+                        .unwrap_or_else(|| panic!("{} {}", k.key, v.value));
                     assert_eq!(decode_word(&w).unwrap(), (k.key, value));
                 }
             }

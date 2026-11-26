@@ -353,7 +353,14 @@ impl<'c, 's, 'a> Pass<'c, 's, 'a> {
         let sugared = match self.c.extension() {
             Some(ext) => {
                 let declares = |p: &str| properties.iter().any(|q| q == p);
-                crate::ext::component_pairs(name, &mut pairs, ext, &self.ctx.classes, &declares, call.name_span)?
+                crate::ext::component_pairs(
+                    name,
+                    &mut pairs,
+                    ext,
+                    &self.ctx.classes,
+                    &declares,
+                    call.name_span,
+                )?
             }
             None => Vec::new(),
         };

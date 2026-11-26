@@ -1,6 +1,6 @@
 """Type stubs for the A2UI Express compiler binding (`a2ui_express`)."""
 
-from typing import Any, Literal, Mapping, Optional, Sequence, Union
+from typing import Any, Literal, Mapping, Optional, Sequence, TypedDict, Union
 
 __version__: str
 DEFAULT_SURFACE_ID: str
@@ -29,6 +29,20 @@ def compile(
     surface_id: Optional[str] = None,
     version: Optional[str] = None,
 ) -> list[Message]: ...
+class Patch(TypedDict):
+    messages: list[Message]
+    screen: str
+
+def compile_patch(
+    catalogs: CatalogInput,
+    screen: str,
+    patch: str,
+    *,
+    surface_id: Optional[str] = None,
+    version: Optional[str] = None,
+) -> Patch: ...
+def expand_theme(seeds: Mapping[str, Json]) -> dict[str, Json]: ...
+def style_table() -> dict[str, Json]: ...
 def decompile(
     catalogs: CatalogInput,
     messages: Sequence[Mapping[str, Json]],
@@ -85,6 +99,7 @@ class Catalogs:
     @property
     def ids(self) -> list[str]: ...
     def compile(self, source: str, *, surface_id: Optional[str] = None) -> list[Message]: ...
+    def compile_patch(self, screen: str, patch: str, *, surface_id: Optional[str] = None) -> Patch: ...
     def decompile(
         self,
         messages: Sequence[Mapping[str, Json]],

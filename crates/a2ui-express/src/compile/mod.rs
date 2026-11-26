@@ -142,7 +142,7 @@ impl Compiler {
     pub(crate) fn desugar<'s>(
         &self,
         statements: &'s [Statement],
-    ) -> Result<(std::borrow::Cow<'s, [Statement]>, Arc<HashMap<String, String>>), CompileError> {
+    ) -> Result<Desugared<'s>, CompileError> {
         match &self.ext {
             None => Ok((std::borrow::Cow::Borrowed(statements), Arc::default())),
             Some(e) => {
@@ -510,7 +510,9 @@ impl Compiler {
             set_nested_path(&mut data_model, path, value)?;
         }
         let extensions = match scope.raw_extensions {
-            Some(raw) => Some(pass.extensions_map(raw, &format!("surface '{}'", scope.surface_id))?),
+            Some(raw) => {
+                Some(pass.extensions_map(raw, &format!("surface '{}'", scope.surface_id))?)
+            }
             None => None,
         };
         let metadata = self.surface_metadata(scope, extensions)?;
@@ -786,6 +788,13 @@ fn parse_delete_surface_id(call: &Call) -> Result<String, CompileError> {
 
 // ---- helpers ----------------------------------------------------------------
 
+/// A block's statements with the extension's sugar expanded, and its style
+/// classes.
+pub(crate) type Desugared<'s> = (
+    std::borrow::Cow<'s, [Statement]>,
+    Arc<HashMap<String, String>>,
+);
+
 /// A fresh compile context (for the extension's messages).
 pub(crate) fn pass_ctx() -> Ctx {
     Ctx::new()
@@ -818,9 +827,8 @@ impl ext::Components for Compiler {
     }
 
     fn declares(&self, name: &str, prop: &str) -> bool {
-        self.set
-            .catalogs()
-            .iter()
-            .any(|c| c.has_component(name) && c.component_properties(name).iter().any(|p| p == prop))
+        self.set.catalogs().iter().any(|c| {
+            c.has_component(name) && c.component_properties(name).iter().any(|p| p == prop)
+        })
     }
 }

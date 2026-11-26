@@ -35,7 +35,9 @@ use serde_json::{Map, Value};
 
 use crate::compile::CompileError;
 use crate::schema::CatalogSet;
-use crate::syntax::{Call, Expr, ExprKind, MapEntry, Number, NumberValue, Span, Statement, StatementKind};
+use crate::syntax::{
+    Call, Expr, ExprKind, MapEntry, Number, NumberValue, Span, Statement, StatementKind,
+};
 
 /// The catalog extension key that turns the extension on.
 pub const EXTENSION: &str = "at_exponential_express";
@@ -64,14 +66,20 @@ impl Express {
     /// The extension declared by the first of `catalogs` that declares it.
     pub fn from_catalogs(catalogs: &CatalogSet) -> Option<Express> {
         catalogs.catalogs().iter().find_map(|c| {
-            let decl = c.document().pointer(&format!("/metadata/extensions/{EXTENSION}"))?;
+            let decl = c
+                .document()
+                .pointer(&format!("/metadata/extensions/{EXTENSION}"))?;
             let obj = match decl {
                 Value::Bool(true) => Map::new(),
                 Value::Object(o) => o.clone(),
                 _ => return None,
             };
             Some(Express {
-                motions: obj.get("motions").and_then(Value::as_object).cloned().unwrap_or_default(),
+                motions: obj
+                    .get("motions")
+                    .and_then(Value::as_object)
+                    .cloned()
+                    .unwrap_or_default(),
                 theme_function: obj
                     .get("themeFunction")
                     .and_then(Value::as_str)
@@ -101,7 +109,9 @@ pub fn json_to_expr(v: &Value, span: Span) -> Expr {
             })
         }
         Value::String(s) => ExprKind::String(s.clone()),
-        Value::Array(items) => ExprKind::List(items.iter().map(|i| json_to_expr(i, span)).collect()),
+        Value::Array(items) => {
+            ExprKind::List(items.iter().map(|i| json_to_expr(i, span)).collect())
+        }
         Value::Object(m) => ExprKind::Map(
             m.iter()
                 .map(|(k, v)| MapEntry {
@@ -123,7 +133,9 @@ pub fn literal_json(e: &Expr) -> Option<Value> {
         ExprKind::Bool(b) => Value::Bool(*b),
         ExprKind::Number(n) => Value::Number(n.to_json()),
         ExprKind::String(s) | ExprKind::Color(s) => Value::String(s.clone()),
-        ExprKind::List(items) => Value::Array(items.iter().map(literal_json).collect::<Option<_>>()?),
+        ExprKind::List(items) => {
+            Value::Array(items.iter().map(literal_json).collect::<Option<_>>()?)
+        }
         ExprKind::Map(entries) => {
             let mut m = Map::new();
             for e in entries {
@@ -133,6 +145,22 @@ pub fn literal_json(e: &Expr) -> Option<Value> {
         }
         _ => return None,
     })
+}
+
+/// `{k: v, …}` without `json!`'s per-site serializer code (the renderer
+/// wasm build is size-budgeted).
+pub(crate) fn obj<const N: usize>(pairs: [(&str, Value); N]) -> Value {
+    Value::Object(pairs.into_iter().map(|(k, v)| (k.to_owned(), v)).collect())
+}
+
+/// `[a, b, …]`.
+pub(crate) fn arr<const N: usize>(items: [Value; N]) -> Value {
+    Value::Array(items.into())
+}
+
+/// A string value.
+pub(crate) fn st(s: &str) -> Value {
+    Value::String(s.to_owned())
 }
 
 fn invalid(message: impl Into<String>) -> CompileError {
@@ -166,9 +194,13 @@ pub fn theme_value(call: &Call) -> Result<Value, CompileError> {
             (ExprKind::String(_), false) => Err(invalid(
                 "theme(\"id\") names a built-in theme and takes no other arguments; to start from one, write theme(extends=\"id\", …).",
             )),
-            _ => Err(invalid("theme() takes keyword seeds, or one string: a built-in theme id.")),
+            _ => Err(invalid(
+                "theme() takes keyword seeds, or one string: a built-in theme id.",
+            )),
         },
-        _ => Err(invalid("theme() takes keyword seeds, or one string: a built-in theme id.")),
+        _ => Err(invalid(
+            "theme() takes keyword seeds, or one string: a built-in theme id.",
+        )),
     }
 }
 
@@ -186,7 +218,7 @@ pub struct Desugarer {
 pub enum Desugared {
     /// The statement in plain Express (or a `theme(...)` call, which the
     /// compiler reads itself).
-    Statement(Statement),
+    Statement(Box<Statement>),
     /// A `style(...)` class definition: nothing to compile.
     Class,
 }
@@ -223,14 +255,16 @@ impl Desugarer {
             }
             if call.name == "theme" {
                 theme_value(call)?;
-                return Ok(Desugared::Statement(stmt.clone()));
+                return Ok(Desugared::Statement(Box::new(stmt.clone())));
             }
         }
         let _ = ext;
         match &stmt.kind {
-            StatementKind::Assign { value, .. } | StatementKind::Expr(value) => self.check_uses(value, cat)?,
+            StatementKind::Assign { value, .. } | StatementKind::Expr(value) => {
+                self.check_uses(value, cat)?
+            }
         }
-        Ok(Desugared::Statement(stmt.clone()))
+        Ok(Desugared::Statement(Box::new(stmt.clone())))
     }
 
     /// A class is defined before its first use: the `s=` of the components
@@ -253,17 +287,25 @@ impl Desugarer {
                         }
                     }
                 }
-                call.args.iter().try_for_each(|a| self.check_uses(&a.value, cat))
+                call.args
+                    .iter()
+                    .try_for_each(|a| self.check_uses(&a.value, cat))
             }
             ExprKind::List(items) => items.iter().try_for_each(|i| self.check_uses(i, cat)),
-            ExprKind::Map(entries) => entries.iter().try_for_each(|m| self.check_uses(&m.value, cat)),
+            ExprKind::Map(entries) => entries
+                .iter()
+                .try_for_each(|m| self.check_uses(&m.value, cat)),
             _ => Ok(()),
         }
     }
 
     fn define_class(&mut self, call: &Call) -> Result<(), CompileError> {
         let pos: Vec<&Expr> = call.positional().collect();
-        let usage = || invalid("style() defines a class: style(name, \"words\"), e.g. style(card, \"col g12 p16 bg-card r-lg\").");
+        let usage = || {
+            invalid(
+                "style() defines a class: style(name, \"words\"), e.g. style(card, \"col g12 p16 bg-card r-lg\").",
+            )
+        };
         if pos.len() != 2 || call.keywords().next().is_some() {
             return Err(usage());
         }
@@ -290,7 +332,6 @@ impl Desugarer {
         self.classes.insert(name, words.clone());
         Ok(())
     }
-
 }
 
 /// The extension's keywords of one component, as `(prop, expr)` pairs
@@ -308,7 +349,9 @@ pub(crate) fn component_pairs(
 ) -> Result<Vec<(String, Expr)>, CompileError> {
     let sugar = |k: &str| !declares(k);
     let given = |pairs: &Vec<(&str, &Expr)>, k: &str| {
-        pairs.iter().any(|(p, e)| *p == k && !matches!(e.kind, ExprKind::Skipped))
+        pairs
+            .iter()
+            .any(|(p, e)| *p == k && !matches!(e.kind, ExprKind::Skipped))
     };
     let take = |pairs: &mut Vec<(&str, &Expr)>, k: &str| -> Option<Expr> {
         let i = pairs.iter().position(|(p, _)| *p == k)?;
@@ -320,14 +363,20 @@ pub(crate) fn component_pairs(
         if sugar("ref") {
             if let Some(r) = take(pairs, "ref") {
                 let ExprKind::String(reference) = &r.kind else {
-                    return Err(invalid("Motion ref= is the name of a registered animation, a string."));
+                    return Err(invalid(
+                        "Motion ref= is the name of a registered animation, a string.",
+                    ));
                 };
                 let Some(Value::Object(props)) = ext.motions.get(reference) else {
                     let mut names: Vec<&str> = ext.motions.keys().map(String::as_str).collect();
                     names.sort_unstable();
                     return Err(invalid(format!(
                         "Motion ref=\"{reference}\" is not a registered animation. Registered: {}.",
-                        if names.is_empty() { "none".to_owned() } else { names.join(", ") }
+                        if names.is_empty() {
+                            "none".to_owned()
+                        } else {
+                            names.join(", ")
+                        }
                     )));
                 };
                 for (k, v) in props {
@@ -347,7 +396,8 @@ pub(crate) fn component_pairs(
                     return Err(invalid("Motion takes kf= or layers=, not both."));
                 }
                 take(pairs, "layers");
-                let layers = motion::kf_layers(text).map_err(|e| invalid(format!("Motion kf=: {e}")))?;
+                let layers =
+                    motion::kf_layers(text).map_err(|e| invalid(format!("Motion kf=: {e}")))?;
                 out.push(("layers".into(), json_to_expr(&layers, span)));
             }
         }
@@ -366,7 +416,11 @@ pub(crate) fn component_pairs(
                     }
                     v.clone()
                 }
-                _ => return Err(invalid("s= takes style words in a string, or a class name.")),
+                _ => {
+                    return Err(invalid(
+                        "s= takes style words in a string, or a class name.",
+                    ));
+                }
             };
             style = Some(decode_words(&text, classes)?);
         }
@@ -385,7 +439,11 @@ pub(crate) fn component_pairs(
     let style = style.unwrap_or_default();
     let mut entries: Vec<MapEntry> = style
         .iter()
-        .map(|(k, v)| MapEntry { key: k.clone(), key_span: span, value: json_to_expr(v, span) })
+        .map(|(k, v)| MapEntry {
+            key: k.clone(),
+            key_span: span,
+            value: json_to_expr(v, span),
+        })
         .collect();
     // An explicit style= map wins over the words.
     if let Some(explicit) = take(pairs, "style") {
@@ -395,18 +453,35 @@ pub(crate) fn component_pairs(
                 entries.retain(|e| !more.iter().any(|m| m.key == e.key));
                 entries.extend(more);
             }
-            _ => return Err(invalid("style= must be a map literal when s=, enter=, exit=, stagger= or delay= is also given.")),
+            _ => {
+                return Err(invalid(
+                    "style= must be a map literal when s=, enter=, exit=, stagger= or delay= is also given.",
+                ));
+            }
         }
     }
     for (k, v) in motion_keys {
         entries.retain(|e| e.key != k);
-        entries.push(MapEntry { key: k.to_owned(), key_span: span, value: json_to_expr(&v, span) });
+        entries.push(MapEntry {
+            key: k.to_owned(),
+            key_span: span,
+            value: json_to_expr(&v, span),
+        });
     }
-    out.push(("style".into(), Expr { kind: ExprKind::Map(entries), span }));
+    out.push((
+        "style".into(),
+        Expr {
+            kind: ExprKind::Map(entries),
+            span,
+        },
+    ));
     Ok(out)
 }
 
-fn decode_words(words: &str, classes: &HashMap<String, String>) -> Result<Map<String, Value>, CompileError> {
+fn decode_words(
+    words: &str,
+    classes: &HashMap<String, String>,
+) -> Result<Map<String, Value>, CompileError> {
     let mut out = Map::new();
     style::decode_into(words, &mut out, &|w| classes.get(w).cloned(), 0).map_err(|e| {
         invalid(format!("{e}. Style words: col, row, g12, p16, px-md, bg-card, fg-mutedForeground, r-lg, sh-sm, w100%, items-center, justify-between, hover:bg-accent, …"))
@@ -424,7 +499,7 @@ pub fn desugar(
     let mut out = Vec::with_capacity(statements.len());
     for s in statements {
         if let Desugared::Statement(s) = d.statement(s, ext, cat)? {
-            out.push(s);
+            out.push(*s);
         }
     }
     Ok((out, d.classes))

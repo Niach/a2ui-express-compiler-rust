@@ -288,7 +288,7 @@ impl ScopeSession {
             Some(ext) => {
                 for stmt in &parsed {
                     if let Desugared::Statement(s) = desugarer.statement(stmt, ext, compiler)? {
-                        out.push(Arc::new(s));
+                        out.push(Arc::new(*s));
                     }
                 }
             }
@@ -445,9 +445,13 @@ impl ScopeSession {
                 }
                 if !components.is_empty() || !data.is_empty() || scope.theme.is_some() {
                     let mut out = self.theme_delta(compiler, idx, scope, ctx, undo)?;
-                    let theme_only = components.is_empty() && data.is_empty() && scope.theme.is_some();
+                    let theme_only =
+                        components.is_empty() && data.is_empty() && scope.theme.is_some();
                     let emitted = &self.scopes[&idx];
-                    if !(theme_only && emitted.emitted_components.is_empty() && emitted.emitted_data.is_empty()) {
+                    if !(theme_only
+                        && emitted.emitted_components.is_empty()
+                        && emitted.emitted_data.is_empty())
+                    {
                         out.extend(self.updates(
                             compiler, idx, scope, components, data, true, false, false, undo,
                         )?);

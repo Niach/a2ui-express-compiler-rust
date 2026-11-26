@@ -26,7 +26,9 @@
 //! The arithmetic is in [`super::color`], deterministic on every target, so
 //! the expansion is pinned as golden JSON (`conformance/extensions/theme.json`).
 
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
+
+use super::{obj, st};
 
 use super::color::{Rgba, contrast};
 
@@ -35,19 +37,34 @@ pub const SCHEMA: &str = "https://ui.exponential.at/schemas/theme/v1.json";
 
 /// The seeds, in the order [`recover`] writes them.
 pub const SEEDS: &[&str] = &[
-    "base", "bg", "fg", "card", "primary", "secondary", "muted", "accent", "border", "charts",
-    "radius", "font", "display", "scale", "density", "shadow", "button", "stroke",
+    "base",
+    "bg",
+    "fg",
+    "card",
+    "primary",
+    "secondary",
+    "muted",
+    "accent",
+    "border",
+    "charts",
+    "radius",
+    "font",
+    "display",
+    "scale",
+    "density",
+    "shadow",
+    "button",
+    "stroke",
 ];
 
 /// Other spellings of a seed.
-pub const ALIASES: &[(&str, &str)] = &[
-    ("mode", "base"),
-    ("background", "bg"),
-    ("foreground", "fg"),
-];
+pub const ALIASES: &[(&str, &str)] =
+    &[("mode", "base"), ("background", "bg"), ("foreground", "fg")];
 
 /// Keys beside the seeds: the theme's identity and the full-token overrides.
-pub const EXTRA: &[&str] = &["id", "name", "extends", "light", "dark", "tokens", "fonts", "recipes"];
+pub const EXTRA: &[&str] = &[
+    "id", "name", "extends", "light", "dark", "tokens", "fonts", "recipes",
+];
 
 /// The colour tokens the expander writes, in order.
 pub const COLORS: &[&str] = &[
@@ -258,10 +275,29 @@ const BUTTONS: &[(&str, Option<&str>)] = &[
 fn num(v: f64) -> Value {
     let r = (v * 100.0).round() / 100.0;
     if r.fract() == 0.0 && r.abs() < 1e15 {
-        json!(r as i64)
+        Value::Number((r as i64).into())
     } else {
-        json!(r)
+        serde_json::Number::from_f64(r).map_or(Value::Null, Value::Number)
     }
+}
+
+fn font_entry(fallback: &str, weights: &[i64]) -> Value {
+    obj([
+        ("fallback", st(fallback)),
+        (
+            "weights",
+            Value::Array(weights.iter().map(|w| Value::Number((*w).into())).collect()),
+        ),
+        ("source", st("host")),
+    ])
+}
+
+/// `{root: [{style: {key: value}}]}`: one recipe rule.
+fn recipe(key: &str, value: &str) -> Value {
+    obj([(
+        "root",
+        Value::Array(vec![obj([("style", obj([(key, st(value))]))])]),
+    )])
 }
 
 fn round_half_up(v: f64) -> f64 {
@@ -388,7 +424,10 @@ fn mode_colors(mode: &str, s: &ModeSeeds, own: bool) -> Map<String, Value> {
     for (name, color) in d.status {
         let color = ensure(color, &[bg], 3.0);
         put(name, color);
-        put(&format!("{name}Foreground"), on(color, &[Rgba::WHITE, fg, bg]));
+        put(
+            &format!("{name}Foreground"),
+            on(color, &[Rgba::WHITE, fg, bg]),
+        );
     }
     put("border", border);
     put("input", border);
@@ -399,7 +438,10 @@ fn mode_colors(mode: &str, s: &ModeSeeds, own: bool) -> Map<String, Value> {
         } else {
             s.charts[i % s.charts.len()]
         };
-        put(&format!("chart{}", i + 1), ensure(chart.over(bg), &[bg], 3.0));
+        put(
+            &format!("chart{}", i + 1),
+            ensure(chart.over(bg), &[bg], 3.0),
+        );
     }
     put("link", ensure(primary.over(bg), &[bg], 4.5));
     c
@@ -416,7 +458,11 @@ fn derive(base: &ModeSeeds, other: &str) -> ModeSeeds {
             let flipped = flip(c);
             // Elevation stays visible: a card distinct from its background
             // stays distinct after mirroring.
-            if flipped == bg { bg.mix(fg_for, 0.05) } else { flipped }
+            if flipped == bg {
+                bg.mix(fg_for, 0.05)
+            } else {
+                flipped
+            }
         })
     };
     ModeSeeds {
@@ -426,9 +472,22 @@ fn derive(base: &ModeSeeds, other: &str) -> ModeSeeds {
         primary: base.primary.map(|p| carry(p, bg)),
         secondary: surface(base.secondary),
         muted: surface(base.muted),
-        accent: base.accent.map(|a| if is_neutral(a) { flip(a) } else { a.with_lightness(1.0 - a.lightness() * 0.6, 0.8) }),
+        accent: base.accent.map(|a| {
+            if is_neutral(a) {
+                flip(a)
+            } else {
+                a.with_lightness(1.0 - a.lightness() * 0.6, 0.8)
+            }
+        }),
         border: base.border.map(|b| {
-            if b.a == 255 { flip(b) } else { Rgba { a: b.a, ..flip(b.opaque()) } }
+            if b.a == 255 {
+                flip(b)
+            } else {
+                Rgba {
+                    a: b.a,
+                    ..flip(b.opaque())
+                }
+            }
         }),
         charts: base.charts.iter().map(|c| carry(*c, bg)).collect(),
     }
@@ -439,10 +498,12 @@ fn derive(base: &ModeSeeds, other: &str) -> ModeSeeds {
 fn color_arg(args: &Map<String, Value>, key: &str) -> Result<Option<Rgba>, String> {
     match args.get(key) {
         None | Some(Value::Null) => Ok(None),
-        Some(Value::String(s)) => Rgba::parse(s)
-            .map(Some)
-            .ok_or_else(|| format!("theme {key}= must be a #rrggbb or #rrggbbaa colour, not \"{s}\".")),
-        Some(other) => Err(format!("theme {key}= must be a #rrggbb colour, not {other}.")),
+        Some(Value::String(s)) => Rgba::parse(s).map(Some).ok_or_else(|| {
+            format!("theme {key}= must be a #rrggbb or #rrggbbaa colour, not \"{s}\".")
+        }),
+        Some(other) => Err(format!(
+            "theme {key}= must be a #rrggbb colour, not {other}."
+        )),
     }
 }
 
@@ -462,13 +523,21 @@ fn string_arg<'a>(args: &'a Map<String, Value>, key: &str) -> Result<Option<&'a 
     }
 }
 
-fn choice<'a, T>(args: &Map<String, Value>, key: &str, table: &'a [(&'a str, T)]) -> Result<Option<&'a T>, String> {
+fn choice<'a, T>(
+    args: &Map<String, Value>,
+    key: &str,
+    table: &'a [(&'a str, T)],
+) -> Result<Option<&'a T>, String> {
     match string_arg(args, key)? {
         None => Ok(None),
-        Some(s) => table.iter().find(|(n, _)| *n == s).map(|(_, v)| Some(v)).ok_or_else(|| {
-            let names: Vec<&str> = table.iter().map(|(n, _)| *n).collect();
-            format!("theme {key}= is one of {}, not \"{s}\".", names.join(", "))
-        }),
+        Some(s) => table
+            .iter()
+            .find(|(n, _)| *n == s)
+            .map(|(_, v)| Some(v))
+            .ok_or_else(|| {
+                let names: Vec<&str> = table.iter().map(|(n, _)| *n).collect();
+                format!("theme {key}= is one of {}, not \"{s}\".", names.join(", "))
+            }),
     }
 }
 
@@ -477,7 +546,10 @@ fn choice<'a, T>(args: &Map<String, Value>, key: &str, table: &'a [(&'a str, T)]
 pub fn normalize_args(raw: &Map<String, Value>) -> Result<Map<String, Value>, String> {
     let mut out = Map::new();
     for (k, v) in raw {
-        let key = ALIASES.iter().find(|(a, _)| a == k).map_or(k.as_str(), |(_, s)| s);
+        let key = ALIASES
+            .iter()
+            .find(|(a, _)| a == k)
+            .map_or(k.as_str(), |(_, s)| s);
         let known = SEEDS.contains(&key) || EXTRA.contains(&key) || ALL_COLORS.contains(&key);
         if !known {
             return Err(format!(
@@ -515,10 +587,14 @@ fn check_colors(map: &Value, owner: &str) -> Result<(), String> {
     };
     for (k, v) in m {
         if !ALL_COLORS.contains(&k.as_str()) {
-            return Err(format!("theme {owner}= names '{k}', which is not a colour token."));
+            return Err(format!(
+                "theme {owner}= names '{k}', which is not a colour token."
+            ));
         }
         if !v.as_str().is_some_and(|s| Rgba::parse(s).is_some()) {
-            return Err(format!("theme {owner}= {k} must be a #rrggbb or #rrggbbaa colour."));
+            return Err(format!(
+                "theme {owner}= {k} must be a #rrggbb or #rrggbbaa colour."
+            ));
         }
     }
     Ok(())
@@ -531,14 +607,22 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
     let base = match string_arg(&args, "base")? {
         None | Some("light") => "light",
         Some("dark") => "dark",
-        Some(other) => return Err(format!("theme base= is \"light\" or \"dark\", not \"{other}\".")),
+        Some(other) => {
+            return Err(format!(
+                "theme base= is \"light\" or \"dark\", not \"{other}\"."
+            ));
+        }
     };
     let other = if base == "light" { "dark" } else { "light" };
     let charts = match args.get("charts") {
         None | Some(Value::Null) => Vec::new(),
         Some(Value::Array(items)) => items
             .iter()
-            .map(|c| c.as_str().and_then(Rgba::parse).ok_or_else(|| "theme charts= is a list of #rrggbb colours.".to_owned()))
+            .map(|c| {
+                c.as_str()
+                    .and_then(Rgba::parse)
+                    .ok_or_else(|| "theme charts= is a list of #rrggbb colours.".to_owned())
+            })
             .collect::<Result<Vec<_>, _>>()?,
         Some(_) => return Err("theme charts= is a list of #rrggbb colours.".into()),
     };
@@ -562,7 +646,11 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
     let mut carried = seeds.clone();
     if !carried.charts.is_empty() {
         carried.charts = (1..=8)
-            .filter_map(|i| base_colors[&format!("chart{i}")].as_str().and_then(Rgba::parse))
+            .filter_map(|i| {
+                base_colors[&format!("chart{i}")]
+                    .as_str()
+                    .and_then(Rgba::parse)
+            })
             .collect();
     }
     let derived = derive(&carried, other);
@@ -574,15 +662,20 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
         } else {
             mode_colors(mode, &derived, false)
         };
-        modes.insert(mode.to_owned(), json!({ "color": colors }));
+        modes.insert(mode.to_owned(), obj([("color", Value::Object(colors))]));
     }
 
-    match choice(&args, "shadow", &SHADOWS.iter().map(|s| (*s, ())).collect::<Vec<_>>())? {
+    match choice(
+        &args,
+        "shadow",
+        &SHADOWS.iter().map(|s| (*s, ())).collect::<Vec<_>>(),
+    )? {
         None => {}
         Some(()) => {
             let level = string_arg(&args, "shadow")?.unwrap_or("soft");
             if level != "soft" {
-                let neutral: Value = serde_json::from_str(NEUTRAL_SHADOWS).expect("built-in shadows");
+                let neutral: Value =
+                    serde_json::from_str(NEUTRAL_SHADOWS).expect("built-in shadows");
                 for mode in MODES {
                     let mut shadow = Map::new();
                     for (name, layers) in neutral[mode].as_object().expect("shadow map") {
@@ -594,11 +687,16 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
                                 .expect("layers")
                                 .iter()
                                 .map(|l| {
-                                    let c = Rgba::parse(l["color"].as_str().unwrap_or("#00000000")).unwrap_or(Rgba::BLACK);
+                                    let c = Rgba::parse(l["color"].as_str().unwrap_or("#00000000"))
+                                        .unwrap_or(Rgba::BLACK);
                                     let a = ((c.a as u32) * 2).min(255) as u8;
-                                    json!({"x": l["x"], "y": num(l["y"].as_f64().unwrap_or(0.0) * 1.5),
-                                           "blur": num(l["blur"].as_f64().unwrap_or(0.0) * 1.5),
-                                           "spread": l["spread"], "color": Rgba { a, ..c }.hex()})
+                                    obj([
+                                        ("x", l["x"].clone()),
+                                        ("y", num(l["y"].as_f64().unwrap_or(0.0) * 1.5)),
+                                        ("blur", num(l["blur"].as_f64().unwrap_or(0.0) * 1.5)),
+                                        ("spread", l["spread"].clone()),
+                                        ("color", Value::String(Rgba { a, ..c }.hex())),
+                                    ])
                                 })
                                 .collect()
                         };
@@ -615,7 +713,10 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
         if r < 0.0 {
             return Err("theme radius= is a number of px, at least 0.".into());
         }
-        let radius: Map<String, Value> = RADIUS.iter().map(|(k, f)| ((*k).to_owned(), num(r * f))).collect();
+        let radius: Map<String, Value> = RADIUS
+            .iter()
+            .map(|(k, f)| ((*k).to_owned(), num(r * f)))
+            .collect();
         tokens.insert("radius".into(), Value::Object(radius));
     }
     if let Some(s) = number_arg(&args, "scale")? {
@@ -624,15 +725,29 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
         }
         if s != 1.0 {
             let scaled = |t: &[(&str, f64)]| -> Value {
-                Value::Object(t.iter().map(|(k, v)| ((*k).to_owned(), num(round_half_up(v * s)))).collect())
+                Value::Object(
+                    t.iter()
+                        .map(|(k, v)| ((*k).to_owned(), num(round_half_up(v * s))))
+                        .collect(),
+                )
             };
-            tokens.insert("type".into(), json!({"size": scaled(TYPE_SIZE), "lineHeight": scaled(LINE_HEIGHT)}));
+            tokens.insert(
+                "type".into(),
+                obj([
+                    ("size", scaled(TYPE_SIZE)),
+                    ("lineHeight", scaled(LINE_HEIGHT)),
+                ]),
+            );
         }
     }
     if let Some(&m) = choice(&args, "density", DENSITY)? {
         if m != 1.0 {
             let scaled = |t: &[(&str, f64)]| -> Value {
-                Value::Object(t.iter().map(|(k, v)| ((*k).to_owned(), num(round_half_up(v * m)))).collect())
+                Value::Object(
+                    t.iter()
+                        .map(|(k, v)| ((*k).to_owned(), num(round_half_up(v * m))))
+                        .collect(),
+                )
             };
             tokens.insert("spacing".into(), scaled(SPACING));
             tokens.insert("control".into(), scaled(CONTROLS));
@@ -642,7 +757,7 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
         if w < 0.0 {
             return Err("theme stroke= is a border width in px, at least 0.".into());
         }
-        tokens.insert("border".into(), json!({"hairline": num(w)}));
+        tokens.insert("border".into(), obj([("hairline", num(w))]));
     }
     let mut fonts = Map::new();
     let mut recipes = Map::new();
@@ -654,31 +769,42 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
             family.insert("sans".into(), f.into());
             fonts.insert(
                 f.to_owned(),
-                json!({"fallback": "ui-sans-serif, system-ui, sans-serif", "weights": [400, 500, 600, 700], "source": "host"}),
+                font_entry(
+                    "ui-sans-serif, system-ui, sans-serif",
+                    &[400, 500, 600, 700],
+                ),
             );
         }
         if let Some(f) = display {
             family.insert("serif".into(), f.into());
-            fonts.entry(f.to_owned()).or_insert_with(
-                || json!({"fallback": "ui-serif, Georgia, serif", "weights": [400, 600, 700], "source": "host"}),
-            );
-            recipes.insert(
-                "Heading".into(),
-                json!({"root": [{"style": {"fontFamily": "$type.family.serif"}}]}),
-            );
+            fonts
+                .entry(f.to_owned())
+                .or_insert_with(|| font_entry("ui-serif, Georgia, serif", &[400, 600, 700]));
+            recipes.insert("Heading".into(), recipe("fontFamily", "$type.family.serif"));
         }
-        let ty = tokens.entry("type").or_insert_with(|| json!({}));
+        let ty = tokens
+            .entry("type")
+            .or_insert_with(|| Value::Object(Map::new()));
         ty["family"] = Value::Object(family);
     }
     if let Some(Some(radius)) = choice(&args, "button", BUTTONS)? {
-        recipes.insert("Button".into(), json!({"root": [{"style": {"borderRadius": radius}}]}));
+        recipes.insert("Button".into(), recipe("borderRadius", radius));
     }
 
     let mut theme = Map::new();
     theme.insert("$schema".into(), SCHEMA.into());
-    theme.insert("id".into(), string_arg(&args, "id")?.unwrap_or("express").into());
-    theme.insert("name".into(), string_arg(&args, "name")?.unwrap_or("Express").into());
-    theme.insert("extends".into(), string_arg(&args, "extends")?.unwrap_or("neutral").into());
+    theme.insert(
+        "id".into(),
+        string_arg(&args, "id")?.unwrap_or("express").into(),
+    );
+    theme.insert(
+        "name".into(),
+        string_arg(&args, "name")?.unwrap_or("Express").into(),
+    );
+    theme.insert(
+        "extends".into(),
+        string_arg(&args, "extends")?.unwrap_or("neutral").into(),
+    );
     let mut theme = Value::Object(theme);
     theme["modes"] = Value::Object(modes);
 
@@ -700,7 +826,11 @@ pub fn expand(raw: &Map<String, Value>) -> Result<Value, String> {
             merge(&mut theme["modes"][mode]["color"], &lowercase_colors(over));
         }
     }
-    for (group, target) in [("tokens", &mut tokens), ("fonts", &mut fonts), ("recipes", &mut recipes)] {
+    for (group, target) in [
+        ("tokens", &mut tokens),
+        ("fonts", &mut fonts),
+        ("recipes", &mut recipes),
+    ] {
         if let Some(over) = args.get(group).filter(|v| !v.is_null()) {
             if !over.is_object() {
                 return Err(format!("theme {group}= must be a map."));
@@ -729,7 +859,13 @@ fn lowercase_colors(v: &Value) -> Value {
     match v {
         Value::Object(m) => Value::Object(
             m.iter()
-                .map(|(k, v)| (k.clone(), v.as_str().map_or(v.clone(), |s| Value::String(s.to_ascii_lowercase()))))
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        v.as_str()
+                            .map_or(v.clone(), |s| Value::String(s.to_ascii_lowercase())),
+                    )
+                })
                 .collect(),
         ),
         other => other.clone(),
@@ -780,7 +916,9 @@ fn chart_cycle(charts: &[Value]) -> Vec<Value> {
 
 fn try_base(theme: &Value, base: &str) -> Option<Map<String, Value>> {
     let other = if base == "light" { "dark" } else { "light" };
-    let colors = theme.pointer(&format!("/modes/{base}/color"))?.as_object()?;
+    let colors = theme
+        .pointer(&format!("/modes/{base}/color"))?
+        .as_object()?;
     let mut seeds = Map::new();
     if base == "dark" {
         seeds.insert("base".into(), "dark".into());
@@ -795,46 +933,86 @@ fn try_base(theme: &Value, base: &str) -> Option<Map<String, Value>> {
         ("accent", "accent"),
         ("border", "border"),
     ] {
-        if let Some(c) = colors.get(token).filter(|c| c.as_str().is_some_and(|s| Rgba::parse(s).is_some())) {
+        if let Some(c) = colors
+            .get(token)
+            .filter(|c| c.as_str().is_some_and(|s| Rgba::parse(s).is_some()))
+        {
             seeds.insert(seed.into(), c.clone());
         }
     }
-    let charts: Vec<Value> = (1..=8).filter_map(|i| colors.get(&format!("chart{i}")).cloned()).collect();
-    if charts.len() == 8 && charts.iter().all(|c| c.as_str().is_some_and(|s| Rgba::parse(s).is_some())) {
+    let charts: Vec<Value> = (1..=8)
+        .filter_map(|i| colors.get(&format!("chart{i}")).cloned())
+        .collect();
+    if charts.len() == 8
+        && charts
+            .iter()
+            .all(|c| c.as_str().is_some_and(|s| Rgba::parse(s).is_some()))
+    {
         seeds.insert("charts".into(), Value::Array(chart_cycle(&charts)));
     }
     let tokens = theme.get("tokens");
-    if let Some(r) = tokens.and_then(|t| t.pointer("/radius/md")).filter(|v| v.is_number()) {
+    if let Some(r) = tokens
+        .and_then(|t| t.pointer("/radius/md"))
+        .filter(|v| v.is_number())
+    {
         seeds.insert("radius".into(), r.clone());
     }
-    if let Some(b) = tokens.and_then(|t| t.pointer("/type/size/base")).and_then(Value::as_f64) {
+    if let Some(b) = tokens
+        .and_then(|t| t.pointer("/type/size/base"))
+        .and_then(Value::as_f64)
+    {
         seeds.insert("scale".into(), num(b / 16.0));
     }
-    if let Some(md) = tokens.and_then(|t| t.pointer("/spacing/md")).and_then(Value::as_f64) {
+    if let Some(md) = tokens
+        .and_then(|t| t.pointer("/spacing/md"))
+        .and_then(Value::as_f64)
+    {
         for (name, m) in DENSITY {
             if round_half_up(12.0 * m) == md && *name != "default" {
                 seeds.insert("density".into(), (*name).into());
             }
         }
     }
-    if let Some(f) = tokens.and_then(|t| t.pointer("/type/family/sans")).filter(|v| v.is_string()) {
+    if let Some(f) = tokens
+        .and_then(|t| t.pointer("/type/family/sans"))
+        .filter(|v| v.is_string())
+    {
         seeds.insert("font".into(), f.clone());
     }
-    if let Some(f) = tokens.and_then(|t| t.pointer("/type/family/serif")).filter(|v| v.is_string()) {
+    if let Some(f) = tokens
+        .and_then(|t| t.pointer("/type/family/serif"))
+        .filter(|v| v.is_string())
+    {
         seeds.insert("display".into(), f.clone());
     }
-    if let Some(w) = tokens.and_then(|t| t.pointer("/border/hairline")).filter(|v| v.is_number()) {
+    if let Some(w) = tokens
+        .and_then(|t| t.pointer("/border/hairline"))
+        .filter(|v| v.is_number())
+    {
         seeds.insert("stroke".into(), w.clone());
     }
-    if let Some(sm) = theme.pointer(&format!("/modes/{base}/shadow/sm")).and_then(Value::as_array) {
-        seeds.insert("shadow".into(), if sm.is_empty() { "none" } else { "strong" }.into());
+    if let Some(sm) = theme
+        .pointer(&format!("/modes/{base}/shadow/sm"))
+        .and_then(Value::as_array)
+    {
+        seeds.insert(
+            "shadow".into(),
+            if sm.is_empty() { "none" } else { "strong" }.into(),
+        );
     }
-    if let Some(r) = theme.pointer("/recipes/Button/root/0/style/borderRadius").and_then(Value::as_str) {
+    if let Some(r) = theme
+        .pointer("/recipes/Button/root/0/style/borderRadius")
+        .and_then(Value::as_str)
+    {
         if let Some((name, _)) = BUTTONS.iter().find(|(_, v)| *v == Some(r)) {
             seeds.insert("button".into(), (*name).into());
         }
     }
-    for (key, default) in [("id", "express"), ("name", "Express"), ("extends", "neutral")] {
+    for (key, default) in [
+        ("id", "express"),
+        ("name", "Express"),
+        ("extends", "neutral"),
+    ] {
         match theme.get(key) {
             Some(Value::String(s)) if s == default => {}
             Some(Value::String(s)) => {
@@ -849,8 +1027,23 @@ fn try_base(theme: &Value, base: &str) -> Option<Map<String, Value>> {
     let distance = |seeds: &Map<String, Value>| expand(seeds).map(|e| leaves_differing(&e, theme));
     let mut current = distance(&seeds).ok()?;
     for seed in [
-        "card", "secondary", "muted", "accent", "border", "charts", "fg", "display", "font", "shadow",
-        "button", "stroke", "density", "scale", "radius", "primary", "bg",
+        "card",
+        "secondary",
+        "muted",
+        "accent",
+        "border",
+        "charts",
+        "fg",
+        "display",
+        "font",
+        "shadow",
+        "button",
+        "stroke",
+        "density",
+        "scale",
+        "radius",
+        "primary",
+        "bg",
     ] {
         if let Some(v) = seeds.remove(seed) {
             match distance(&seeds) {
@@ -873,15 +1066,18 @@ fn try_base(theme: &Value, base: &str) -> Option<Map<String, Value>> {
         return None;
     }
     let ocolors = theme.pointer(&format!("/modes/{other}/color"))?;
-    match diff(expanded.pointer(&format!("/modes/{other}/color"))?, ocolors)? {
-        Some(d) => {
-            extra.insert(other.into(), d);
-        }
-        None => {}
+    if let Some(d) = diff(expanded.pointer(&format!("/modes/{other}/color"))?, ocolors)? {
+        extra.insert(other.into(), d);
     }
     for group in ["tokens", "fonts", "recipes"] {
-        let e = expanded.get(group).cloned().unwrap_or_else(|| json!({}));
-        let a = theme.get(group).cloned().unwrap_or_else(|| json!({}));
+        let e = expanded
+            .get(group)
+            .cloned()
+            .unwrap_or_else(|| Value::Object(Map::new()));
+        let a = theme
+            .get(group)
+            .cloned()
+            .unwrap_or_else(|| Value::Object(Map::new()));
         if let Some(d) = diff(&e, &a)? {
             extra.insert(group.into(), d);
         }
@@ -900,9 +1096,19 @@ fn sorted(seeds: Map<String, Value>) -> Map<String, Value> {
         SEEDS
             .iter()
             .position(|s| *s == k)
-            .or_else(|| ["id", "name", "extends"].iter().position(|s| *s == k).map(|i| 100 + i))
+            .or_else(|| {
+                ["id", "name", "extends"]
+                    .iter()
+                    .position(|s| *s == k)
+                    .map(|i| 100 + i)
+            })
             .or_else(|| ALL_COLORS.iter().position(|s| *s == k).map(|i| 200 + i))
-            .or_else(|| ["light", "dark", "tokens", "fonts", "recipes"].iter().position(|s| *s == k).map(|i| 300 + i))
+            .or_else(|| {
+                ["light", "dark", "tokens", "fonts", "recipes"]
+                    .iter()
+                    .position(|s| *s == k)
+                    .map(|i| 300 + i)
+            })
             .unwrap_or(400)
     };
     let mut entries: Vec<(String, Value)> = seeds.into_iter().collect();
@@ -944,15 +1150,22 @@ fn leaf_count(v: &Value) -> usize {
 /// theme JSON as it is).
 pub fn recover(theme: &Value) -> Option<Map<String, Value>> {
     let obj = theme.as_object()?;
-    let allowed = ["$schema", "id", "name", "extends", "modes", "tokens", "fonts", "recipes"];
-    if obj.get("$schema").and_then(Value::as_str) != Some(SCHEMA) || obj.keys().any(|k| !allowed.contains(&k.as_str())) {
+    let allowed = [
+        "$schema", "id", "name", "extends", "modes", "tokens", "fonts", "recipes",
+    ];
+    if obj.get("$schema").and_then(Value::as_str) != Some(SCHEMA)
+        || obj.keys().any(|k| !allowed.contains(&k.as_str()))
+    {
         return None;
     }
     let mut best: Option<Map<String, Value>> = None;
     for base in MODES {
         if let Some(seeds) = try_base(theme, base) {
             let len = Value::Object(seeds.clone()).to_string().len();
-            if best.as_ref().is_none_or(|b| len < Value::Object(b.clone()).to_string().len()) {
+            if best
+                .as_ref()
+                .is_none_or(|b| len < Value::Object(b.clone()).to_string().len())
+            {
                 best = Some(seeds);
             }
         }
@@ -963,6 +1176,7 @@ pub fn recover(theme: &Value) -> Option<Map<String, Value>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     fn args(v: Value) -> Map<String, Value> {
         v.as_object().unwrap().clone()
@@ -980,8 +1194,14 @@ mod tests {
         assert_eq!(t["modes"]["dark"]["color"]["primary"], "#eef800");
         assert_eq!(t["modes"]["dark"]["color"]["background"], "#0e0e0e");
         for mode in MODES {
-            for (x, fg) in [("primary", "primaryForeground"), ("card", "cardForeground"), ("muted", "mutedForeground"),
-                            ("background", "foreground"), ("accent", "accentForeground"), ("destructive", "destructiveForeground")] {
+            for (x, fg) in [
+                ("primary", "primaryForeground"),
+                ("card", "cardForeground"),
+                ("muted", "mutedForeground"),
+                ("background", "foreground"),
+                ("accent", "accentForeground"),
+                ("destructive", "destructiveForeground"),
+            ] {
                 let r = contrast(c(&t, mode, x), c(&t, mode, fg));
                 assert!(r >= 4.5, "{mode} {x}/{fg}: {r}");
             }
@@ -990,7 +1210,10 @@ mod tests {
         // Yellow on white fails 3:1, so light mode darkens it.
         assert_ne!(t["modes"]["light"]["color"]["primary"], "#eef800");
         assert_eq!(t["tokens"]["radius"]["md"], 0);
-        assert_eq!(t["recipes"]["Button"]["root"][0]["style"]["borderRadius"], "$radius.full");
+        assert_eq!(
+            t["recipes"]["Button"]["root"][0]["style"]["borderRadius"],
+            "$radius.full"
+        );
         assert_eq!(t["modes"]["dark"]["shadow"]["sm"], json!([]));
     }
 
@@ -1006,13 +1229,22 @@ mod tests {
         ] {
             let t = expand(&args(a.clone())).unwrap();
             let seeds = recover(&t).unwrap_or_else(|| panic!("{a}"));
-            assert_eq!(expand(&seeds).unwrap(), t, "{a} -> {}", Value::Object(seeds.clone()));
+            assert_eq!(
+                expand(&seeds).unwrap(),
+                t,
+                "{a} -> {}",
+                Value::Object(seeds.clone())
+            );
         }
     }
 
     #[test]
     fn unknown_arguments_are_refused() {
-        assert!(expand(&args(json!({"primry": "#000000"}))).unwrap_err().contains("Unknown theme argument"));
+        assert!(
+            expand(&args(json!({"primry": "#000000"})))
+                .unwrap_err()
+                .contains("Unknown theme argument")
+        );
         assert!(expand(&args(json!({"bg": "red"}))).is_err());
     }
 }
