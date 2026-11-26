@@ -192,6 +192,10 @@ pub enum ExprKind {
     /// `{key: value}`. Keys keep their order; a repeated key appears twice
     /// here, and upstream keeps the last one.
     Map(Vec<MapEntry>),
+    /// `#rrggbb` / `#rrggbbaa`, lowercased: only in the
+    /// [`Dialect::EXTENDED`](super::Dialect) dialect, and only valid inside
+    /// `theme(...)`.
+    Color(String),
 }
 
 /// A number literal: the token text and the value it reads as.

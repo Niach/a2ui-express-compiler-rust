@@ -66,7 +66,6 @@ use crate::Error;
 use crate::compile::{CompileError, Compiler};
 use crate::schema::CatalogSet;
 use crate::state::RendererState;
-use crate::syntax;
 
 pub use lexer::{has_format_content, unwrap, wrap};
 pub use stream::{AfterRejectedBlock, ResponseStream};
@@ -143,7 +142,7 @@ impl Inner {
             return Ok(self.compiler.compile(payload, &self.surface_id)?);
         }
         let body = crate::compile::strip_sentinel_tags(payload);
-        let parsed = syntax::parse(&body);
+        let parsed = self.compiler.parse_block(&body);
         let mut program = parsed.program;
         if let Some(line) = parsed.errors.iter().map(|e| e.line()).min() {
             program.statements.retain(|s| s.span.start.line < line);

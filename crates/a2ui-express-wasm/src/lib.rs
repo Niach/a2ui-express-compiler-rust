@@ -148,6 +148,30 @@ export interface Catalogs {
 }
 "#;
 
+#[cfg(feature = "patch")]
+#[wasm_bindgen(typescript_custom_section)]
+const TS_PATCH: &str = r##"
+/** What `compilePatch` returns: the messages that change the surface, and the new screen. */
+export interface Patch {
+  messages: A2uiMessage[];
+  /** The screen with the patch applied: the state to patch next. */
+  screen: string;
+}
+/**
+ * Compiles `patch` (reassignments, `$/path = v`, `style(...)`, `theme(...)`, `del(name)`) against
+ * `screen`, the Express of a surface that exists. Needs a catalog that declares the
+ * `at_exponential_express` extension.
+ */
+export function compilePatch(catalogs: CatalogDocuments, screen: string, patch: string, options?: CompileOptions): Patch;
+/** Expands `theme(...)` arguments (colours as `"#rrggbb"`) into the eUI theme `theme(...)` compiles to. */
+export function expandTheme(seeds: Record<string, unknown>): Record<string, unknown>;
+/** The style shorthand table (`s="col g12 p16"`), for grammar generators. */
+export function styleTable(): Record<string, unknown>;
+export interface Catalogs {
+  compilePatch(screen: string, patch: string, options?: CompileOptions): Patch;
+}
+"##;
+
 #[cfg(feature = "prompt")]
 #[wasm_bindgen(typescript_custom_section)]
 const TS_PROMPT: &str = r#"
@@ -189,6 +213,46 @@ fn to_js(value: &[Value]) -> JsValue {
     // Serializing a `Value` cannot fail, and its text is valid JSON.
     let text = serde_json::to_string(value).unwrap_or_else(|_| "null".to_owned());
     JSON::parse(&text).unwrap_or(JsValue::NULL)
+}
+
+#[cfg(feature = "patch")]
+fn to_js_value(value: &Value) -> JsValue {
+    let text = serde_json::to_string(value).unwrap_or_else(|_| "null".to_owned());
+    JSON::parse(&text).unwrap_or(JsValue::NULL)
+}
+
+/// Compiles a patch against a screen: `{messages, screen}`.
+#[cfg(feature = "patch")]
+#[wasm_bindgen(js_name = compilePatch, skip_typescript)]
+pub fn compile_patch(
+    catalogs: JsValue,
+    screen: &str,
+    patch: &str,
+    options: Option<JsValue>,
+) -> JsResult<JsValue> {
+    let (surface_id, version) = ok(ffi::compile_options(&opt(options)?))?;
+    let out = ok(ffi::compile_patch(
+        from_js(&catalogs)?,
+        screen,
+        patch,
+        surface_id.as_deref(),
+        version.as_deref(),
+    ))?;
+    Ok(to_js_value(&out))
+}
+
+/// Expands `theme(...)` arguments into an eUI theme.
+#[cfg(feature = "patch")]
+#[wasm_bindgen(js_name = expandTheme, skip_typescript)]
+pub fn expand_theme(seeds: JsValue) -> JsResult<JsValue> {
+    Ok(to_js_value(&ok(ffi::expand_theme(&from_js(&seeds)?))?))
+}
+
+/// The style shorthand table.
+#[cfg(feature = "patch")]
+#[wasm_bindgen(js_name = styleTable, skip_typescript)]
+pub fn style_table() -> JsValue {
+    to_js_value(&ffi::style_table())
 }
 
 /// An `Error` named after its category, with `category` and `partial`.
@@ -352,6 +416,24 @@ impl Catalogs {
         Ok(StreamCompiler {
             inner: ok(self.inner.stream(&options))?,
         })
+    }
+
+    /// Compiles a patch against a screen: `{messages, screen}`.
+    #[cfg(feature = "patch")]
+    #[wasm_bindgen(js_name = compilePatch)]
+    pub fn compile_patch(
+        &self,
+        screen: &str,
+        patch: &str,
+        options: Option<JsValue>,
+    ) -> JsResult<JsValue> {
+        let (surface_id, version) = ok(ffi::compile_options(&opt(options)?))?;
+        ok(self.inner.check_version(version.as_deref()))?;
+        Ok(to_js_value(&ok(self.inner.compile_patch(
+            screen,
+            patch,
+            surface_id.as_deref(),
+        ))?))
     }
 
     /// Writes A2UI messages back as one Express block.

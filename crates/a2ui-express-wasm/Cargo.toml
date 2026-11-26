@@ -13,11 +13,13 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["decompile", "prompt"]
+default = ["decompile", "prompt", "patch"]
 # `decompile`: A2UI JSON back to Express.
 decompile = []
 # `generatePrompt` / `agentCallableFunctions`.
 prompt = []
+# `compilePatch`, `expandTheme`, `styleTable` (the at_exponential_express extension's agent side).
+patch = []
 
 [dependencies]
 a2ui-express-ffi = { path = "../a2ui-express-ffi" }

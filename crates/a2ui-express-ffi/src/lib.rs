@@ -185,6 +185,35 @@ pub fn compile(
     Catalogs::new(catalogs, version)?.compile(source, surface_id)
 }
 
+/// Compiles `patch` against `screen` (the Express of a surface that
+/// exists): `{messages, screen}`, the messages that change the surface and
+/// the new screen. Needs a catalog declaring `at_exponential_express`.
+pub fn compile_patch(
+    catalogs: Value,
+    screen: &str,
+    patch: &str,
+    surface_id: Option<&str>,
+    version: Option<&str>,
+) -> Result<Value> {
+    Catalogs::new(catalogs, version)?.compile_patch(screen, patch, surface_id)
+}
+
+/// Expands `theme(...)` arguments (a JSON map; colours as `"#rrggbb"`)
+/// into the eUI theme `theme(...)` compiles to.
+pub fn expand_theme(seeds: &Value) -> Result<Value> {
+    let Some(map) = seeds.as_object() else {
+        return Err(FfiError::argument(
+            "expand_theme takes a map of theme arguments",
+        ));
+    };
+    a2ui_express::ext::theme::expand(map).map_err(|m| FfiError::new(Category::Validation, m))
+}
+
+/// The style shorthand table, for grammar generators.
+pub fn style_table() -> Value {
+    a2ui_express::ext::style::table_json()
+}
+
 /// Parses a decompile order: `"upstream"` (default) or `"top-down"`.
 pub fn parse_order(order: Option<&str>) -> Result<Order> {
     match order {
@@ -577,6 +606,21 @@ impl Catalogs {
             .base
             .compiler()
             .compile(source, surface_id.unwrap_or(DEFAULT_SURFACE_ID))?)
+    }
+
+    /// Compiles `patch` against `screen`: `{messages, screen}`.
+    pub fn compile_patch(
+        &self,
+        screen: &str,
+        patch: &str,
+        surface_id: Option<&str>,
+    ) -> Result<Value> {
+        let p = self.base.compiler().compile_patch(
+            screen,
+            patch,
+            surface_id.unwrap_or(DEFAULT_SURFACE_ID),
+        )?;
+        Ok(json!({"messages": p.messages, "screen": p.screen}))
     }
 
     /// Writes A2UI messages back as one Express block.

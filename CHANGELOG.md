@@ -6,6 +6,30 @@ All crates and bindings of this workspace share one version.
 
 A2UI 1.0 only (#AXC-19, #VAPP-289).
 
+### Added: the `at_exponential_express` extension (genUI round 4)
+
+On only for a catalog that declares `metadata.extensions.at_exponential_express`;
+upstream Express is unchanged (282/282). See `docs/express-extensions.md`.
+
+- `theme(...)`: about 14 seeds expanded by a deterministic, contrast-checked
+  expander into an eUI theme for both modes, in
+  `createSurface.metadata.extensions.at_exponential_theme`; on a live surface a
+  `callRendererFunction` to `setTheme` (#VAPP-304). `#rrggbb[aa]` literals
+  inside `theme(...)`. Decompile recovers the seeds.
+- `s="col g12 p16 bg-card r-lg"` and `style(name, "…")` classes: a style
+  shorthand over eUI's Box whitelist, written back canonically by decompile
+  (with shared classes and hoisted children inline again).
+- `enter=`, `exit=`, `stagger=`, `delay=` on any component; `Motion(ref=…)`
+  from the catalog's registry; `Motion(kf="…")` keyframes.
+- `Compiler::compile_patch(screen, patch)`: reassignments, `$/path = …`,
+  `style()`, `theme()`, `del()` against an existing surface; only what
+  changed is sent. FFI `compile_patch`, `expand_theme`, `style_table`; wasm
+  `compilePatch`, `expandTheme`, `styleTable` (feature `patch`); Python
+  `compile_patch`, `expand_theme`, `style_table`, `Catalogs.compile_patch`.
+- `syntax::Dialect`, `parse_dialect`, `lexer::lex_with`,
+  `normalize::normalize_dialect`; `ExprKind::Color`.
+- Fixtures `conformance/extensions/*.json`, replayed by Rust, wasm and Python.
+
 ### Breaking
 
 - v0.9 and v0.9.1 are gone. A catalog must declare `protocolVersion` 1.0:

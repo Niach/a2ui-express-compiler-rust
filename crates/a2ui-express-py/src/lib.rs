@@ -171,6 +171,43 @@ fn compile(
     to_py_list(py, messages)
 }
 
+/// Compiles a patch against a screen (the Express of a surface that
+/// exists). Returns ``{"messages": [...], "screen": "..."}``: the messages
+/// that change the surface, and the new screen to patch next. Needs a
+/// catalog that declares the ``at_exponential_express`` extension.
+#[pyfunction]
+#[pyo3(signature = (catalogs, screen, patch, *, surface_id=None, version=None))]
+fn compile_patch(
+    py: Python<'_>,
+    catalogs: &Bound<'_, PyAny>,
+    screen: &str,
+    patch: &str,
+    surface_id: Option<&str>,
+    version: Option<&str>,
+) -> PyResult<Py<PyAny>> {
+    let catalogs = from_py(catalogs)?;
+    let out = ok(
+        py,
+        ffi::compile_patch(catalogs, screen, patch, surface_id, version),
+    )?;
+    to_py(py, &out)
+}
+
+/// Expands ``theme(...)`` arguments (a dict; colours as ``"#rrggbb"``) into
+/// the eUI theme ``theme(...)`` compiles to.
+#[pyfunction]
+fn expand_theme(py: Python<'_>, seeds: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    let seeds = from_py(seeds)?;
+    let theme = ok(py, ffi::expand_theme(&seeds))?;
+    to_py(py, &theme)
+}
+
+/// The style shorthand table (``s="col g12 p16"``), for grammar generators.
+#[pyfunction]
+fn style_table(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    to_py(py, &ffi::style_table())
+}
+
 /// Writes A2UI messages back as one Express block (without tags).
 ///
 /// `order` is `"upstream"` (message order) or `"top-down"` (`root` first,
@@ -347,6 +384,18 @@ impl Catalogs {
         to_py_list(py, messages)
     }
 
+    #[pyo3(signature = (screen, patch, *, surface_id=None))]
+    fn compile_patch(
+        &self,
+        py: Python<'_>,
+        screen: &str,
+        patch: &str,
+        surface_id: Option<&str>,
+    ) -> PyResult<Py<PyAny>> {
+        let out = ok(py, self.inner.compile_patch(screen, patch, surface_id))?;
+        to_py(py, &out)
+    }
+
     #[pyo3(signature = (messages, *, keyword_args=false, order="upstream"))]
     fn decompile(
         &self,
@@ -490,6 +539,9 @@ fn a2ui_express(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("CatalogError", py.get_type::<CatalogError>())?;
     m.add_function(wrap_pyfunction!(compile, m)?)?;
     m.add_function(wrap_pyfunction!(decompile, m)?)?;
+    m.add_function(wrap_pyfunction!(compile_patch, m)?)?;
+    m.add_function(wrap_pyfunction!(expand_theme, m)?)?;
+    m.add_function(wrap_pyfunction!(style_table, m)?)?;
     m.add_function(wrap_pyfunction!(parse_response, m)?)?;
     m.add_function(wrap_pyfunction!(unwrap, m)?)?;
     m.add_function(wrap_pyfunction!(wrap, m)?)?;

@@ -31,6 +31,7 @@ use serde_json::{Map, Value, json};
 use super::data::{set_nested_path, to_json_pointer};
 use super::pass::{Ctx, Pass};
 use super::{CompIds, CompileError, Compiler, Scope, Unit};
+use crate::ext::{Desugared, Desugarer};
 use crate::syntax::{self, Expr, Statement, StatementKind, Target};
 
 /// What a component depends on in another variable.
@@ -76,6 +77,8 @@ struct ScopeState {
     var_ids: HashMap<String, String>,
     cache: HashMap<String, CompCache>,
     data_cache: HashMap<String, DataCache>,
+    /// The theme the surface was created with or last changed to.
+    emitted_theme: Option<Value>,
 }
 
 /// One change to the session, recorded so a failed step can be undone.
@@ -87,6 +90,7 @@ enum Undo {
     Data(usize, String, Option<Value>),
     VarId(usize, String, Option<String>),
     EmittedUnit(usize),
+    Theme(usize, Option<Value>),
 }
 
 /// A step's messages, and how to undo it.
@@ -103,6 +107,7 @@ struct CacheUndo {
     prefix: String,
     statements: Vec<Arc<Statement>>,
     added_known: Vec<String>,
+    desugarer: Desugarer,
 }
 
 /// The incremental compiler of one block.
@@ -115,6 +120,8 @@ pub(crate) struct ScopeSession {
     pub has_emitted: bool,
     cached_prefix: String,
     cached: Vec<Arc<Statement>>,
+    /// The extension's style classes of the cached statements.
+    desugarer: Desugarer,
     known: HashSet<String>,
     /// Components (surface, id) that a later step re-emitted under another
     /// id, and that no other scope holds: the caller drops them from its
@@ -200,6 +207,7 @@ impl ScopeSession {
         if let Some(c) = step.cache {
             self.cached_prefix = c.prefix;
             self.cached = c.statements;
+            self.desugarer = c.desugarer;
             for name in c.added_known {
                 self.known.remove(&name);
             }
@@ -239,27 +247,53 @@ impl ScopeSession {
             Undo::EmittedUnit(i) => {
                 self.emitted_units.remove(&i);
             }
+            Undo::Theme(i, old) => {
+                if let Some(s) = self.scopes.get_mut(&i) {
+                    s.emitted_theme = old;
+                }
+            }
         }
     }
 
-    /// The statements of `text`, parsing only what follows the text the
-    /// last cached step saw.
-    fn statements(&self, text: &str) -> Result<Vec<Arc<Statement>>, CompileError> {
-        if !self.cached_prefix.is_empty()
+    /// The statements of `text` (the extension's sugar expanded), parsing
+    /// only what follows the text the last cached step saw, and the style
+    /// classes they define.
+    fn statements(
+        &self,
+        compiler: &Compiler,
+        text: &str,
+    ) -> Result<(Vec<Arc<Statement>>, Desugarer), CompileError> {
+        let dialect = compiler.dialect();
+        let (mut out, mut desugarer, parsed) = if !self.cached_prefix.is_empty()
             && text.starts_with(&self.cached_prefix)
             && is_prefix_boundary(text, self.cached_prefix.len())
         {
             let delta = &text[self.cached_prefix.len()..];
-            let mut out = self.cached.clone();
-            if !delta.trim().is_empty() {
-                let parsed = syntax::parse_at(delta, syntax::Pos::START, &self.known);
-                let program = parsed.into_result()?;
-                out.extend(program.statements.into_iter().map(Arc::new));
+            let parsed = if delta.trim().is_empty() {
+                Vec::new()
+            } else {
+                syntax::parse_dialect(delta, syntax::Pos::START, &self.known, dialect)
+                    .into_result()?
+                    .statements
+            };
+            (self.cached.clone(), self.desugarer.clone(), parsed)
+        } else {
+            let parsed = syntax::parse_dialect(text, syntax::Pos::START, &HashSet::new(), dialect)
+                .into_result()?
+                .statements;
+            (Vec::new(), Desugarer::default(), parsed)
+        };
+        match compiler.extension() {
+            None => out.extend(parsed.into_iter().map(Arc::new)),
+            Some(ext) => {
+                for stmt in &parsed {
+                    if let Desugared::Statement(s) = desugarer.statement(stmt, ext, compiler)? {
+                        out.push(Arc::new(*s));
+                    }
+                }
             }
-            return Ok(out);
         }
-        let program = syntax::parse(text).into_result()?;
-        Ok(program.statements.into_iter().map(Arc::new).collect())
+        Ok((out, desugarer))
     }
 
     fn step(
@@ -271,7 +305,7 @@ impl ScopeSession {
         cache_prefix: bool,
         undo: &mut Vec<Undo>,
     ) -> Result<(Vec<Value>, Option<CacheUndo>), CompileError> {
-        let statements = self.statements(text)?;
+        let (statements, desugarer) = self.statements(compiler, text)?;
         let (scopes, units) =
             compiler.build_units(statements.iter().map(|s| &**s), &self.surface_id)?;
         if units.is_empty() {
@@ -282,6 +316,9 @@ impl ScopeSession {
         }
         let mut ctx = Ctx::new();
         ctx.allow_pending = !is_final;
+        if compiler.extension().is_some() {
+            ctx.classes = std::sync::Arc::new(desugarer.classes().clone());
+        }
         let mut active: HashSet<String> = existing.clone();
         let mut out = Vec::new();
         for (idx, unit) in units.iter().enumerate() {
@@ -368,6 +405,7 @@ impl ScopeSession {
             prefix: std::mem::replace(&mut self.cached_prefix, text.to_owned()),
             statements: std::mem::replace(&mut self.cached, statements),
             added_known,
+            desugarer: std::mem::replace(&mut self.desugarer, desugarer),
         };
         Ok((out, Some(cache)))
     }
@@ -405,10 +443,20 @@ impl ScopeSession {
                         "surface() extensions require a surface-creating scope with a root component.",
                     ));
                 }
-                if !components.is_empty() || !data.is_empty() {
-                    return self.updates(
-                        compiler, idx, scope, components, data, true, false, false, undo,
-                    );
+                if !components.is_empty() || !data.is_empty() || scope.theme.is_some() {
+                    let mut out = self.theme_delta(compiler, idx, scope, ctx, undo)?;
+                    let theme_only =
+                        components.is_empty() && data.is_empty() && scope.theme.is_some();
+                    let emitted = &self.scopes[&idx];
+                    if !(theme_only
+                        && emitted.emitted_components.is_empty()
+                        && emitted.emitted_data.is_empty())
+                    {
+                        out.extend(self.updates(
+                            compiler, idx, scope, components, data, true, false, false, undo,
+                        )?);
+                    }
+                    return Ok(out);
                 }
                 return Err(CompileError::undefined_root("root"));
             }
@@ -416,7 +464,13 @@ impl ScopeSession {
                 compiler, idx, scope, &ids, components, data, ctx, is_final, undo,
             );
         }
-        self.updates(
+        let mut out = self.theme_delta(compiler, idx, scope, ctx, undo)?;
+        let theme_only = components.is_empty() && data.is_empty() && scope.theme.is_some();
+        let emitted = &self.scopes[&idx];
+        if theme_only && emitted.emitted_components.is_empty() && emitted.emitted_data.is_empty() {
+            return Ok(out);
+        }
+        out.extend(self.updates(
             compiler,
             idx,
             scope,
@@ -426,7 +480,32 @@ impl ScopeSession {
             has_pending,
             exists,
             undo,
-        )
+        )?);
+        Ok(out)
+    }
+
+    /// The theme change of a surface that exists: a `setTheme` call when
+    /// the scope's theme differs from the one last emitted.
+    fn theme_delta(
+        &mut self,
+        compiler: &Compiler,
+        idx: usize,
+        scope: &Scope<'_>,
+        ctx: &mut Ctx,
+        undo: &mut Vec<Undo>,
+    ) -> Result<Vec<Value>, CompileError> {
+        let Some(theme) = &scope.theme else {
+            return Ok(Vec::new());
+        };
+        let state = self.scopes.get_mut(&idx).expect("scope state");
+        if state.emitted_theme.as_ref() == Some(theme) {
+            return Ok(Vec::new());
+        }
+        let message = compiler.theme_call(&scope.surface_id, theme, ctx)?;
+        let old = state.emitted_theme.replace(theme.clone());
+        undo.push(Undo::Theme(idx, old));
+        self.has_emitted = true;
+        Ok(vec![message])
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -446,17 +525,18 @@ impl ScopeSession {
         for (path, value) in &data {
             set_nested_path(&mut data_model, path, value.clone())?;
         }
-        let metadata = match scope.raw_extensions {
+        let extensions = match scope.raw_extensions {
             Some(raw) => {
                 let mut pass = Pass::new(compiler, &scope.syms, ids, ctx);
                 match pass.extensions_map(raw, &format!("surface '{}'", scope.surface_id)) {
-                    Ok(ext) => Some(json!({ "extensions": ext })),
+                    Ok(ext) => Some(ext),
                     Err(e) if e.is_pending() && !is_final => return Ok(Vec::new()),
                     Err(e) => return Err(e),
                 }
             }
             None => None,
         };
+        let metadata = compiler.surface_metadata(scope, extensions)?;
         let messages = compiler.create_messages(
             scope,
             components
@@ -478,6 +558,10 @@ impl ScopeSession {
         }
         state.created = true;
         undo.push(Undo::Created(idx));
+        if let Some(theme) = &scope.theme {
+            let old = state.emitted_theme.replace(theme.clone());
+            undo.push(Undo::Theme(idx, old));
+        }
         self.has_emitted = true;
         Ok(messages)
     }

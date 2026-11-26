@@ -29,8 +29,14 @@ pub fn normalize(source: &str) -> String {
 /// A streaming caller passes the names assigned by statements it has
 /// already emitted, which are no longer in the text it normalizes.
 pub fn normalize_with(source: &str, known: &HashSet<String>) -> String {
+    normalize_dialect(source, known, false)
+}
+
+/// [`normalize_with`]; with `hex_colors`, a `#rrggbb[aa]` colour literal is
+/// a token kept as written rather than the start of a `#` comment.
+pub fn normalize_dialect(source: &str, known: &HashSet<String>, hex_colors: bool) -> String {
     let chars: Vec<char> = source.chars().collect();
-    let segments = segment(&chars);
+    let segments = segment(&chars, hex_colors);
 
     // Bracket depth before each character of the plain segments.
     let mut depth = 0i32;
@@ -139,8 +145,17 @@ fn lazy_close(chars: &[char], mut i: usize, close: &str, escapes: bool) -> Optio
 
 /// `_SQL_COMMENT_OR_TOKEN_RE` at `i`: the end of a string or comment token,
 /// and whether it was a `--` comment.
-fn token_at(chars: &[char], i: usize) -> Option<(usize, bool)> {
+fn token_at(chars: &[char], i: usize, hex_colors: bool) -> Option<(usize, bool)> {
     let c = chars[i];
+    if hex_colors && c == '#' {
+        let ascii: Vec<u8> = chars[i..(i + 10).min(chars.len())]
+            .iter()
+            .map(|&c| if c.is_ascii() { c as u8 } else { b' ' })
+            .collect();
+        if let Some(len) = super::lexer::hex_color_at(&ascii, 0) {
+            return Some((i + len, false));
+        }
+    }
     if c == 'r' || c == 'R' {
         // [rR]"""[\s\S]*?"""
         if starts(chars, i + 1, "\"\"\"") {
@@ -193,12 +208,12 @@ fn token_at(chars: &[char], i: usize) -> Option<(usize, bool)> {
     None
 }
 
-fn segment(chars: &[char]) -> Vec<Segment> {
+fn segment(chars: &[char], hex_colors: bool) -> Vec<Segment> {
     let mut segments = Vec::new();
     let mut plain_start = 0;
     let mut i = 0;
     while i < chars.len() {
-        match token_at(chars, i) {
+        match token_at(chars, i, hex_colors) {
             Some((end, sql)) => {
                 if i > plain_start {
                     segments.push(Segment {

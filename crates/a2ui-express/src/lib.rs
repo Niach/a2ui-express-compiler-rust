@@ -18,6 +18,7 @@
 
 pub mod compile;
 pub mod decompile;
+pub mod ext;
 pub mod prompt;
 pub mod response;
 pub mod schema;

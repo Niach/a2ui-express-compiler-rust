@@ -56,12 +56,12 @@ jobs:
           node-version: 22
       - name: Build (wasm-pack --target web, full and renderer)
         run: scripts/build-npm.sh | tee "$RUNNER_TEMP/sizes.txt"
-      - name: Size budget (renderer build < 200 KB gzipped)
+      - name: Size budget (renderer build < 225 KB gzipped; raised from 200 KB for the at_exponential_express extension, Danny 2026-11-26)
         run: |
           gz=$(gzip -9c packages/npm/dist/renderer/a2ui_express_bg.wasm | wc -c)
           echo "::notice title=wasm size::$(tr '\n' ';' < "$RUNNER_TEMP/sizes.txt")"
-          if [ "$gz" -ge 200000 ]; then
-            echo "::error title=wasm size budget::renderer build is $gz bytes gzipped (budget 200000)"
+          if [ "$gz" -ge 225000 ]; then
+            echo "::error title=wasm size budget::renderer build is $gz bytes gzipped (budget 225000)"
             exit 1
           fi
       - run: npm ci
